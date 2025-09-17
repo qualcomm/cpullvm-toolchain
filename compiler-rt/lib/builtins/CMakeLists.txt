@@ -964,6 +964,29 @@ else ()
                               C_STANDARD 11
                               CXX_STANDARD 17
                               PARENT_TARGET builtins)
+      if(arch MATCHES "aarch64")
+        add_compiler_rt_runtime(clang_rt.builtins-pacret-b-key-bti
+                                STATIC
+                                ARCHS ${arch}
+                                SOURCES ${${arch}_SOURCES}
+                                DEFS "${BUILTIN_DEFS}"
+                                CFLAGS ${BUILTIN_CFLAGS_${arch}} -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti
+                                PARENT_TARGET builtins)
+        add_compiler_rt_runtime(clang_rt.builtins-pacret
+                                STATIC
+                                ARCHS ${arch}
+                                SOURCES ${${arch}_SOURCES}
+                                DEFS "${BUILTIN_DEFS}"
+                                CFLAGS ${BUILTIN_CFLAGS_${arch}} -march=armv8.5-a -mbranch-protection=pac-ret+leaf
+                                PARENT_TARGET builtins)
+        add_compiler_rt_runtime(clang_rt.builtins-pacret-bti
+                                STATIC
+                                ARCHS ${arch}
+                                SOURCES ${${arch}_SOURCES}
+                                DEFS "${BUILTIN_DEFS}"
+                                CFLAGS ${BUILTIN_CFLAGS_${arch}} -march=armv8.5-a -mbranch-protection=pac-ret+leaf+bti
+                                PARENT_TARGET builtins)
+      endif ()
       cmake_pop_check_state()
     endif ()
   endforeach ()
