@@ -272,6 +272,16 @@ macro(test_targets)
     elseif("${COMPILER_RT_DEFAULT_TARGET_ARCH}" MATCHES "nvptx")
       test_target_arch(nvptx64 "" "--nvptx64-nvidia-cuda" "-nogpulib" "-flto"
                        "-fconvergent-functions" "-c")
+    # Rule for aarch64 baremetal library
+    # Match the entire triple
+    elseif ("${COMPILER_RT_DEFAULT_TARGET_TRIPLE}" MATCHES "aarch64-unknown-none-elf")
+      set (CAN_TARGET_aarch64 1)
+      list(APPEND COMPILER_RT_SUPPORTED_ARCH aarch64)
+    # Rule for armv7 baremetal library
+    # Match the entire triple
+    elseif ("${COMPILER_RT_DEFAULT_TARGET_TRIPLE}" MATCHES "arm-unknown-none-eabi")
+      set (CAN_TARGET_armv7 1)
+      list(APPEND COMPILER_RT_SUPPORTED_ARCH armv7)
     elseif("${COMPILER_RT_DEFAULT_TARGET_ARCH}" MATCHES "arm")
       if(WIN32)
         test_target_arch(arm "" "" "")
