@@ -65,7 +65,7 @@ done
 
 # --- Set the Build flags ---
 BUILD_MODE="Release"
-ASSERTION_MODE="ON"
+ASSERTION_MODE="OFF"
 ARM32_LINUX_TRIPLE="arm-linux-gnueabi"
 AARCH64_LINUX_TRIPLE="aarch64-linux-gnu"
 COMPILER_RT_ARM32_LINUX_BUILDDIR="${WORKSPACE}/build/compiler-rt/arm32/linux"
