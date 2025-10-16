@@ -57,7 +57,7 @@ jobs:
         run: mkdir -p "${SRC_DIR}"
 
       - name: Checkout qualcomm/cpullvm-toolchain
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: qualcomm/cpullvm-toolchain
           ref: "${{ env.BASE_BRANCH_NAME }}"
