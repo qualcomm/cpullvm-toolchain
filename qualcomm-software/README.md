@@ -11,4 +11,5 @@ required for building C and C++ toolchains optimized for embedded development.
 ## Quick Links
 ### [Building CPULLVM Toolchain for Embedded](https://github.com/qualcomm/cpullvm-toolchain/qualcomm-software/README.md)
 
-### Getting releases binary - TBD
+### Getting releases binary -- TBD
+
