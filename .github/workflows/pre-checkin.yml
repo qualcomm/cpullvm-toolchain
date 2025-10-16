@@ -75,7 +75,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "${SRC_DIR}/llvm-top/llvm/tools"
-          git clone https://github.com/qualcomm/eld.git "${SRC_DIR}/llvm-top/llvm/tools/eld"
+          git clone https://github.com/qualcomm/eld.git "${SRC_DIR}/llvm-top/llvm/tools/eld" -b "release/21.x"
           cd "${SRC_DIR}/llvm-top/llvm/tools/eld"
           git checkout 65ea860802c41ef5c0becff9750a350495de27b0
 

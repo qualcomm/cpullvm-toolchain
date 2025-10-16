@@ -13,7 +13,7 @@
 set -euo pipefail
 
 readonly ELD_REPO_URL="https://github.com/qualcomm/eld.git"
-readonly ELD_BRANCH="main"
+readonly ELD_BRANCH="release/21.x"
 
 readonly MUSL_EMBEDDED_REPO_URL="https://github.com/qualcomm/musl-embedded.git"
 readonly MUSL_EMBEDDED_BRANCH="main"
