@@ -9,6 +9,7 @@ Our mission is to deliver a robust LLVM-based platform with all the essential li
 required for building C and C++ toolchains optimized for embedded development.
 
 ## Quick Links
-### [Building CPULLVM Toolchain for Embedded](https://github.com/qualcomm/cpullvm-toolchain/qualcomm-software/README.md)
+### [Building CPULLVM Toolchain for Embedded](https://github.com/qualcomm/cpullvm-toolchain/blob/release/qualcomm-software/21.x/qualcomm-software/embedded/README.md)
 
 ### Getting releases binary - TBD
+
