@@ -1,15 +1,6 @@
 name: pre-checkin
 
-on:
-  pull_request:
-  workflow_call:
-    inputs:
-      repo_name:
-        required: true
-        type: string
-      pr_branch:
-        required: true
-        type: string
+on: pull_request
 
 jobs:
   build:
@@ -22,9 +13,6 @@ jobs:
       statuses: write
 
     env:
-      REPO_NAME: "${{ github.event_name == 'workflow_call' && inputs.repo_name || github.repository }}"
-      PR_BRANCH: "${{ github.event_name == 'workflow_call' && inputs.pr_branch || github.head_ref }}"
-      BASE_BRANCH_NAME: "${{ github.event.pull_request.base.ref }}"
       SRC_DIR: "${{ github.workspace }}/src"
       BUILD_DIR: "${{ github.workspace }}/build"
       INSTALL_DIR: "${{ github.workspace }}/install"
@@ -56,44 +44,26 @@ jobs:
         shell: bash
         run: mkdir -p "${SRC_DIR}"
 
-      - name: Checkout qualcomm/cpullvm-toolchain
+      - name: Checkout qualcomm/cpullvm-toolchain PR branch
         uses: actions/checkout@v4
         with:
-          repository: qualcomm/cpullvm-toolchain
-          ref: "${{ env.BASE_BRANCH_NAME }}"
-          path: "${{ env.SRC_DIR }}/llvm-top"
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          path: ${{ env.SRC_DIR }}/llvm-top
           fetch-depth: 0
 
       - name: Fetch musl-embedded
-        shell: bash
-        run: |
-          set -euo pipefail
-          git clone https://github.com/qualcomm/musl-embedded.git "${{ env.SRC_DIR }}/musl-embedded"
+        uses: actions/checkout@v4
+        with:
+          repository: qualcomm/musl-embedded
+          path: ${{ env.SRC_DIR }}/musl-embedded
 
       - name: Fetch qualcomm/eld
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "${SRC_DIR}/llvm-top/llvm/tools"
-          git clone https://github.com/qualcomm/eld.git "${SRC_DIR}/llvm-top/llvm/tools/eld"
-          cd "${SRC_DIR}/llvm-top/llvm/tools/eld"
-          git checkout 65ea860802c41ef5c0becff9750a350495de27b0
-
-      - name: Fetch and update PR repository
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "PR repository: ${REPO_NAME}"
-          if [[ "${REPO_NAME}" == */cpullvm-toolchain ]]; then
-            cd "${SRC_DIR}/llvm-top"
-          elif [[ "${REPO_NAME}" == */musl-embedded ]]; then
-            cd "${SRC_DIR}/musl-embedded"
-          else
-            echo "Unsupported repository: ${REPO_NAME}"
-            exit 1
-          fi
-          git fetch origin
-          git reset --hard "origin/${PR_BRANCH}"
+        uses: actions/checkout@v4
+        with:
+          repository: qualcomm/eld
+          path: ${{ env.SRC_DIR }}/llvm-top/llvm/tools/eld
+          ref: 65ea860802c41ef5c0becff9750a350495de27b0
 
       - name: Apply patches
         shell: bash
