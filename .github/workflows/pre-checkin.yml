@@ -5,6 +5,7 @@ on:
 
 jobs:
   base:
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
     uses: ./.github/workflows/base-build.yml
     with:
       build-script: "src/qualcomm-software/embedded/scripts/build.sh"
