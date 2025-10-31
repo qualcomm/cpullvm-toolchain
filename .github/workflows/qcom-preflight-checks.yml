@@ -3,9 +3,13 @@ on:
   # FIXME: these branch targets might need to be revisited to make this work
   # as we create new release branches.
   pull_request_target:
-    branches: [ "qualcomm-software" ]
+    branches:
+      - 'qualcomm-software'
+      - 'release/qualcomm-software/**'
   push:
-    branches: [ "qualcomm-software" ]
+    branches:
+      - 'qualcomm-software'
+      - 'release/qualcomm-software/**'
   workflow_dispatch:
 
 permissions:
