@@ -47,16 +47,10 @@ jobs:
       COMPILER_RT_AARCH64_BM_BUILDDIR: "${{ github.workspace }}/build/compiler-rt/aarch64/baremetal"
       COMPILER_RT_ARM32_BM_FLAGS: "--target=arm-none-eabi -mcpu=cortex-a9 -ffunction-sections -fdata-sections -mfloat-abi=softfp -mfpu=neon -nostdlibinc"
       COMPILER_RT_AARCH64_BM_FLAGS: "--target=aarch64-none-elf -mcpu=cortex-a53 -ffunction-sections -fdata-sections -nostdlibinc"
-
-      # aarch64 cross compilation environment
       SYS_ROOT_AARCH64: "/usr"
-      AARCH64_LIBC: "$SYS_ROOT_AARCH64/aarch64-none-linux-gnu/libc"
-      AARCH64_LINUX_FLAGS: "--target=aarch64-linux-gnu --sysroot=$AARCH64_LIBC --gcc-toolchain=$SYS_ROOT_AARCH64 -pthread"
-
-      # Help the cross-linker find libdl/librt in the AArch64 sysroot
-      RPATH_LINK_FLAGS: "-Wl,-rpath-link,$AARCH64_LIBC/lib -Wl,-rpath-link,$AARCH64_LIBC/usr/lib \
-                         -Wl,-rpath-link,$AARCH64_LIBC/lib64 -Wl,-rpath-link,$AARCH64_LIBC/usr/lib64 \
-                         -L$AARCH64_LIBC/lib -L$AARCH64_LIBC/usr/lib -L$AARCH64_LIBC/lib64 -L$AARCH64_LIBC/usr/lib64"
+      AARCH64_LIBC: "/usr/aarch64-none-linux-gnu/libc"
+      AARCH64_LINUX_FLAGS: "--target=aarch64-linux-gnu --sysroot=/usr/aarch64-none-linux-gnu/libc --gcc-toolchain=/usr -pthread"
+      RPATH_LINK_FLAGS: "-Wl,-rpath-link,/usr/aarch64-none-linux-gnu/libc/lib -Wl,-rpath-link,/usr/aarch64-none-linux-gnu/libc/usr/lib -Wl,-rpath-link,/usr/aarch64-none-linux-gnu/libc/lib64 -Wl,-rpath-link,/usr/aarch64-none-linux-gnu/libc/usr/lib64 -L/usr/aarch64-none-linux-gnu/libc/lib -L/usr/aarch64-none-linux-gnu/libc/usr/lib -L/usr/aarch64-none-linux-gnu/libc/lib64 -L/usr/aarch64-none-linux-gnu/libc/usr/lib64"
 
     steps:
       - name: Workspace Cleanup
@@ -145,39 +139,38 @@ jobs:
       - name: Run CMake (LLVM) aarch64
         shell: bash
         run: |
-          rm -rf "$BUILD_DIR_AARCH64"
-          mkdir -p "$BUILD_DIR_AARCH64" "$INSTALL_DIR_AARCH64"
+          mkdir -p "${BUILD_DIR_AARCH64}" "${INSTALL_DIR_AARCH64}"
 
           cmake -G Ninja \
-            -S "$SRC_LLVM" \
-            -B "$BUILD_DIR_AARCH64" \
-            -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR_AARCH64" \
+            -S "${SRC_LLVM}" \
+            -B "${BUILD_DIR_AARCH64}" \
+            -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR_AARCH64}" \
             -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
             -DLLVM_TARGETS_TO_BUILD="ARM;AArch64" \
             -DELD_TARGETS_TO_BUILD="ARM;AArch64" \
             -DLLVM_EXTERNAL_PROJECTS=eld \
-            -DLLVM_EXTERNAL_ELD_SOURCE_DIR="$SRC_DIR/llvm/tools/eld" \
+            -DLLVM_EXTERNAL_ELD_SOURCE_DIR="${SRC_DIR}/llvm/tools/eld" \
             -DLLVM_DEFAULT_TARGET_TRIPLE="${AARCH64_LINUX_TRIPLE}" \
             -DLLVM_BUILD_RUNTIME=OFF \
             -DLIBCLANG_BUILD_STATIC=ON \
             -DLLVM_POLLY_LINK_INTO_TOOLS=ON \
             -DCMAKE_SYSTEM_NAME=Linux \
             -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
-            -DCMAKE_SYSROOT="$AARCH64_LIBC" \
+            -DCMAKE_SYSROOT="${AARCH64_LIBC}" \
             -DCMAKE_C_COMPILER="clang" \
             -DCMAKE_CXX_COMPILER="clang++" \
             -DCMAKE_ASM_COMPILER="clang" \
             -DCMAKE_C_FLAGS="${AARCH64_LINUX_FLAGS}" \
             -DCMAKE_CXX_FLAGS="${AARCH64_LINUX_FLAGS}" \
-            -DCMAKE_EXE_LINKER_FLAGS="$RPATH_LINK_FLAGS" \
-            -DCMAKE_SHARED_LINKER_FLAGS="$RPATH_LINK_FLAGS" \
-            -DLLVM_TABLEGEN="$INSTALL_DIR/bin/llvm-tblgen" \
-            -DCLANG_TABLEGEN="$INSTALL_DIR/bin/clang-tblgen" \
+            -DCMAKE_EXE_LINKER_FLAGS="${RPATH_LINK_FLAGS}" \
+            -DCMAKE_SHARED_LINKER_FLAGS="${RPATH_LINK_FLAGS}" \
+            -DLLVM_TABLEGEN="${INSTALL_DIR}/bin/llvm-tblgen" \
+            -DCLANG_TABLEGEN="${INSTALL_DIR}/bin/clang-tblgen" \
             -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
-            -DLLVM_ENABLE_ASSERTIONS:BOOL=$ASSERTION_MODE
+            -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}"
 
-          ninja -C "$BUILD_DIR_AARCH64"
-          ninja -C "$BUILD_DIR_AARCH64" install
+          ninja -C "${BUILD_DIR_AARCH64}"
+          ninja -C "${BUILD_DIR_AARCH64}" install
 
       - name: Compute clang RESOURCE_DIR
         id: resource_dir
