@@ -26,7 +26,6 @@ jobs:
       PR_BRANCH: "${{ github.event_name == 'workflow_call' && inputs.pr_branch || github.head_ref }}"
       BASE_BRANCH_NAME: "${{ github.event.pull_request.base.ref }}"
       SRC_DIR: "${{ github.workspace }}/src"
-      SRC_LLVM: "${{ github.workspace }}/src/llvm"
       BUILD_DIR: "${{ github.workspace }}/build"
       INSTALL_DIR: "${{ github.workspace }}/install"
       BUILD_DIR_AARCH64: "${{ github.workspace }}/build/aarch64"
@@ -142,14 +141,14 @@ jobs:
           mkdir -p "${BUILD_DIR_AARCH64}" "${INSTALL_DIR_AARCH64}"
 
           cmake -G Ninja \
-            -S "${SRC_LLVM}" \
+            -S "${SRC_DIR}/llvm-top/llvm" \
             -B "${BUILD_DIR_AARCH64}" \
             -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR_AARCH64}" \
             -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
             -DLLVM_TARGETS_TO_BUILD="ARM;AArch64" \
             -DELD_TARGETS_TO_BUILD="ARM;AArch64" \
             -DLLVM_EXTERNAL_PROJECTS=eld \
-            -DLLVM_EXTERNAL_ELD_SOURCE_DIR="${SRC_DIR}/llvm/tools/eld" \
+            -DLLVM_EXTERNAL_ELD_SOURCE_DIR="${SRC_DIR}/llvm-top/llvm/tools/eld" \
             -DLLVM_DEFAULT_TARGET_TRIPLE="${AARCH64_LINUX_TRIPLE}" \
             -DLLVM_BUILD_RUNTIME=OFF \
             -DLIBCLANG_BUILD_STATIC=ON \
