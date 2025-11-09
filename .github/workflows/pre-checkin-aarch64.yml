@@ -1,0 +1,423 @@
+name: pre-checkin-aarch64
+
+on:
+  pull_request:
+  workflow_call:
+    inputs:
+      repo_name:
+        required: true
+        type: string
+      pr_branch:
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: self-hosted
+    concurrency:
+      group: "${{ github.workflow }}-${{ github.event.pull_request.number }}"
+      cancel-in-progress: true
+    permissions:
+      contents: write
+      statuses: write
+
+    env:
+      REPO_NAME: "${{ github.event_name == 'workflow_call' && inputs.repo_name || github.repository }}"
+      PR_BRANCH: "${{ github.event_name == 'workflow_call' && inputs.pr_branch || github.head_ref }}"
+      BASE_BRANCH_NAME: "${{ github.event.pull_request.base.ref }}"
+      SRC_DIR: "${{ github.workspace }}/src"
+      SRC_LLVM: "${{ github.workspace }}/src/llvm"
+      BUILD_DIR: "${{ github.workspace }}/build"
+      INSTALL_DIR: "${{ github.workspace }}/install"
+      BUILD_DIR_AARCH64: "${{ github.workspace }}/build/aarch64"
+      INSTALL_DIR_AARCH64: "${{ github.workspace }}/install/aarch64"
+      CCACHE_DIR: "/local/mnt/workspace/cpullvm_ccache/${{ github.event.pull_request.base.ref }}"
+      CCACHE_BASEDIR: "${{ github.workspace }}/pr-${{ github.event.number }}"
+      BUILD_MODE: "Release"
+      ASSERTION_MODE: "OFF"
+      ARM32_LINUX_TRIPLE: "arm-linux-gnueabi"
+      AARCH64_LINUX_TRIPLE: "aarch64-linux-gnu"
+      COMPILER_RT_ARM32_LINUX_BUILDDIR: "${{ github.workspace }}/build/compiler-rt/arm32/linux"
+      COMPILER_RT_AARCH64_LINUX_BUILDDIR: "${{ github.workspace }}/build/compiler-rt/aarch64/linux"
+      COMPILER_RT_ARM32_LINUX_FLAGS: "--target=arm-linux-gnueabi -mcpu=cortex-a9 -mfloat-abi=softfp -mfpu=neon"
+      COMPILER_RT_AARCH64_LINUX_FLAGS: "--sysroot=/usr/aarch64-linux-gnu --target=aarch64-linux-gnu -mcpu=cortex-a53"
+      ARM32_BM_TRIPLE: "arm-none-eabi"
+      AARCH64_BM_TRIPLE: "aarch64-none-elf"
+      COMPILER_RT_ARM32_BM_BUILDDIR: "${{ github.workspace }}/build/compiler-rt/arm32/baremetal"
+      COMPILER_RT_AARCH64_BM_BUILDDIR: "${{ github.workspace }}/build/compiler-rt/aarch64/baremetal"
+      COMPILER_RT_ARM32_BM_FLAGS: "--target=arm-none-eabi -mcpu=cortex-a9 -ffunction-sections -fdata-sections -mfloat-abi=softfp -mfpu=neon -nostdlibinc"
+      COMPILER_RT_AARCH64_BM_FLAGS: "--target=aarch64-none-elf -mcpu=cortex-a53 -ffunction-sections -fdata-sections -nostdlibinc"
+
+      # aarch64 cross compilation environment
+      SYS_ROOT_AARCH64: "/usr"
+      AARCH64_LIBC: "$SYS_ROOT_AARCH64/aarch64-none-linux-gnu/libc"
+      AARCH64_LINUX_FLAGS: "--target=aarch64-linux-gnu --sysroot=$AARCH64_LIBC --gcc-toolchain=$SYS_ROOT_AARCH64 -pthread"
+
+      # Help the cross-linker find libdl/librt in the AArch64 sysroot
+      RPATH_LINK_FLAGS: "-Wl,-rpath-link,$AARCH64_LIBC/lib -Wl,-rpath-link,$AARCH64_LIBC/usr/lib \
+                         -Wl,-rpath-link,$AARCH64_LIBC/lib64 -Wl,-rpath-link,$AARCH64_LIBC/usr/lib64 \
+                         -L$AARCH64_LIBC/lib -L$AARCH64_LIBC/usr/lib -L$AARCH64_LIBC/lib64 -L$AARCH64_LIBC/usr/lib64"
+
+    steps:
+      - name: Workspace Cleanup
+        shell: bash
+        run: |
+          echo "Clean workspace dir..."
+          rm -rf "${{ github.workspace }}"/*
+
+      - name: Create source root
+        shell: bash
+        run: mkdir -p "${SRC_DIR}"
+
+      - name: Checkout qualcomm/cpullvm-toolchain
+        uses: actions/checkout@v4
+        with:
+          repository: qualcomm/cpullvm-toolchain
+          ref: "${{ env.BASE_BRANCH_NAME }}"
+          path: "${{ env.SRC_DIR }}/llvm-top"
+          fetch-depth: 0
+
+      - name: Fetch musl-embedded
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone https://github.com/qualcomm/musl-embedded.git "${{ env.SRC_DIR }}/musl-embedded"
+
+      - name: Fetch qualcomm/eld
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${SRC_DIR}/llvm-top/llvm/tools"
+          git clone https://github.com/qualcomm/eld.git "${SRC_DIR}/llvm-top/llvm/tools/eld" -b "release/21.x"
+          cd "${SRC_DIR}/llvm-top/llvm/tools/eld"
+          git checkout 65ea860802c41ef5c0becff9750a350495de27b0
+
+      - name: Fetch and update PR repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "PR repository: ${REPO_NAME}"
+          if [[ "${REPO_NAME}" == */cpullvm-toolchain ]]; then
+            cd "${SRC_DIR}/llvm-top"
+          elif [[ "${REPO_NAME}" == */musl-embedded ]]; then
+            cd "${SRC_DIR}/musl-embedded"
+          else
+            echo "Unsupported repository: ${REPO_NAME}"
+            exit 1
+          fi
+          git fetch origin
+          git reset --hard "origin/${PR_BRANCH}"
+
+      - name: Apply patches
+        shell: bash
+        run: |
+          python3 "${SRC_DIR}/llvm-top/qualcomm-software/embedded/tools/patchctl.py" apply -f "${SRC_DIR}/llvm-top/qualcomm-software/embedded/patchsets.yml"
+
+      - name: Run CMake (LLVM)
+        shell: bash
+        run: |
+          mkdir -p "${BUILD_DIR}/llvm"
+          cd "${BUILD_DIR}/llvm"
+          mkdir -p "${CCACHE_DIR}"
+          ccache --zero-stats
+          ccache --set-config "max_size=50GB" "compression=true"
+          ccache --show-config
+
+          cmake -G Ninja -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
+            -DLLVM_TARGETS_TO_BUILD="ARM;AArch64" \
+            -DLLVM_EXTERNAL_PROJECTS=eld \
+            -DLLVM_EXTERNAL_ELD_SOURCE_DIR="llvm-top/llvm/tools/eld" \
+            -DLLVM_DEFAULT_TARGET_TRIPLE="aarch64-unknown-linux-gnueabi" \
+            -DLLVM_TARGET_ARCH="arm-linux-gnueabi" \
+            -DLLVM_LIT_ARGS="-v" -DLLVM_BUILD_RUNTIME="OFF" \
+            -DLIBCLANG_BUILD_STATIC="ON" -DLLVM_POLLY_LINK_INTO_TOOLS="ON" \
+            -DCMAKE_C_COMPILER_LAUNCHER="ccache" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="ccache" \
+            -DCMAKE_C_COMPILER="clang" -DCMAKE_CXX_COMPILER="clang++" \
+            -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+            -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
+            -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
+            -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
+            "${SRC_DIR}/llvm-top/llvm"
+          ninja
+          ninja install
+
+      - name: Run CMake (LLVM) aarch64
+        shell: bash
+        run: |
+          rm -rf "$BUILD_DIR_AARCH64"
+          mkdir -p "$BUILD_DIR_AARCH64" "$INSTALL_DIR_AARCH64"
+
+          cmake -G Ninja \
+            -S "$SRC_LLVM" \
+            -B "$BUILD_DIR_AARCH64" \
+            -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR_AARCH64" \
+            -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
+            -DLLVM_TARGETS_TO_BUILD="ARM;AArch64" \
+            -DELD_TARGETS_TO_BUILD="ARM;AArch64" \
+            -DLLVM_EXTERNAL_PROJECTS=eld \
+            -DLLVM_EXTERNAL_ELD_SOURCE_DIR="$SRC_DIR/llvm/tools/eld" \
+            -DLLVM_DEFAULT_TARGET_TRIPLE="${AARCH64_LINUX_TRIPLE}" \
+            -DLLVM_BUILD_RUNTIME=OFF \
+            -DLIBCLANG_BUILD_STATIC=ON \
+            -DLLVM_POLLY_LINK_INTO_TOOLS=ON \
+            -DCMAKE_SYSTEM_NAME=Linux \
+            -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+            -DCMAKE_SYSROOT="$AARCH64_LIBC" \
+            -DCMAKE_C_COMPILER="clang" \
+            -DCMAKE_CXX_COMPILER="clang++" \
+            -DCMAKE_ASM_COMPILER="clang" \
+            -DCMAKE_C_FLAGS="${AARCH64_LINUX_FLAGS}" \
+            -DCMAKE_CXX_FLAGS="${AARCH64_LINUX_FLAGS}" \
+            -DCMAKE_EXE_LINKER_FLAGS="$RPATH_LINK_FLAGS" \
+            -DCMAKE_SHARED_LINKER_FLAGS="$RPATH_LINK_FLAGS" \
+            -DLLVM_TABLEGEN="$INSTALL_DIR/bin/llvm-tblgen" \
+            -DCLANG_TABLEGEN="$INSTALL_DIR/bin/clang-tblgen" \
+            -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
+            -DLLVM_ENABLE_ASSERTIONS:BOOL=$ASSERTION_MODE
+
+          ninja -C "$BUILD_DIR_AARCH64"
+          ninja -C "$BUILD_DIR_AARCH64" install
+
+      - name: Compute clang RESOURCE_DIR
+        id: resource_dir
+        shell: bash
+        run: |
+          echo "value=$("${INSTALL_DIR}/bin/clang" -print-resource-dir)" >> "${GITHUB_OUTPUT}"
+
+      - name: Compiler-rt arm-linux
+        shell: bash
+        env:
+          RESOURCE_DIR: "${{ steps.resource_dir.outputs.value }}"
+        run: |
+          mkdir -p "${COMPILER_RT_ARM32_LINUX_BUILDDIR}"
+          echo -e "\nCOMPILER_RT for arm-linux:"
+          cd "${COMPILER_RT_ARM32_LINUX_BUILDDIR}"
+          cmake -G Ninja \
+            -DCMAKE_INSTALL_PREFIX="${RESOURCE_DIR}" \
+            -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+            -DCMAKE_ASM_COMPILER_TARGET="${ARM32_LINUX_TRIPLE}" \
+            -DCMAKE_C_COMPILER_TARGET="${ARM32_LINUX_TRIPLE}" \
+            -DCMAKE_CXX_COMPILER_TARGET="${ARM32_LINUX_TRIPLE}" \
+            -DCMAKE_C_COMPILER="${INSTALL_DIR}/bin/clang" \
+            -DCMAKE_CXX_COMPILER="${INSTALL_DIR}/bin/clang++" \
+            -DCMAKE_PREFIX_PATH="${INSTALL_DIR}" \
+            -DCMAKE_C_FLAGS="${COMPILER_RT_ARM32_LINUX_FLAGS}" \
+            -DCMAKE_CXX_FLAGS="${COMPILER_RT_ARM32_LINUX_FLAGS}" \
+            -DCMAKE_ASM_FLAGS="${COMPILER_RT_ARM32_LINUX_FLAGS}" \
+            -DCMAKE_SYSTEM_NAME=Generic \
+            -DCOMPILER_RT_BUILD_BUILTINS=ON \
+            -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+            -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
+            -DCOMPILER_RT_OS_DIR="linux" \
+            -DCOMPILER_RT_TEST_TARGET_TRIPLE="${ARM32_LINUX_TRIPLE}" \
+            -DCOMPILER_RT_TEST_COMPILER_CFLAGS="${COMPILER_RT_ARM32_LINUX_FLAGS}" \
+            -DCOMPILER_RT_TEST_COMPILER="${INSTALL_DIR}/bin/clang" \
+            -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
+            -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
+            -DCXX_SUPPORTS_UNWINDLIB_NONE_FLAG:BOOL=OFF \
+            "${SRC_DIR}/llvm-top/compiler-rt"
+          ninja
+          ninja install
+
+      - name: Compiler-rt arm-baremetal
+        shell: bash
+        env:
+          RESOURCE_DIR: "${{ steps.resource_dir.outputs.value }}"
+        run: |
+          mkdir -p "${COMPILER_RT_ARM32_BM_BUILDDIR}"
+          echo -e "\nCOMPILER_RT for arm-baremetal:"
+          cd "${COMPILER_RT_ARM32_BM_BUILDDIR}"
+          cmake -G Ninja \
+            -DCMAKE_INSTALL_PREFIX="${RESOURCE_DIR}" \
+            -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+            -DCMAKE_ASM_COMPILER_TARGET="${ARM32_BM_TRIPLE}" \
+            -DCMAKE_C_COMPILER_TARGET="${ARM32_BM_TRIPLE}" \
+            -DCMAKE_CXX_COMPILER_TARGET="${ARM32_BM_TRIPLE}" \
+            -DCMAKE_C_COMPILER="${INSTALL_DIR}/bin/clang" \
+            -DCMAKE_CXX_COMPILER="${INSTALL_DIR}/bin/clang++" \
+            -DCMAKE_PREFIX_PATH="${INSTALL_DIR}" \
+            -DCMAKE_C_FLAGS="${COMPILER_RT_ARM32_BM_FLAGS}" \
+            -DCMAKE_CXX_FLAGS="${COMPILER_RT_ARM32_BM_FLAGS}" \
+            -DCMAKE_ASM_FLAGS="${COMPILER_RT_ARM32_BM_FLAGS}" \
+            -DCMAKE_SYSTEM_NAME=Generic \
+            -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+            -DCOMPILER_RT_BAREMETAL_BUILD=ON \
+            -DCOMPILER_RT_BUILD_BUILTINS=ON \
+            -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+            -DCOMPILER_RT_BUILD_PROFILE=OFF \
+            -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+            -DCOMPILER_RT_BUILD_XRAY=OFF \
+            -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE="${ARM32_BM_TRIPLE}" \
+            -DCOMPILER_RT_OS_DIR="baremetal" \
+            -DCOMPILER_RT_TEST_TARGET_TRIPLE="${ARM32_BM_TRIPLE}" \
+            -DCOMPILER_RT_TEST_COMPILER="${INSTALL_DIR}/bin/clang" \
+            -DCOMPILER_RT_TEST_COMPILER_CFLAGS="${COMPILER_RT_ARM32_BM_FLAGS}" \
+            -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
+            -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
+            -DCXX_SUPPORTS_UNWINDLIB_NONE_FLAG:BOOL=OFF \
+            "${SRC_DIR}/llvm-top/compiler-rt"
+          ninja -t clean all
+          ninja -v
+          ninja install
+
+      - name: Compiler-rt aarch64-linux
+        shell: bash
+        env:
+          RESOURCE_DIR: "${{ steps.resource_dir.outputs.value }}"
+        run: |
+          mkdir -p "${COMPILER_RT_AARCH64_LINUX_BUILDDIR}"
+          cd "${COMPILER_RT_AARCH64_LINUX_BUILDDIR}"
+          cmake -G Ninja \
+            -DCMAKE_INSTALL_PREFIX="${RESOURCE_DIR}" \
+            -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+            -DCMAKE_C_COMPILER="${INSTALL_DIR}/bin/clang" \
+            -DCMAKE_CXX_COMPILER="${INSTALL_DIR}/bin/clang++" \
+            -DCMAKE_PREFIX_PATH="${INSTALL_DIR}" \
+            -DCMAKE_C_FLAGS="${COMPILER_RT_AARCH64_LINUX_FLAGS}" \
+            -DCMAKE_CXX_FLAGS="${COMPILER_RT_AARCH64_LINUX_FLAGS}" \
+            -DCMAKE_ASM_FLAGS="${COMPILER_RT_AARCH64_LINUX_FLAGS}" \
+            -DCMAKE_SYSTEM_NAME=Generic \
+            -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE="${AARCH64_LINUX_TRIPLE}" \
+            -DCOMPILER_RT_OS_DIR="linux" \
+            -DCOMPILER_RT_TEST_COMPILER_CFLAGS="${COMPILER_RT_AARCH64_LINUX_FLAGS}" \
+            -DCOMPILER_RT_TEST_COMPILER="${INSTALL_DIR}/bin/clang" \
+            -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
+            -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
+            "${SRC_DIR}/llvm-top/compiler-rt"
+          ninja
+          ninja install
+
+      - name: Compiler-rt aarch64-baremetal
+        shell: bash
+        env:
+          RESOURCE_DIR: "${{ steps.resource_dir.outputs.value }}"
+        run: |
+          mkdir -p "${COMPILER_RT_AARCH64_BM_BUILDDIR}"
+          cd "${COMPILER_RT_AARCH64_BM_BUILDDIR}"
+          cmake -G Ninja \
+            -DCMAKE_INSTALL_PREFIX="${RESOURCE_DIR}" \
+            -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+            -DCMAKE_C_COMPILER="${INSTALL_DIR}/bin/clang" \
+            -DCMAKE_CXX_COMPILER="${INSTALL_DIR}/bin/clang++" \
+            -DCMAKE_PREFIX_PATH="${INSTALL_DIR}" \
+            -DCMAKE_C_FLAGS="${COMPILER_RT_AARCH64_BM_FLAGS}" \
+            -DCMAKE_CXX_FLAGS="${COMPILER_RT_AARCH64_BM_FLAGS}" \
+            -DCMAKE_ASM_FLAGS="${COMPILER_RT_AARCH64_BM_FLAGS}" \
+            -DCMAKE_SYSTEM_NAME=Generic \
+            -DCOMPILER_RT_BAREMETAL_BUILD=ON \
+            -DCOMPILER_RT_BUILD_BUILTINS=ON \
+            -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+            -DCOMPILER_RT_BUILD_PROFILE=OFF \
+            -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+            -DCOMPILER_RT_BUILD_XRAY=OFF \
+            -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE="${AARCH64_BM_TRIPLE}" \
+            -DCOMPILER_RT_OS_DIR="baremetal" \
+            -DCOMPILER_RT_TEST_TARGET_TRIPLE="${AARCH64_BM_TRIPLE}" \
+            -DCOMPILER_RT_TEST_COMPILER="${INSTALL_DIR}/bin/clang" \
+            -DCOMPILER_RT_TEST_COMPILER_CFLAGS="${COMPILER_RT_AARCH64_BM_FLAGS}" \
+            -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
+            -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
+            "${SRC_DIR}/llvm-top/compiler-rt"
+          ninja -t clean all
+          ninja
+          ninja install
+
+      - name: musl-embedded
+        shell: bash
+        run: |
+          export PATH="${INSTALL_DIR}/bin:${PATH}"
+          MUSL_BUILDDIR="${SRC_DIR}/musl-embedded"
+          source "${MUSL_BUILDDIR}/qualcomm-software/config/component_list.sh"
+          for lib in "${musl_components[@]}"; do
+            libName=$(echo "${lib}" | awk -F".sh," '{print $1}')
+            dirName=$(echo "${lib}" | awk -F"," '{print $2}')
+            mkdir -p "${MUSL_BUILDDIR}"
+            cd "${MUSL_BUILDDIR}"
+            make distclean
+            bash -x "${MUSL_BUILDDIR}/qualcomm-software/config/linux/arm/${libName}.sh" --prefix="${INSTALL_DIR}/${dirName}/libc"
+            make
+            make install
+          done
+
+      - name: c++ libs
+        shell: bash
+        run: |
+          export PATH="${INSTALL_DIR}/bin:${PATH}"
+          declare -A Triples=(
+            ["aarch64-none-elf"]="aarch64-none-elf"
+            ["aarch64-pacret-b-key-bti-none-elf"]="aarch64-none-elf"
+            ["armv7-none-eabi"]="armv7-none-eabi"
+          )
+
+          declare -A CFLAGS=(
+            ["aarch64-none-elf"]="-mcpu=cortex-a53 -nostartfiles"
+            ["aarch64-pacret-b-key-bti-none-elf"]="-mcpu=cortex-a53 -nostartfiles -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti"
+            ["armv7-none-eabi"]="-mcpu=cortex-a9 -mthumb -specs=nosys.specs"
+          )
+
+          CFLAGS_RELEASE="-Os -DNDEBUG"
+
+          for VARIANT in "aarch64-none-elf" "aarch64-pacret-b-key-bti-none-elf" "armv7-none-eabi"; do
+            TRIPLE="${Triples[${VARIANT}]}"
+            MUSL_INC="${INSTALL_DIR}/${TRIPLE}/libc/include"
+            CMAKE_CFLAGS="-target ${TRIPLE} -nostdinc -isystem ${MUSL_INC} -ccc-gcc-name ${TRIPLE}-g++ -fno-unroll-loops -fno-optimize-sibling-calls -ffunction-sections -fdata-sections -fno-exceptions -D_GNU_SOURCE ${CFLAGS[${VARIANT}]}"
+
+            mkdir -p "${BUILD_DIR}/${VARIANT}"
+            pushd "${BUILD_DIR}/${VARIANT}"
+            cmake -G Ninja \
+              -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}/${VARIANT}" \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_COMPILER=clang \
+              -DCMAKE_CXX_COMPILER=clang++ \
+              -DHAVE_LIBCXXABI=True \
+              -DCMAKE_SYSTEM_NAME=Generic \
+              -DCMAKE_C_FLAGS_RELEASE="${CFLAGS_RELEASE}" \
+              -DCMAKE_CXX_FLAGS_RELEASE="${CFLAGS_RELEASE}" \
+              -DCMAKE_C_FLAGS="${CMAKE_CFLAGS}" \
+              -DCMAKE_CXX_FLAGS="${CMAKE_CFLAGS}" \
+              -DCMAKE_ASM_FLAGS="${CMAKE_CFLAGS}" \
+              -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+              -DLIBCXX_ENABLE_SHARED=False \
+              -DLIBCXX_SHARED_OUTPUT_NAME="c++-shared" \
+              -DLIBCXX_ENABLE_EXCEPTIONS=False \
+              -DLIBCXX_HAS_MUSL_LIBC=True \
+              -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=False \
+              -DLIBCXX_ENABLE_THREADS=False \
+              -DLIBCXX_ENABLE_FILESYSTEM=False \
+              -DLIBCXX_ENABLE_RANDOM_DEVICE=False \
+              -DLIBCXX_ENABLE_LOCALIZATION=False \
+              -DLIBCXX_SUPPORTS_STD_EQ_CXX11_FLAG=ON \
+              -DLIBCXX_SUPPORTS_STD_EQ_CXX14_FLAG=ON \
+              -DLIBCXX_SUPPORTS_STD_EQ_CXX17_FLAG=ON \
+              -DLIBCXX_QUIC_BAREMETAL=ON \
+              -DLIBCXXABI_USE_LLVM_UNWINDER=True \
+              -DLIBCXXABI_BAREMETAL=True \
+              -DLIBCXXABI_ENABLE_SHARED=False \
+              -DLIBCXXABI_SHARED_OUTPUT_NAME="c++abi-shared" \
+              -DLIBCXXABI_ENABLE_WERROR=True \
+              -DLIBCXXABI_ENABLE_THREADS=False \
+              -DLIBCXXABI_ENABLE_ASSERTIONS=False \
+              -DLIBCXXABI_ENABLE_EXCEPTIONS=False \
+              -DLIBUNWIND_TARGET_TRIPLE="${QUIC_ARM_BAREMETAL_TRIPLE}" \
+              -DLIBUNWIND_IS_BAREMETAL=True \
+              -DLIBUNWIND_ENABLE_SHARED=False \
+              -DLIBUNWIND_SHARED_OUTPUT_NAME="unwind-shared" \
+              -DUNIX=True \
+              -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" \
+              -S "${SRC_DIR}/llvm-top/runtimes"
+            ninja
+            ninja install
+            popd
+          done
+
+      - name: Tar the Toolchain
+        shell: bash
+        run: |
+          cd "${INSTALL_DIR}"
+          cp -r aarch64/bin aarch64/lib aarch64/libexec aarch64/share aarch64/tools .
+          rm -rf aarch64
+          short_sha=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          tar_file="PR${{ github.event.pull_request.number }}_${short_sha}.tgz"
+          tar -czvf "../build/${tar_file}" .
+
