@@ -39,7 +39,7 @@ warn() { echo -e "\033[1;33m[warn]\033[0m $*"; }
 usage() {
   cat <<'EOF'
 Usage:
-  build.sh [options]
+  build_aarch64.sh [options]
 
 Options:
   --artifact-dir <path>       Directory to copy final tarball
@@ -48,7 +48,7 @@ Options:
   --clean                     Delete and recreate build/install dirs
 
 Examples:
-  ./build.sh --artifact-dir /tmp/artifacts
+  ./build_aarch64.sh --artifact-dir /tmp/artifacts
 EOF
 }
 
