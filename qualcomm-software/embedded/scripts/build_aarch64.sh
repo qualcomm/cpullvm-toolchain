@@ -406,7 +406,7 @@ pushd "${INSTALL_DIR}" >/dev/null
 cp -r aarch64/bin aarch64/lib aarch64/libexec aarch64/share aarch64/tools .
 rm -rf aarch64
 short_sha="$(git -C "${SRC_DIR}" rev-parse --short HEAD)"
-tar_file="${ELD_BRANCH}_${short_sha}_$(date +%Y%m%d).tgz"
+tar_file="${ELD_BRANCH}_${short_sha}_aarch64_$(date +%Y%m%d).tgz"
 tar -czvf "${BUILD_DIR}/${tar_file}" "."
 popd >/dev/null
 

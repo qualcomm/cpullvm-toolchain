@@ -379,6 +379,6 @@ jobs:
           cp -r aarch64/bin aarch64/lib aarch64/libexec aarch64/share aarch64/tools .
           rm -rf aarch64
           short_sha=$(echo "${GITHUB_SHA}" | cut -c1-7)
-          tar_file="PR${{ github.event.pull_request.number }}_${short_sha}.tgz"
+          tar_file="PR${{ github.event.pull_request.number }}_${short_sha}_aarch64.tgz"
           tar -czvf "../build/${tar_file}" .
 
