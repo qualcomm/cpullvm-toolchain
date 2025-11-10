@@ -42,13 +42,19 @@ jobs:
         run: |
           choco install ninja cmake git python llvm -y
 
-      - name: Setup MSVC environment
+      - name: Setup MSVC environment (cmd)
+        shell: cmd
         run: |
-          $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-          if (-not $vsPath) { throw "Visual Studio Build Tools not found" }
-          $vcvarsall = "$vsPath\VC\Auxiliary\Build\vcvarsall.bat"
-          if (-not (Test-Path $vcvarsall)) { throw "vcvarsall.bat not found" }
-          cmd /c "call `"$vcvarsall`" x64 && set" | Out-File -FilePath $env:GITHUB_ENV -Append
+         for /f "usebackq tokens=*" %%i in (`
+         "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+         `) do set VSINSTALL=%%i
+
+         if "%VSINSTALL%"=="" (echo Visual Studio Build Tools not found & exit /b 1)
+         if not exist "%VSINSTALL%\VC\Auxiliary\Build\vcvarsall.bat" (echo vcvarsall.bat not found & exit /b 1)
+
+         call "%VSINSTALL%\VC\Auxiliary\Build\vcvarsall.bat" x64
+         rem Export full environment to GITHUB_ENV (accepted key=value format)
+         set >> "%GITHUB_ENV%"
 
       - name: Prepare directories
         run: |
