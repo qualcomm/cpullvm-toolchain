@@ -1,11 +1,6 @@
 name: pre-checkin-win-x86_64
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+on: pull_request
 
 jobs:
   build-windows:
