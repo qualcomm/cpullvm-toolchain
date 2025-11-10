@@ -1,0 +1,126 @@
+name: pre-checkin-win-x86_64
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    env:
+      SRC_DIR: ${{ github.workspace }}         
+      BUILD_MODE: Release
+      ASSERTION_MODE: OFF
+      JOBS: 8
+      CLEAN: false
+      ELD_REPO_URL: https://github.com/qualcomm/eld.git
+      ELD_BRANCH: main
+      ELD_COMMIT: 65ea860802c41ef5c0becff9750a350495de27b0
+      MUSL_EMBEDDED_REPO_URL: https://github.com/qualcomm/musl-embedded.git
+      MUSL_EMBEDDED_BRANCH: main
+
+    steps:
+      # PR checkout (your exact request)
+      - name: Checkout qualcomm/cpullvm-toolchain PR branch
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          path: ${{ env.SRC_DIR }}/llvm-top
+          fetch-depth: 0
+          # persist-credentials: false   # uncomment if receiving PRs from forks
+
+      # Fallback for non-PR events
+      - name: Checkout default branch (non-PR)
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.SRC_DIR }}/llvm-top
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          choco install ninja cmake git python llvm -y
+
+      - name: Setup MSVC environment
+        run: |
+          $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vsPath) { throw "Visual Studio Build Tools not found" }
+          $vcvarsall = "$vsPath\VC\Auxiliary\Build\vcvarsall.bat"
+          if (-not (Test-Path $vcvarsall)) { throw "vcvarsall.bat not found" }
+          cmd /c "call `"$vcvarsall`" x64 && set" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Prepare directories
+        run: |
+          mkdir build install
+
+      - name: Clone musl-embedded
+        working-directory: ${{ env.SRC_DIR }}/llvm-top
+        run: |
+          if (!(Test-Path musl-embedded/.git)) {
+            git clone $env:MUSL_EMBEDDED_REPO_URL musl-embedded -b $env:MUSL_EMBEDDED_BRANCH
+          }
+
+      - name: Clone ELD
+        working-directory: ${{ env.SRC_DIR }}/llvm-top
+        run: |
+          if (!(Test-Path llvm/tools/eld/.git)) {
+            git clone $env:ELD_REPO_URL llvm/tools/eld -b $env:ELD_BRANCH
+            cd llvm/tools/eld
+            git checkout $env:ELD_COMMIT
+          }
+
+      - name: Apply patches
+        working-directory: ${{ env.SRC_DIR }}/llvm-top
+        run: |
+          python qualcomm-software/embedded/tools/patchctl.py apply -f qualcomm-software/embedded/patchsets.yml
+
+      - name: Configure CMake
+        working-directory: ${{ env.SRC_DIR }}/llvm-top
+        run: |
+          cmake -G Ninja `
+            -S llvm `
+            -B build/llvm `
+            -DCMAKE_INSTALL_PREFIX=install `
+            -DLLVM_TARGETS_TO_BUILD="ARM;AArch64" `
+            -DLLVM_EXTERNAL_PROJECTS="eld" `
+            -DLLVM_EXTERNAL_ELD_SOURCE_DIR="llvm/tools/eld" `
+            -DLLVM_DEFAULT_TARGET_TRIPLE="aarch64-unknown-linux-gnu" `
+            -DLIBCLANG_BUILD_STATIC=ON `
+            -DLLVM_POLLY_LINK_INTO_TOOLS=ON `
+            -DCMAKE_C_COMPILER=clang-cl `
+            -DCMAKE_CXX_COMPILER=clang-cl `
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL `
+            -DCMAKE_BUILD_TYPE=$env:BUILD_MODE `
+            -DLLVM_ENABLE_ASSERTIONS=$env:ASSERTION_MODE `
+            -DLLVM_ENABLE_PROJECTS="clang;polly;lld;mlir"
+
+      - name: Build and Install
+        working-directory: ${{ env.SRC_DIR }}/llvm-top
+        run: |
+          ninja -C build/llvm -j $env:JOBS
+          ninja -C build/llvm install
+
+      - name: Run Tests
+        working-directory: ${{ env.SRC_DIR }}/llvm-top
+        run: |
+          ninja -C build/llvm check-llvm
+          ninja -C build/llvm check-lld
+          ninja -C build/llvm check-eld
+          ninja -C build/llvm check-clang
+          ninja -C build/llvm check-polly
+
+      - name: Tar the Toolchain
+        shell: bash
+        run: |
+          cd "${{ env.SRC_DIR }}/llvm-top/install"
+          cp -r aarch64/bin aarch64/lib aarch64/libexec aarch64/share aarch64/tools .
+          rm -rf aarch64
+          short_sha=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          tar_file="PR${{ github.event.pull_request.number }}_${short_sha}_aarch64.tgz"
+          tar -czvf "${{ env.SRC_DIR }}/llvm-top/build/${tar_file}" .
