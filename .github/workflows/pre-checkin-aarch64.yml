@@ -1,15 +1,6 @@
 name: pre-checkin-aarch64
 
-on:
-  pull_request:
-  workflow_call:
-    inputs:
-      repo_name:
-        required: true
-        type: string
-      pr_branch:
-        required: true
-        type: string
+on: pull_request
 
 jobs:
   build:
@@ -22,9 +13,6 @@ jobs:
       statuses: write
 
     env:
-      REPO_NAME: "${{ github.event_name == 'workflow_call' && inputs.repo_name || github.repository }}"
-      PR_BRANCH: "${{ github.event_name == 'workflow_call' && inputs.pr_branch || github.head_ref }}"
-      BASE_BRANCH_NAME: "${{ github.event.pull_request.base.ref }}"
       SRC_DIR: "${{ github.workspace }}/src"
       BUILD_DIR: "${{ github.workspace }}/build"
       INSTALL_DIR: "${{ github.workspace }}/install"
@@ -46,7 +34,6 @@ jobs:
       COMPILER_RT_AARCH64_BM_BUILDDIR: "${{ github.workspace }}/build/compiler-rt/aarch64/baremetal"
       COMPILER_RT_ARM32_BM_FLAGS: "--target=arm-none-eabi -mcpu=cortex-a9 -ffunction-sections -fdata-sections -mfloat-abi=softfp -mfpu=neon -nostdlibinc"
       COMPILER_RT_AARCH64_BM_FLAGS: "--target=aarch64-none-elf -mcpu=cortex-a53 -ffunction-sections -fdata-sections -nostdlibinc"
-      SYS_ROOT_AARCH64: "/usr"
       AARCH64_LIBC: "/usr/aarch64-none-linux-gnu/libc"
       AARCH64_LINUX_FLAGS: "--target=aarch64-linux-gnu --sysroot=/usr/aarch64-none-linux-gnu/libc --gcc-toolchain=/usr -pthread"
       RPATH_LINK_FLAGS: "-Wl,-rpath-link,/usr/aarch64-none-linux-gnu/libc/lib -Wl,-rpath-link,/usr/aarch64-none-linux-gnu/libc/usr/lib -Wl,-rpath-link,/usr/aarch64-none-linux-gnu/libc/lib64 -Wl,-rpath-link,/usr/aarch64-none-linux-gnu/libc/usr/lib64 -L/usr/aarch64-none-linux-gnu/libc/lib -L/usr/aarch64-none-linux-gnu/libc/usr/lib -L/usr/aarch64-none-linux-gnu/libc/lib64 -L/usr/aarch64-none-linux-gnu/libc/usr/lib64"
@@ -62,44 +49,26 @@ jobs:
         shell: bash
         run: mkdir -p "${SRC_DIR}"
 
-      - name: Checkout qualcomm/cpullvm-toolchain
+      - name: Checkout qualcomm/cpullvm-toolchain PR branch
         uses: actions/checkout@v4
         with:
-          repository: qualcomm/cpullvm-toolchain
-          ref: "${{ env.BASE_BRANCH_NAME }}"
-          path: "${{ env.SRC_DIR }}/llvm-top"
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          path: ${{ env.SRC_DIR }}/llvm-top
           fetch-depth: 0
 
       - name: Fetch musl-embedded
-        shell: bash
-        run: |
-          set -euo pipefail
-          git clone https://github.com/qualcomm/musl-embedded.git "${{ env.SRC_DIR }}/musl-embedded"
+        uses: actions/checkout@v4
+        with:
+          repository: qualcomm/musl-embedded
+          path: ${{ env.SRC_DIR }}/musl-embedded
 
       - name: Fetch qualcomm/eld
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "${SRC_DIR}/llvm-top/llvm/tools"
-          git clone https://github.com/qualcomm/eld.git "${SRC_DIR}/llvm-top/llvm/tools/eld" -b "release/21.x"
-          cd "${SRC_DIR}/llvm-top/llvm/tools/eld"
-          git checkout 65ea860802c41ef5c0becff9750a350495de27b0
-
-      - name: Fetch and update PR repository
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "PR repository: ${REPO_NAME}"
-          if [[ "${REPO_NAME}" == */cpullvm-toolchain ]]; then
-            cd "${SRC_DIR}/llvm-top"
-          elif [[ "${REPO_NAME}" == */musl-embedded ]]; then
-            cd "${SRC_DIR}/musl-embedded"
-          else
-            echo "Unsupported repository: ${REPO_NAME}"
-            exit 1
-          fi
-          git fetch origin
-          git reset --hard "origin/${PR_BRANCH}"
+        uses: actions/checkout@v4
+        with:
+          repository: qualcomm/eld
+          path: ${{ env.SRC_DIR }}/llvm-top/llvm/tools/eld
+          ref: 65ea860802c41ef5c0becff9750a350495de27b0
 
       - name: Apply patches
         shell: bash

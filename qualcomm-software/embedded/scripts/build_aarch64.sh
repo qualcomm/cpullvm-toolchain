@@ -94,8 +94,8 @@ RPATH_LINK_FLAGS="-Wl,-rpath-link,$AARCH64_LIBC/lib -Wl,-rpath-link,$AARCH64_LIB
 
 # --- Prepare build/install dirs of aarch64 ---
 if [[ "${CLEAN}" == "true" ]]; then
-  log "Cleaning ${BUILD_DIR} and ${INSTALL_DIR}"
-  rm -rf "${BUILD_DIR}" "${INSTALL_DIR}"
+  log "Cleaning ${BUILD_DIR} ${INSTALL_DIR} $BUILD_DIR_AARCH64 and $INSTALL_DIR_AARCH64"
+  rm -rf "${BUILD_DIR}" "${INSTALL_DIR}" "$BUILD_DIR_AARCH64" "$INSTALL_DIR_AARCH64"
 fi
 
 # --- Workspace prep ---
@@ -157,7 +157,6 @@ ninja -C "${BUILD_DIR}/llvm" install
 
 # ---  Stage 2: host = AArch64, targets = ARM;AArch64 ---
 log "[Stage 2] Configuring Cross-compiling LLVM for AArch64..."
-rm -rf "$BUILD_DIR_AARCH64"
 mkdir -p "$BUILD_DIR_AARCH64" "$INSTALL_DIR_AARCH64"
 
 cmake -G Ninja \
