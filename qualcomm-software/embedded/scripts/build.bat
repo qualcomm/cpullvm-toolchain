@@ -144,7 +144,24 @@ call :check_status "ninja build failed"
 echo [precheckin] Installing LLVM...
 ninja install
 call :check_status "ninja install failed"
+
+REM === LIT / check targets ===
+ninja check-llvm
+call :check_status "check-llvm failed"
+ 
+ninja check-lld
+call :check_status "check-lld failed"
+
+ninja check-eld
+call :check_status "check-eld failed"
+ 
+ninja check-clang
+call :check_status "check-clang failed"
+ 
+ninja check-polly
+call :check_status "check-polly failed"
 popd
 
 echo [precheckin] Build completed successfully!
+
 exit /b 0
