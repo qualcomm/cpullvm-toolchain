@@ -86,4 +86,4 @@ jobs:
       - name: Build
         working-directory: llvm-top
         run: |
-           qualcomm-software/embedded/scripts/cpullvm_windows_for_yml.bat
+           qualcomm-software/embedded/scripts/build.bat
