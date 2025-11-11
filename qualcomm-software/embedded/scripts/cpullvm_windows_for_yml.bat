@@ -117,7 +117,6 @@ if not exist "%ELD_DIR%\.git" (
 )
 
 REM === Build ===
-pushd "%BUILD_DIR%\llvm"
 echo [precheckin] Configuring CMake...
 cmake -G Ninja ^
   -S "%SRC_DIR%\llvm" ^
@@ -138,6 +137,7 @@ cmake -G Ninja ^
 call :check_status "cmake configure failed"
 
 echo [precheckin] Building LLVM...
+pushd "%BUILD_DIR%\llvm"
 ninja -j %JOBS%
 call :check_status "ninja build failed"
 
