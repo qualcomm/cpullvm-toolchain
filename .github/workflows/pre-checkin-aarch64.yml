@@ -78,4 +78,4 @@ jobs:
       - name: Run CMake (LLVM)
         shell: bash
         run: |
-          qualcomm-software/embedded/scripts/build_aarch64.sh --skip-clones --aarch64-build
+          ${SRC_DIR}/llvm-top/qualcomm-software/embedded/scripts/build_aarch64.sh --skip-clones --aarch64-build
