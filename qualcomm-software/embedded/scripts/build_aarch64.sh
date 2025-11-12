@@ -13,7 +13,7 @@
 set -euo pipefail
 
 readonly ELD_REPO_URL="https://github.com/qualcomm/eld.git"
-readonly ELD_BRANCH="main"
+readonly ELD_BRANCH="release/21.x"
 
 readonly MUSL_EMBEDDED_REPO_URL="https://github.com/qualcomm/musl-embedded.git"
 readonly MUSL_EMBEDDED_BRANCH="main"
@@ -24,7 +24,6 @@ SCRIPT_DIR=$(
 REPO_ROOT="$( git -C "${SCRIPT_DIR}" rev-parse --show-toplevel )"
 WORKSPACE="${REPO_ROOT}/.."
 SRC_DIR="${REPO_ROOT}"
-SRC_LLVM="$SRC_DIR/llvm"
 BUILD_DIR="${WORKSPACE}/build"
 INSTALL_DIR="${WORKSPACE}/install"
 BUILD_DIR_AARCH64="${BUILD_DIR}/aarch64"
@@ -53,12 +52,16 @@ EOF
 }
 
 CLEAN="false"
+SKIP_CLONES="false"
+AARCH64_BUILD="false"
 
 # --- Parse args ---
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --artifact-dir) ARTIFACT_DIR="$2"; shift 2 ;;
     --skip-tests) SKIP_TESTS="true"; shift ;;
+    --skip-clones) SKIP_CLONES="true"; shift ;;
+    --aarch64-build) AARCH64_BUILD="true"; shift ;;
     --aarch64-sysroot) AARCH64_SYSROOT="$2"; shift 2 ;;
     --clean) CLEAN="true"; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -87,10 +90,6 @@ SYS_ROOT_AARCH64="/usr"
 AARCH64_LIBC="$SYS_ROOT_AARCH64/aarch64-none-linux-gnu/libc"
 AARCH64_LINUX_FLAGS="--target=aarch64-linux-gnu --sysroot=$AARCH64_LIBC --gcc-toolchain=$SYS_ROOT_AARCH64 -pthread"
 
-#--- Help the cross-linker find libdl/librt in the AArch64 sysroot ---
-RPATH_LINK_FLAGS="-Wl,-rpath-link,$AARCH64_LIBC/lib -Wl,-rpath-link,$AARCH64_LIBC/usr/lib \
-                  -Wl,-rpath-link,$AARCH64_LIBC/lib64 -Wl,-rpath-link,$AARCH64_LIBC/usr/lib64 \
-                  -L$AARCH64_LIBC/lib -L$AARCH64_LIBC/usr/lib -L$AARCH64_LIBC/lib64 -L$AARCH64_LIBC/usr/lib64"
 
 # --- Prepare build/install dirs of aarch64 ---
 if [[ "${CLEAN}" == "true" ]]; then
@@ -102,40 +101,36 @@ fi
 log "Preparing workspace at: ${WORKSPACE}"
 mkdir -p "${BUILD_DIR}" "${INSTALL_DIR}"
 
-# --- Clone musl-embedded (if absent) ---
-if [[ ! -d "${WORKSPACE}/musl-embedded/.git" ]]; then
-  log "Cloning musl-embedded into ${WORKSPACE}/musl-embedded"
-  git clone "${MUSL_EMBEDDED_REPO_URL}" "${WORKSPACE}/musl-embedded" -b "${MUSL_EMBEDDED_BRANCH}"
-else
-  log "musl-embedded already present, leaving as-is"
+if [[ "${SKIP_CLONES}" == "false" ]]; then
+  # --- Clone musl-embedded (if absent) ---
+  if [[ ! -d "${WORKSPACE}/musl-embedded/.git" ]]; then
+    log "Cloning musl-embedded into ${WORKSPACE}/musl-embedded"
+    git clone "${MUSL_EMBEDDED_REPO_URL}" "${WORKSPACE}/musl-embedded" -b "${MUSL_EMBEDDED_BRANCH}"
+  else
+    log "musl-embedded already present, leaving as-is"
+  fi
+
+  # --- Clone ELD under llvm/tools (if absent) ---
+  if [[ ! -d "${REPO_ROOT}/llvm/tools/eld/.git" ]]; then
+    log "Cloning ELD to ${REPO_ROOT}/llvm/tools/eld"
+    git clone "${ELD_REPO_URL}" "${SRC_DIR}/llvm/tools/eld" -b "${ELD_BRANCH}"
+    # Pin ELD to known commit
+    pushd "${SRC_DIR}/llvm/tools/eld" >/dev/null
+    git checkout "65ea860802c41ef5c0becff9750a350495de27b0"
+    popd >/dev/null
+  else
+    log "ELD already present under llvm/tools, leaving as-is"
+  fi
+  # --- Apply patches ---
+  log "Applying patches"
+  python3 "${SRC_DIR}/qualcomm-software/embedded/tools/patchctl.py" apply -f "${SRC_DIR}/qualcomm-software/embedded/patchsets.yml"
 fi
 
-# --- Clone ELD under llvm/tools (if absent) ---
-if [[ ! -d "${REPO_ROOT}/llvm/tools/eld/.git" ]]; then
-  log "Cloning ELD to ${REPO_ROOT}/llvm/tools/eld"
-  git clone "${ELD_REPO_URL}" "${SRC_DIR}/llvm/tools/eld" -b "${ELD_BRANCH}"
-  # Pin ELD to known commit
-  pushd "${SRC_DIR}/llvm/tools/eld" >/dev/null
-  git checkout "65ea860802c41ef5c0becff9750a350495de27b0"
-  popd >/dev/null
-else
-  log "ELD already present under llvm/tools, leaving as-is"
-fi
-
-# --- Apply patches ---
-log "Applying patches"
-python3 "${SRC_DIR}/qualcomm-software/embedded/tools/patchctl.py" apply -f "${SRC_DIR}/qualcomm-software/embedded/patchsets.yml"
-
-
-# --- Build LLVM AARCH64 ---
-# --- Stage 1: native tools (x86_64) ---
-log "[Stage 1] Configuring native x86 LLVM toolchain..."
-
-# Configure (writes build files into ${BUILD_DIR}/llvm) 
+# --- Build LLVM ---
+log "Configuring LLVM"
 mkdir -p "${BUILD_DIR}/llvm"
+pushd "${BUILD_DIR}/llvm" >/dev/null
 cmake -G Ninja -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
-  -S "${SRC_LLVM}" \
-  -B "${BUILD_DIR}/llvm" \
   -DLLVM_TARGETS_TO_BUILD="ARM;AArch64" \
   -DLLVM_EXTERNAL_PROJECTS="eld" \
   -DLLVM_EXTERNAL_ELD_SOURCE_DIR="llvm/tools/eld" \
@@ -145,53 +140,60 @@ cmake -G Ninja -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
   -DLIBCLANG_BUILD_STATIC="ON" -DLLVM_POLLY_LINK_INTO_TOOLS="ON" \
   -DCMAKE_C_COMPILER="clang" -DCMAKE_CXX_COMPILER="clang++" \
   -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+  -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
   -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
   -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
-  -DCMAKE_BUILD_TYPE="${BUILD_MODE}"
+  "${SRC_DIR}/llvm"
 
-log "Building LLVM native X86 [Stage 1]"
-ninja -C "${BUILD_DIR}/llvm"
+log "Building LLVM"
+ninja
+log "Installing LLVM"
+ninja install
+popd >/dev/null
 
-log "Installing LLVM native X86 [Stage 1]"
-ninja -C "${BUILD_DIR}/llvm" install
+if [[ "${AARCH64_BUILD}" == "true" ]]; then
+  # ---  Stage 2: host = AArch64, targets = ARM;AArch64 ---
+  log "[Stage 2] Configuring Cross-compiling LLVM for AArch64..."
+  mkdir -p "$BUILD_DIR_AARCH64" "$INSTALL_DIR_AARCH64"
 
-# ---  Stage 2: host = AArch64, targets = ARM;AArch64 ---
-log "[Stage 2] Configuring Cross-compiling LLVM for AArch64..."
-mkdir -p "$BUILD_DIR_AARCH64" "$INSTALL_DIR_AARCH64"
+  cmake -G Ninja \
+    -S "$SRC_LLVM" -B "$BUILD_DIR_AARCH64" \
+    -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR_AARCH64" \
+    -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
+    -DLLVM_TARGETS_TO_BUILD="ARM;AArch64" \
+    -DELD_TARGETS_TO_BUILD="ARM;AArch64" \
+    -DLLVM_EXTERNAL_PROJECTS=eld \
+    -DLLVM_EXTERNAL_ELD_SOURCE_DIR="$SRC_DIR/llvm/tools/eld" \
+    -DLLVM_DEFAULT_TARGET_TRIPLE="${AARCH64_LINUX_TRIPLE}" \
+    -DLLVM_BUILD_RUNTIME=OFF \
+    -DLIBCLANG_BUILD_STATIC=ON \
+    -DLLVM_POLLY_LINK_INTO_TOOLS=ON \
+    -DCMAKE_SYSTEM_NAME=Linux \
+    -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+    -DCMAKE_SYSROOT="$AARCH64_LIBC" \
+    -DCMAKE_C_COMPILER="clang" \
+    -DCMAKE_CXX_COMPILER="clang++" \
+    # One place to define target + toolchain + sysroot for both C and C++
+    -DCMAKE_C_FLAGS="--target=aarch64-linux-gnu \
+                     --sysroot=$AARCH64_LIBC \
+                     --gcc-toolchain=$SYS_ROOT_AARCH64" \
+    -DCMAKE_CXX_FLAGS="--target=aarch64-linux-gnu \
+                       --sysroot=$AARCH64_LIBC \
+                       --gcc-toolchain=$SYS_ROOT_AARCH64" \
+    # No RPATH_LINK_FLAGS at all
+    -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
+    -DLLVM_TABLEGEN="$INSTALL_DIR/bin/llvm-tblgen" \
+    -DCLANG_TABLEGEN="$INSTALL_DIR/bin/clang-tblgen" \
+    -DLLVM_ENABLE_ASSERTIONS:BOOL=$ASSERTION_MODE
 
-cmake -G Ninja \
-  -S "$SRC_LLVM" \
-  -B "$BUILD_DIR_AARCH64" \
-  -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR_AARCH64" \
-  -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
-  -DLLVM_TARGETS_TO_BUILD="ARM;AArch64" \
-  -DELD_TARGETS_TO_BUILD="ARM;AArch64" \
-  -DLLVM_EXTERNAL_PROJECTS=eld \
-  -DLLVM_EXTERNAL_ELD_SOURCE_DIR="$SRC_DIR/llvm/tools/eld" \
-  -DLLVM_DEFAULT_TARGET_TRIPLE="${AARCH64_LINUX_TRIPLE}" \
-  -DLLVM_BUILD_RUNTIME=OFF \
-  -DLIBCLANG_BUILD_STATIC=ON \
-  -DLLVM_POLLY_LINK_INTO_TOOLS=ON \
-  -DCMAKE_SYSTEM_NAME=Linux \
-  -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
-  -DCMAKE_SYSROOT="$AARCH64_LIBC" \
-  -DCMAKE_C_COMPILER="clang" \
-  -DCMAKE_CXX_COMPILER="clang++" \
-  -DCMAKE_ASM_COMPILER="clang" \
-  -DCMAKE_C_FLAGS="${AARCH64_LINUX_FLAGS}" \
-  -DCMAKE_CXX_FLAGS="${AARCH64_LINUX_FLAGS}" \
-  -DCMAKE_EXE_LINKER_FLAGS="$RPATH_LINK_FLAGS" \
-  -DCMAKE_SHARED_LINKER_FLAGS="$RPATH_LINK_FLAGS" \
-  -DLLVM_TABLEGEN="$INSTALL_DIR/bin/llvm-tblgen" \
-  -DCLANG_TABLEGEN="$INSTALL_DIR/bin/clang-tblgen" \
-  -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
-  -DLLVM_ENABLE_ASSERTIONS:BOOL=$ASSERTION_MODE
+  log "Building LLVM"
+  ninja
+  log "Installing LLVM"
+  ninja install
+  popd >/dev/null
+fi
 
-log "Building LLVM aarch64 [Stage 2]"
-ninja -C "$BUILD_DIR_AARCH64"
-
-log "Installing LLVM aarch64 [Stage 2]"
-ninja -C "$BUILD_DIR_AARCH64" install
+exit 0 # to be removed- for partial testing
 
 # --- Compute clang resource dir ---
 RESOURCE_DIR="$("${INSTALL_DIR}/bin/clang" -print-resource-dir)"
