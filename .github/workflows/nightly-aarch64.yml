@@ -1,12 +1,13 @@
-name: pre-checkin-aarch64
+name: nightly-aarch64
 
 on:
-  pull_request:
+  schedule:
+    - cron: '0 5 * * *' # 9 PM PT (UTC)
 
 jobs:
   call-base:
     uses: ./.github/workflows/base-build.yml
     with:
       build-script: "${SRC_DIR}/llvm-top/qualcomm-software/embedded/scripts/build.sh --skip-clones --aarch64-build"
-      checkout-ref: ${{ github.event.pull_request.head.ref }}
-      checkout-repo: ${{ github.event.pull_request.head.repo.full_name }}
+      checkout-ref: ${{ github.ref_name }}
+      checkout-repo: ${{ github.repository }}

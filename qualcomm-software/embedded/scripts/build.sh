@@ -26,11 +26,13 @@ WORKSPACE="${REPO_ROOT}/.."
 SRC_DIR="${REPO_ROOT}"
 BUILD_DIR="${WORKSPACE}/build"
 INSTALL_DIR="${WORKSPACE}/install"
+BUILD_DIR_AARCH64="${BUILD_DIR}/aarch64"
+INSTALL_DIR_AARCH64="${INSTALL_DIR}/aarch64"
 ARTIFACT_DIR=""
 SKIP_TESTS="false"
 JOBS="${JOBS:-$(nproc)}"
 
-log() { echo -e "\033[1;34m[precheckin]\033[0m $*"; }
+log() { echo -e "\033[1;34m[log]\033[0m $*"; }
 warn() { echo -e "\033[1;33m[warn]\033[0m $*"; }
 
 usage() {
@@ -41,7 +43,9 @@ Usage:
 Options:
   --artifact-dir <path>       Directory to copy final tarball
   --skip-tests                Skip LLVM test steps
+  --skip-clones               Skip Clone - if workspace is ready for the build
   --aarch64-sysroot <path>    AArch64 sysroot (default: /usr/aarch64-linux-gnu)
+  --aarch64-build             Aarch64 build
   --clean                     Delete and recreate build/install dirs
 
 Examples:
@@ -50,12 +54,16 @@ EOF
 }
 
 CLEAN="false"
+SKIP_CLONES="false"
+AARCH64_BUILD="false"
 
 # --- Parse args ---
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --artifact-dir) ARTIFACT_DIR="$2"; shift 2 ;;
     --skip-tests) SKIP_TESTS="true"; shift ;;
+    --skip-clones) SKIP_CLONES="true"; shift ;;
+    --aarch64-build) AARCH64_BUILD="true"; shift ;;
     --aarch64-sysroot) AARCH64_SYSROOT="$2"; shift 2 ;;
     --clean) CLEAN="true"; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -79,39 +87,46 @@ COMPILER_RT_AARCH64_BM_BUILDDIR="${WORKSPACE}/build/compiler-rt/aarch64/baremeta
 COMPILER_RT_ARM32_BM_FLAGS="--target=arm-none-eabi -mcpu=cortex-a9 -ffunction-sections -fdata-sections -mfloat-abi=softfp -mfpu=neon -nostdlibinc"
 COMPILER_RT_AARCH64_BM_FLAGS="--target=aarch64-none-elf -mcpu=cortex-a53 -ffunction-sections -fdata-sections -nostdlibinc"
 
-# --- Prepare build/install dirs ---
+# aarch64 cross compilation environment
+SYS_ROOT_AARCH64="/usr"
+AARCH64_LIBC="$SYS_ROOT_AARCH64/aarch64-none-linux-gnu/libc"
+AARCH64_LINUX_FLAGS="--target=aarch64-linux-gnu --sysroot=$AARCH64_LIBC --gcc-toolchain=$SYS_ROOT_AARCH64 -pthread"
+
+
+# --- Prepare build/install dirs of aarch64 ---
 if [[ "${CLEAN}" == "true" ]]; then
-  log "Cleaning ${BUILD_DIR} and ${INSTALL_DIR}"
-  rm -rf "${BUILD_DIR}" "${INSTALL_DIR}"
+  log "Cleaning ${BUILD_DIR} ${INSTALL_DIR} $BUILD_DIR_AARCH64 and $INSTALL_DIR_AARCH64"
+  rm -rf "${BUILD_DIR}" "${INSTALL_DIR}" "$BUILD_DIR_AARCH64" "$INSTALL_DIR_AARCH64"
 fi
 
 # --- Workspace prep ---
 log "Preparing workspace at: ${WORKSPACE}"
 mkdir -p "${BUILD_DIR}" "${INSTALL_DIR}"
 
-# --- Clone musl-embedded (if absent) ---
-if [[ ! -d "${WORKSPACE}/musl-embedded/.git" ]]; then
-  log "Cloning musl-embedded into ${WORKSPACE}/musl-embedded"
-  git clone "${MUSL_EMBEDDED_REPO_URL}" "${WORKSPACE}/musl-embedded" -b "${MUSL_EMBEDDED_BRANCH}"
-else
-  log "musl-embedded already present, leaving as-is"
-fi
+if [[ "${SKIP_CLONES}" == "false" ]]; then
+  # --- Clone musl-embedded (if absent) ---
+  if [[ ! -d "${WORKSPACE}/musl-embedded/.git" ]]; then
+    log "Cloning musl-embedded into ${WORKSPACE}/musl-embedded"
+    git clone "${MUSL_EMBEDDED_REPO_URL}" "${WORKSPACE}/musl-embedded" -b "${MUSL_EMBEDDED_BRANCH}"
+  else
+    log "musl-embedded already present, leaving as-is"
+  fi
 
-# --- Clone ELD under llvm/tools (if absent) ---
-if [[ ! -d "${REPO_ROOT}/llvm/tools/eld/.git" ]]; then
-  log "Cloning ELD to ${REPO_ROOT}/llvm/tools/eld"
-  git clone "${ELD_REPO_URL}" "${SRC_DIR}/llvm/tools/eld" -b "${ELD_BRANCH}"
-  # Pin ELD to known commit
-  pushd "${SRC_DIR}/llvm/tools/eld" >/dev/null
-  git checkout "65ea860802c41ef5c0becff9750a350495de27b0"
-  popd >/dev/null
-else
-  log "ELD already present under llvm/tools, leaving as-is"
+  # --- Clone ELD under llvm/tools (if absent) ---
+  if [[ ! -d "${REPO_ROOT}/llvm/tools/eld/.git" ]]; then
+    log "Cloning ELD to ${REPO_ROOT}/llvm/tools/eld"
+    git clone "${ELD_REPO_URL}" "${SRC_DIR}/llvm/tools/eld" -b "${ELD_BRANCH}"
+    # Pin ELD to known commit
+    pushd "${SRC_DIR}/llvm/tools/eld" >/dev/null
+    git checkout "65ea860802c41ef5c0becff9750a350495de27b0"
+    popd >/dev/null
+  else
+    log "ELD already present under llvm/tools, leaving as-is"
+  fi
+  # --- Apply patches ---
+  log "Applying patches"
+  python3 "${SRC_DIR}/qualcomm-software/embedded/tools/patchctl.py" apply -f "${SRC_DIR}/qualcomm-software/embedded/patchsets.yml"
 fi
-
-# --- Apply patches ---
-log "Applying patches"
-python3 "${SRC_DIR}/qualcomm-software/embedded/tools/patchctl.py" apply -f "${SRC_DIR}/qualcomm-software/embedded/patchsets.yml"
 
 # --- Build LLVM ---
 log "Configuring LLVM"
@@ -138,7 +153,46 @@ log "Installing LLVM"
 ninja install
 popd >/dev/null
 
-if [[ "${SKIP_TESTS}" != "true" ]]; then
+if [[ "${AARCH64_BUILD}" == "true" ]]; then
+  # ---  Stage 2: host = AArch64, targets = ARM;AArch64 ---
+  log "[Stage 2] Configuring Cross-compiling LLVM for AArch64..."
+  mkdir -p "$BUILD_DIR_AARCH64" "$INSTALL_DIR_AARCH64"
+
+  cmake -G Ninja \
+    -S "${SRC_DIR}/llvm" -B "$BUILD_DIR_AARCH64" \
+    -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR_AARCH64" \
+    -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
+    -DLLVM_TARGETS_TO_BUILD="ARM;AArch64" \
+    -DELD_TARGETS_TO_BUILD="ARM;AArch64" \
+    -DLLVM_EXTERNAL_PROJECTS=eld \
+    -DLLVM_EXTERNAL_ELD_SOURCE_DIR="$SRC_DIR/llvm/tools/eld" \
+    -DLLVM_DEFAULT_TARGET_TRIPLE="${AARCH64_LINUX_TRIPLE}" \
+    -DLLVM_BUILD_RUNTIME=OFF \
+    -DLIBCLANG_BUILD_STATIC=ON \
+    -DLLVM_POLLY_LINK_INTO_TOOLS=ON \
+    -DCMAKE_SYSTEM_NAME=Linux \
+    -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+    -DCMAKE_SYSROOT="$AARCH64_LIBC" \
+    -DCMAKE_C_COMPILER="clang" \
+    -DCMAKE_CXX_COMPILER="clang++" \
+    -DCMAKE_C_FLAGS="--target=aarch64-linux-gnu \
+                     --sysroot=$AARCH64_LIBC \
+                     --gcc-toolchain=$SYS_ROOT_AARCH64" \
+    -DCMAKE_CXX_FLAGS="--target=aarch64-linux-gnu \
+                       --sysroot=$AARCH64_LIBC \
+                       --gcc-toolchain=$SYS_ROOT_AARCH64" \
+    -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
+    -DLLVM_TABLEGEN="$INSTALL_DIR/bin/llvm-tblgen" \
+    -DCLANG_TABLEGEN="$INSTALL_DIR/bin/clang-tblgen" \
+    -DLLVM_ENABLE_ASSERTIONS:BOOL=$ASSERTION_MODE
+
+  log "Building LLVM"
+  ninja
+  log "Installing LLVM"
+  ninja install
+fi
+
+if [[ "${SKIP_TESTS}" != "true" && "${AARCH64_BUILD}" != "true" ]]; then
   log "Running LLVM tests"
   (cd "${BUILD_DIR}/llvm" && ninja check-llvm check-lld check-polly check-eld check-clang)
 else
@@ -213,7 +267,6 @@ cmake -G Ninja \
     -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
     -DCXX_SUPPORTS_UNWINDLIB_NONE_FLAG:BOOL="OFF" \
     "${SRC_DIR}/compiler-rt"
-ninja -t clean all
 ninja
 ninja install
 popd >/dev/null
@@ -271,7 +324,6 @@ cmake -G Ninja \
     -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
     -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
     "${SRC_DIR}/compiler-rt"
-ninja -t clean all
 ninja
 ninja install
 popd >/dev/null
@@ -344,7 +396,6 @@ for VARIANT in "aarch64-none-elf" "aarch64-pacret-b-key-bti-none-elf" "armv7-non
         -DLIBUNWIND_SHARED_OUTPUT_NAME="unwind-shared" \
         -DUNIX="True" \
         -S "${SRC_DIR}/runtimes" "-DLLVM_ENABLE_RUNTIMES=libcxx;libcxxabi;libunwind"
-    ninja -t clean all
     ninja
     ninja install
     popd >/dev/null
@@ -357,13 +408,20 @@ log "Creating artifact tarball"
 pushd "${INSTALL_DIR}" >/dev/null
 short_sha="$(git -C "${SRC_DIR}" rev-parse --short HEAD)"
 tar_file="${ELD_BRANCH}_${short_sha}_$(date +%Y%m%d).tgz"
-tar -czvf "${BUILD_DIR}/${tar_file}" "."
+
+if [[ "${AARCH64_BUILD}" == "true" ]]; then
+    cp -r aarch64/bin aarch64/lib aarch64/libexec aarch64/share aarch64/tools .
+    rm -rf aarch64
+    tar_file="${ELD_BRANCH}_${short_sha}_aarch64_$(date +%Y%m%d).tgz"
+fi
+
+tar -czvf "${BUILD_DIR}/${tar_file}" .
 popd >/dev/null
 
 if [[ -n "${ARTIFACT_DIR}" ]]; then
-  mkdir -p "${ARTIFACT_DIR}"
-  cp "${BUILD_DIR}/${tar_file}" "${ARTIFACT_DIR}/"
-  log "Artifact copied to ${ARTIFACT_DIR}/${tar_file}"
+    mkdir -p "${ARTIFACT_DIR}"
+    cp "${BUILD_DIR}/${tar_file}" "${ARTIFACT_DIR}/"
+    log "Artifact copied to ${ARTIFACT_DIR}/${tar_file}"
 else
-  warn "Artifact left at ${BUILD_DIR}/${tar_file}"
+    warn "Artifact left at ${BUILD_DIR}/${tar_file}"
 fi
