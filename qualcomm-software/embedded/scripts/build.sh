@@ -407,12 +407,12 @@ echo "Build and installation complete."
 log "Creating artifact tarball"
 pushd "${INSTALL_DIR}" >/dev/null
 short_sha="$(git -C "${SRC_DIR}" rev-parse --short HEAD)"
-tar_file="${ELD_BRANCH}_${short_sha}_$(date +%Y%m%d).tgz"
+tar_file="${ELD_BRANCH##*/}_${short_sha}_$(date +%Y%m%d).tgz"
 
 if [[ "${AARCH64_BUILD}" == "true" ]]; then
     cp -r aarch64/bin aarch64/lib aarch64/libexec aarch64/share aarch64/tools .
     rm -rf aarch64
-    tar_file="${ELD_BRANCH}_${short_sha}_aarch64_$(date +%Y%m%d).tgz"
+    tar_file="${ELD_BRANCH##*/}_${short_sha}_aarch64_$(date +%Y%m%d).tgz"
 fi
 
 tar -czvf "${BUILD_DIR}/${tar_file}" .
