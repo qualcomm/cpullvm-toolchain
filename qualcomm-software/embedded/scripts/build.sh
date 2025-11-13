@@ -18,9 +18,9 @@ readonly ELD_BRANCH="release/21.x"
 readonly MUSL_EMBEDDED_REPO_URL="https://github.com/qualcomm/musl-embedded.git"
 readonly MUSL_EMBEDDED_BRANCH="main"
 
-SCRIPT_DIR=$(
-  cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd
-)
+SCRIPT_DIR="$(
+  cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" >/dev/null && pwd
+)"
 REPO_ROOT="$( git -C "${SCRIPT_DIR}" rev-parse --show-toplevel )"
 WORKSPACE="${REPO_ROOT}/.."
 SRC_DIR="${REPO_ROOT}"
@@ -89,14 +89,13 @@ COMPILER_RT_AARCH64_BM_FLAGS="--target=aarch64-none-elf -mcpu=cortex-a53 -ffunct
 
 # aarch64 cross compilation environment
 SYS_ROOT_AARCH64="/usr"
-AARCH64_LIBC="$SYS_ROOT_AARCH64/aarch64-none-linux-gnu/libc"
-AARCH64_LINUX_FLAGS="--target=aarch64-linux-gnu --sysroot=$AARCH64_LIBC --gcc-toolchain=$SYS_ROOT_AARCH64 -pthread"
-
+AARCH64_LIBC="${SYS_ROOT_AARCH64}/aarch64-none-linux-gnu/libc"
+AARCH64_LINUX_FLAGS="--target=aarch64-linux-gnu --sysroot=${AARCH64_LIBC} --gcc-toolchain=${SYS_ROOT_AARCH64} -pthread"
 
 # --- Prepare build/install dirs of aarch64 ---
 if [[ "${CLEAN}" == "true" ]]; then
-  log "Cleaning ${BUILD_DIR} ${INSTALL_DIR} $BUILD_DIR_AARCH64 and $INSTALL_DIR_AARCH64"
-  rm -rf "${BUILD_DIR}" "${INSTALL_DIR}" "$BUILD_DIR_AARCH64" "$INSTALL_DIR_AARCH64"
+  log "Cleaning ${BUILD_DIR} ${INSTALL_DIR} ${BUILD_DIR_AARCH64} and ${INSTALL_DIR_AARCH64}"
+  rm -rf "${BUILD_DIR}" "${INSTALL_DIR}" "${BUILD_DIR_AARCH64}" "${INSTALL_DIR_AARCH64}"
 fi
 
 # --- Workspace prep ---
@@ -128,7 +127,7 @@ if [[ "${SKIP_CLONES}" == "false" ]]; then
   python3 "${SRC_DIR}/qualcomm-software/embedded/tools/patchctl.py" apply -f "${SRC_DIR}/qualcomm-software/embedded/patchsets.yml"
 fi
 
-# --- Build LLVM ---
+# --- Build LLVM (native) ---
 log "Configuring LLVM"
 mkdir -p "${BUILD_DIR}/llvm"
 pushd "${BUILD_DIR}/llvm" >/dev/null
@@ -154,42 +153,43 @@ ninja install
 popd >/dev/null
 
 if [[ "${AARCH64_BUILD}" == "true" ]]; then
-  # ---  Stage 2: host = AArch64, targets = ARM;AArch64 ---
   log "[Stage 2] Configuring Cross-compiling LLVM for AArch64..."
-  mkdir -p "$BUILD_DIR_AARCH64" "$INSTALL_DIR_AARCH64"
+  mkdir -p "${BUILD_DIR_AARCH64}" "${INSTALL_DIR_AARCH64}"
 
+  pushd "${BUILD_DIR_AARCH64}" >/dev/null
   cmake -G Ninja \
-    -S "${SRC_DIR}/llvm" -B "$BUILD_DIR_AARCH64" \
-    -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR_AARCH64" \
+    -S "${SRC_DIR}/llvm" \
+    -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR_AARCH64}" \
     -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
     -DLLVM_TARGETS_TO_BUILD="ARM;AArch64" \
     -DELD_TARGETS_TO_BUILD="ARM;AArch64" \
-    -DLLVM_EXTERNAL_PROJECTS=eld \
-    -DLLVM_EXTERNAL_ELD_SOURCE_DIR="$SRC_DIR/llvm/tools/eld" \
+    -DLLVM_EXTERNAL_PROJECTS="eld" \
+    -DLLVM_EXTERNAL_ELD_SOURCE_DIR="${SRC_DIR}/llvm/tools/eld" \
     -DLLVM_DEFAULT_TARGET_TRIPLE="${AARCH64_LINUX_TRIPLE}" \
-    -DLLVM_BUILD_RUNTIME=OFF \
-    -DLIBCLANG_BUILD_STATIC=ON \
-    -DLLVM_POLLY_LINK_INTO_TOOLS=ON \
-    -DCMAKE_SYSTEM_NAME=Linux \
-    -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
-    -DCMAKE_SYSROOT="$AARCH64_LIBC" \
+    -DLLVM_BUILD_RUNTIME="OFF" \
+    -DLIBCLANG_BUILD_STATIC="ON" \
+    -DLLVM_POLLY_LINK_INTO_TOOLS="ON" \
+    -DCMAKE_SYSTEM_NAME="Linux" \
+    -DCMAKE_SYSTEM_PROCESSOR="aarch64" \
+    -DCMAKE_SYSROOT="${AARCH64_LIBC}" \
     -DCMAKE_C_COMPILER="clang" \
     -DCMAKE_CXX_COMPILER="clang++" \
     -DCMAKE_C_FLAGS="--target=aarch64-linux-gnu \
-                     --sysroot=$AARCH64_LIBC \
-                     --gcc-toolchain=$SYS_ROOT_AARCH64" \
+                     --sysroot=${AARCH64_LIBC} \
+                     --gcc-toolchain=${SYS_ROOT_AARCH64}" \
     -DCMAKE_CXX_FLAGS="--target=aarch64-linux-gnu \
-                       --sysroot=$AARCH64_LIBC \
-                       --gcc-toolchain=$SYS_ROOT_AARCH64" \
+                       --sysroot=${AARCH64_LIBC} \
+                       --gcc-toolchain=${SYS_ROOT_AARCH64}" \
     -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
-    -DLLVM_TABLEGEN="$INSTALL_DIR/bin/llvm-tblgen" \
-    -DCLANG_TABLEGEN="$INSTALL_DIR/bin/clang-tblgen" \
-    -DLLVM_ENABLE_ASSERTIONS:BOOL=$ASSERTION_MODE
+    -DLLVM_TABLEGEN="${INSTALL_DIR}/bin/llvm-tblgen" \
+    -DCLANG_TABLEGEN="${INSTALL_DIR}/bin/clang-tblgen" \
+    -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}"
 
   log "Building LLVM"
   ninja
   log "Installing LLVM"
   ninja install
+  popd >/dev/null
 fi
 
 if [[ "${SKIP_TESTS}" != "true" && "${AARCH64_BUILD}" != "true" ]]; then
@@ -333,7 +333,7 @@ export PATH="${INSTALL_DIR}/bin:${PATH}"
 log "Building musl-embedded"
 MUSL_BUILDDIR="${WORKSPACE}/musl-embedded"
 source "${MUSL_BUILDDIR}/qualcomm-software/config/component_list.sh"
-for lib in ${musl_components[*]}; do
+for lib in "${musl_components[@]}"; do
   libName="$(echo "${lib}" | awk -F".sh," '{print $1}')"
   dirName="$(echo "${lib}" | awk -F"," '{print $2}')"
   pushd "${MUSL_BUILDDIR}" >/dev/null
@@ -357,9 +357,9 @@ CFLAGS["aarch64-pacret-b-key-bti-none-elf"]="-mcpu=cortex-a53 -nostartfiles -mar
 CFLAGS["armv7-none-eabi"]="-mcpu=cortex-a9 -mthumb -specs=nosys.specs"
 CFLAGS_RELEASE="-Os -DNDEBUG"
 for VARIANT in "aarch64-none-elf" "aarch64-pacret-b-key-bti-none-elf" "armv7-none-eabi"; do
-    TRIPLE="${Triples[${VARIANT}]}"
+    TRIPLE="${Triples[$VARIANT]}"
     MUSL_INC="${INSTALL_DIR}/${TRIPLE}/libc/include"
-    CMAKE_CFLAGS="-target ${TRIPLE} -nostdinc -isystem ${MUSL_INC} -ccc-gcc-name ${TRIPLE}-g++ -fno-unroll-loops -fno-optimize-sibling-calls -ffunction-sections -fdata-sections -fno-exceptions -D_GNU_SOURCE ${CFLAGS[${VARIANT}]}"
+    CMAKE_CFLAGS="-target ${TRIPLE} -nostdinc -isystem ${MUSL_INC} -ccc-gcc-name ${TRIPLE}-g++ -fno-unroll-loops -fno-optimize-sibling-calls -ffunction-sections -fdata-sections -fno-exceptions -D_GNU_SOURCE ${CFLAGS[$VARIANT]}"
     mkdir -p "${BUILD_DIR}/${VARIANT}"
     pushd "${BUILD_DIR}/${VARIANT}" >/dev/null
     cmake -G Ninja -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}/${VARIANT}" -DCMAKE_BUILD_TYPE="Release" -DCMAKE_C_COMPILER="clang" -DCMAKE_CXX_COMPILER="clang++" \
@@ -399,7 +399,7 @@ for VARIANT in "aarch64-none-elf" "aarch64-pacret-b-key-bti-none-elf" "armv7-non
     ninja
     ninja install
     popd >/dev/null
-echo "c++ libs install ..."
+    echo "c++ libs install ..."
 done
 echo "Build and installation complete."
 
