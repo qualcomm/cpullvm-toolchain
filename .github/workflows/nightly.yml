@@ -5,9 +5,7 @@ on:
     - cron: '0 5 * * *' # 9 PM PT (UTC)
 
 jobs:
-  call-base:
+  base:
     uses: ./.github/workflows/base-build.yml
     with:
-      build-script: "${SRC_DIR}/llvm-top/qualcomm-software/embedded/scripts/build.sh"
-      checkout-ref: ${{ github.ref_name }}
-      checkout-repo: ${{ github.repository }}
+      build-script: "src/qualcomm-software/embedded/scripts/build.sh"

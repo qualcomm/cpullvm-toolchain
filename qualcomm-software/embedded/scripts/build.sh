@@ -43,7 +43,6 @@ Usage:
 Options:
   --artifact-dir <path>       Directory to copy final tarball
   --skip-tests                Skip LLVM test steps
-  --skip-clones               Skip Clone - if workspace is ready for the build
   --aarch64-sysroot <path>    AArch64 sysroot (default: /usr/aarch64-linux-gnu)
   --aarch64-build             Aarch64 build
   --clean                     Delete and recreate build/install dirs
@@ -54,7 +53,6 @@ EOF
 }
 
 CLEAN="false"
-SKIP_CLONES="false"
 AARCH64_BUILD="false"
 
 # --- Parse args ---
@@ -62,7 +60,6 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --artifact-dir) ARTIFACT_DIR="$2"; shift 2 ;;
     --skip-tests) SKIP_TESTS="true"; shift ;;
-    --skip-clones) SKIP_CLONES="true"; shift ;;
     --aarch64-build) AARCH64_BUILD="true"; shift ;;
     --aarch64-sysroot) AARCH64_SYSROOT="$2"; shift 2 ;;
     --clean) CLEAN="true"; shift ;;
@@ -102,30 +99,29 @@ fi
 log "Preparing workspace at: ${WORKSPACE}"
 mkdir -p "${BUILD_DIR}" "${INSTALL_DIR}"
 
-if [[ "${SKIP_CLONES}" == "false" ]]; then
-  # --- Clone musl-embedded (if absent) ---
-  if [[ ! -d "${WORKSPACE}/musl-embedded/.git" ]]; then
-    log "Cloning musl-embedded into ${WORKSPACE}/musl-embedded"
-    git clone "${MUSL_EMBEDDED_REPO_URL}" "${WORKSPACE}/musl-embedded" -b "${MUSL_EMBEDDED_BRANCH}"
-  else
-    log "musl-embedded already present, leaving as-is"
-  fi
-
-  # --- Clone ELD under llvm/tools (if absent) ---
-  if [[ ! -d "${REPO_ROOT}/llvm/tools/eld/.git" ]]; then
-    log "Cloning ELD to ${REPO_ROOT}/llvm/tools/eld"
-    git clone "${ELD_REPO_URL}" "${SRC_DIR}/llvm/tools/eld" -b "${ELD_BRANCH}"
-    # Pin ELD to known commit
-    pushd "${SRC_DIR}/llvm/tools/eld" >/dev/null
-    git checkout "65ea860802c41ef5c0becff9750a350495de27b0"
-    popd >/dev/null
-  else
-    log "ELD already present under llvm/tools, leaving as-is"
-  fi
-  # --- Apply patches ---
-  log "Applying patches"
-  python3 "${SRC_DIR}/qualcomm-software/embedded/tools/patchctl.py" apply -f "${SRC_DIR}/qualcomm-software/embedded/patchsets.yml"
+# --- Clone musl-embedded (if absent) ---
+if [[ ! -d "${WORKSPACE}/musl-embedded/.git" ]]; then
+  log "Cloning musl-embedded into ${WORKSPACE}/musl-embedded"
+  git clone "${MUSL_EMBEDDED_REPO_URL}" "${WORKSPACE}/musl-embedded" -b "${MUSL_EMBEDDED_BRANCH}"
+else
+  log "musl-embedded already present, leaving as-is"
 fi
+
+# --- Clone ELD under llvm/tools (if absent) ---
+if [[ ! -d "${REPO_ROOT}/llvm/tools/eld/.git" ]]; then
+  log "Cloning ELD to ${REPO_ROOT}/llvm/tools/eld"
+  git clone "${ELD_REPO_URL}" "${SRC_DIR}/llvm/tools/eld" -b "${ELD_BRANCH}"
+  # Pin ELD to known commit
+  pushd "${SRC_DIR}/llvm/tools/eld" >/dev/null
+  git checkout "65ea860802c41ef5c0becff9750a350495de27b0"
+  popd >/dev/null
+else
+  log "ELD already present under llvm/tools, leaving as-is"
+fi
+
+# --- Apply patches ---
+log "Applying patches"
+python3 "${SRC_DIR}/qualcomm-software/embedded/tools/patchctl.py" apply -f "${SRC_DIR}/qualcomm-software/embedded/patchsets.yml"
 
 # --- Build LLVM (native) ---
 log "Configuring LLVM"

@@ -6,71 +6,38 @@ on:
       build-script:
         required: true
         type: string
-      checkout-ref:
-        required: false
-        type: string
-        default: ${{ github.ref_name }}
-      checkout-repo:
-        required: false
-        type: string
-        default: ${{ github.repository }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: self-hosted
-    env:
-      SRC_DIR: "${{ github.workspace }}/src"
-      BUILD_DIR: "${{ github.workspace }}/build"
-      INSTALL_DIR: "${{ github.workspace }}/install"
-      BUILD_DIR_AARCH64: "${{ github.workspace }}/build/aarch64"
-      INSTALL_DIR_AARCH64: "${{ github.workspace }}/install/aarch64"
-      BUILD_MODE: "Release"
-      ASSERTION_MODE: "OFF"
-      ARM32_LINUX_TRIPLE: "arm-linux-gnueabi"
-      AARCH64_LINUX_TRIPLE: "aarch64-linux-gnu"
-      COMPILER_RT_ARM32_LINUX_BUILDDIR: "${{ github.workspace }}/build/compiler-rt/arm32/linux"
-      COMPILER_RT_AARCH64_LINUX_BUILDDIR: "${{ github.workspace }}/build/compiler-rt/aarch64/linux"
-      COMPILER_RT_ARM32_LINUX_FLAGS: "--target=arm-linux-gnueabi -mcpu=cortex-a9 -mfloat-abi=softfp -mfpu=neon"
-      COMPILER_RT_AARCH64_LINUX_FLAGS: "--sysroot=/usr/aarch64-linux-gnu --target=aarch64-linux-gnu -mcpu=cortex-a53"
-      ARM32_BM_TRIPLE: "arm-none-eabi"
-      AARCH64_BM_TRIPLE: "aarch64-none-elf"
-      COMPILER_RT_ARM32_BM_BUILDDIR: "${{ github.workspace }}/build/compiler-rt/arm32/baremetal"
-      COMPILER_RT_AARCH64_BM_BUILDDIR: "${{ github.workspace }}/build/compiler-rt/aarch64/baremetal"
-      COMPILER_RT_ARM32_BM_FLAGS: "--target=arm-none-eabi -mcpu=cortex-a9 -ffunction-sections -fdata-sections -mfloat-abi=softfp -mfpu=neon -nostdlibinc"
-      COMPILER_RT_AARCH64_BM_FLAGS: "--target=aarch64-none-elf -mcpu=cortex-a53 -ffunction-sections -fdata-sections -nostdlibinc"
-      AARCH64_LIBC: "/usr/aarch64-none-linux-gnu/libc"
-      AARCH64_LINUX_FLAGS: "--target=aarch64-linux-gnu --sysroot=/usr/aarch64-none-linux-gnu/libc --gcc-toolchain=/usr -pthread"
 
     steps:
-      - name: Workspace Cleanup
-        run: rm -rf "${{ github.workspace }}"/*
-
-      - name: Create source root
-        run: mkdir -p "${SRC_DIR}"
+      - name: Cleanup workspace (safe)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Cleaning workspace: ${GITHUB_WORKSPACE}"
+          shopt -s dotglob nullglob
+          rm -rf "${GITHUB_WORKSPACE}/"*
+          rm -rf "${GITHUB_WORKSPACE}/"..?*
 
       - name: Checkout source
         uses: actions/checkout@v4
         with:
-          repository: ${{ inputs.checkout-repo }}
-          ref: ${{ inputs.checkout-ref }}
-          path: ${{ env.SRC_DIR }}/llvm-top
-          fetch-depth: 0
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref:        ${{ github.event.pull_request.head.sha || github.sha }}
+          path: src
+          clean: true
 
-      - name: Fetch musl-embedded
-        uses: actions/checkout@v4
-        with:
-          repository: qualcomm/musl-embedded
-          path: ${{ env.SRC_DIR }}/musl-embedded
-
-      - name: Fetch qualcomm/eld
-        uses: actions/checkout@v4
-        with:
-          repository: qualcomm/eld
-          path: ${{ env.SRC_DIR }}/llvm-top/llvm/tools/eld
-          ref: 65ea860802c41ef5c0becff9750a350495de27b0
-
-      - name: Apply patches
-        run: python3 "${SRC_DIR}/llvm-top/qualcomm-software/embedded/tools/patchctl.py" apply -f "${SRC_DIR}/llvm-top/qualcomm-software/embedded/patchsets.yml"
-
-      - name: Build and Test
-        run: ${{ inputs.build-script }}
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          ${{ inputs.build-script }}
