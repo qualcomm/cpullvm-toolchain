@@ -1,12 +1,15 @@
 name: pre-checkin-aarch64
 
-on: pull_request
+on:
+  pull_request:
+  schedule:
+    - cron: '0 5 * * *'  # 9 PM PT
 
 jobs:
   build:
     runs-on: self-hosted
     concurrency:
-      group: "${{ github.workflow }}-${{ github.event.pull_request.number }}"
+      group: "${{ github.workflow }}-${{ github.event.pull_request.number || 'nightly' }}"
       cancel-in-progress: true
     permissions:
       contents: write
@@ -18,8 +21,8 @@ jobs:
       INSTALL_DIR: "${{ github.workspace }}/install"
       BUILD_DIR_AARCH64: "${{ github.workspace }}/build/aarch64"
       INSTALL_DIR_AARCH64: "${{ github.workspace }}/install/aarch64"
-      CCACHE_DIR: "/local/mnt/workspace/cpullvm_ccache/${{ github.event.pull_request.base.ref }}"
-      CCACHE_BASEDIR: "${{ github.workspace }}/pr-${{ github.event.number }}"
+      CCACHE_DIR: "/local/mnt/workspace/cpullvm_ccache/${{ github.event.pull_request.base.ref || 'nightly' }}"
+      CCACHE_BASEDIR: "${{ github.workspace }}/pr-${{ github.event.number || 'nightly' }}"
       BUILD_MODE: "Release"
       ASSERTION_MODE: "OFF"
       ARM32_LINUX_TRIPLE: "arm-linux-gnueabi"
@@ -49,11 +52,11 @@ jobs:
         shell: bash
         run: mkdir -p "${SRC_DIR}"
 
-      - name: Checkout qualcomm/cpullvm-toolchain PR branch
+      - name: Checkout source
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name || 'qualcomm/cpullvm-toolchain' }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
           path: ${{ env.SRC_DIR }}/llvm-top
           fetch-depth: 0
 
@@ -75,7 +78,7 @@ jobs:
         run: |
           python3 "${SRC_DIR}/llvm-top/qualcomm-software/embedded/tools/patchctl.py" apply -f "${SRC_DIR}/llvm-top/qualcomm-software/embedded/patchsets.yml"
 
-      - name: Run CMake (LLVM)
+      - name: Build and Test
         shell: bash
         run: |
           ${SRC_DIR}/llvm-top/qualcomm-software/embedded/scripts/build_aarch64.sh --skip-clones --aarch64-build

@@ -32,7 +32,7 @@ ARTIFACT_DIR=""
 SKIP_TESTS="false"
 JOBS="${JOBS:-$(nproc)}"
 
-log() { echo -e "\033[1;34m[precheckin]\033[0m $*"; }
+log() { echo -e "\033[1;34m[log]\033[0m $*"; }
 warn() { echo -e "\033[1;33m[warn]\033[0m $*"; }
 
 usage() {
@@ -157,7 +157,7 @@ if [[ "${AARCH64_BUILD}" == "true" ]]; then
   mkdir -p "$BUILD_DIR_AARCH64" "$INSTALL_DIR_AARCH64"
 
   cmake -G Ninja \
-    -S "$SRC_LLVM" -B "$BUILD_DIR_AARCH64" \
+    -S "${SRC_DIR}/llvm" -B "$BUILD_DIR_AARCH64" \
     -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR_AARCH64" \
     -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
     -DLLVM_TARGETS_TO_BUILD="ARM;AArch64" \
@@ -173,14 +173,12 @@ if [[ "${AARCH64_BUILD}" == "true" ]]; then
     -DCMAKE_SYSROOT="$AARCH64_LIBC" \
     -DCMAKE_C_COMPILER="clang" \
     -DCMAKE_CXX_COMPILER="clang++" \
-    # One place to define target + toolchain + sysroot for both C and C++
     -DCMAKE_C_FLAGS="--target=aarch64-linux-gnu \
                      --sysroot=$AARCH64_LIBC \
                      --gcc-toolchain=$SYS_ROOT_AARCH64" \
     -DCMAKE_CXX_FLAGS="--target=aarch64-linux-gnu \
                        --sysroot=$AARCH64_LIBC \
                        --gcc-toolchain=$SYS_ROOT_AARCH64" \
-    # No RPATH_LINK_FLAGS at all
     -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
     -DLLVM_TABLEGEN="$INSTALL_DIR/bin/llvm-tblgen" \
     -DCLANG_TABLEGEN="$INSTALL_DIR/bin/clang-tblgen" \
@@ -193,7 +191,14 @@ if [[ "${AARCH64_BUILD}" == "true" ]]; then
   popd >/dev/null
 fi
 
-exit 0 # to be removed- for partial testing
+
+
+if [[ "${SKIP_TESTS}" != "true" && "${AARCH64_BUILD}" != "true" ]]; then
+  log "Running LLVM tests"
+  (cd "${BUILD_DIR}/llvm" && ninja check-llvm check-lld check-polly check-eld check-clang)
+else
+  warn "Skipping tests"
+fi
 
 # --- Compute clang resource dir ---
 RESOURCE_DIR="$("${INSTALL_DIR}/bin/clang" -print-resource-dir)"
@@ -405,17 +410,22 @@ echo "Build and installation complete."
 # --- Create artifact ---
 log "Creating artifact tarball"
 pushd "${INSTALL_DIR}" >/dev/null
-cp -r aarch64/bin aarch64/lib aarch64/libexec aarch64/share aarch64/tools .
-rm -rf aarch64
 short_sha="$(git -C "${SRC_DIR}" rev-parse --short HEAD)"
-tar_file="${ELD_BRANCH}_${short_sha}_aarch64_$(date +%Y%m%d).tgz"
-tar -czvf "${BUILD_DIR}/${tar_file}" "."
+tar_file="${ELD_BRANCH}_${short_sha}_$(date +%Y%m%d).tgz"
+
+if [[ "${AARCH64_BUILD}" == "true" ]]; then
+    cp -r aarch64/bin aarch64/lib aarch64/libexec aarch64/share aarch64/tools .
+    rm -rf aarch64
+    tar_file="${ELD_BRANCH}_${short_sha}_aarch64_$(date +%Y%m%d).tgz"
+fi
+
+tar -czvf "${BUILD_DIR}/${tar_file}" .
 popd >/dev/null
 
 if [[ -n "${ARTIFACT_DIR}" ]]; then
-  mkdir -p "${ARTIFACT_DIR}"
-  cp "${BUILD_DIR}/${tar_file}" "${ARTIFACT_DIR}/"
-  log "Artifact copied to ${ARTIFACT_DIR}/${tar_file}"
+    mkdir -p "${ARTIFACT_DIR}"
+    cp "${BUILD_DIR}/${tar_file}" "${ARTIFACT_DIR}/"
+    log "Artifact copied to ${ARTIFACT_DIR}/${tar_file}"
 else
-  warn "Artifact left at ${BUILD_DIR}/${tar_file}"
+    warn "Artifact left at ${BUILD_DIR}/${tar_file}"
 fi
