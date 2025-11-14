@@ -22,6 +22,8 @@ jobs:
       ASSERTION_MODE: "OFF"
       ARM32_LINUX_TRIPLE: "arm-linux-gnueabi"
       AARCH64_LINUX_TRIPLE: "aarch64-linux-gnu"
+      ARM32_SYSROOT: "/usr/arm-linux-gnueabi"
+      AARCH64_SYSROOT: "/usr/aarch64-linux-gnu"
       COMPILER_RT_ARM32_LINUX_BUILDDIR: "${{ github.workspace }}/build/compiler-rt/arm32/linux"
       COMPILER_RT_AARCH64_LINUX_BUILDDIR: "${{ github.workspace }}/build/compiler-rt/aarch64/linux"
       COMPILER_RT_ARM32_LINUX_FLAGS: "--target=arm-linux-gnueabi -mcpu=cortex-a9 -mfloat-abi=softfp -mfpu=neon"
@@ -292,7 +294,7 @@ jobs:
             make install
           done
 
-      - name: c++ libs
+      - name: Baremetal libc++
         shell: bash
         run: |
           export PATH="${INSTALL_DIR}/bin:${PATH}"
@@ -361,6 +363,54 @@ jobs:
             ninja
             ninja install
             popd
+          done
+
+      - name: Linux libc++
+        shell: bash
+        run: |
+          export PATH="${INSTALL_DIR}/bin:${PATH}"
+          declare -A LINUX_TRIPLES
+          LINUX_TRIPLES["aarch64-linux-gnu"]="aarch64-linux-gnu"
+          LINUX_TRIPLES["aarch64-pacret-linux-gnu"]="aarch64-linux-gnu"
+          LINUX_TRIPLES["aarch64-pacret-bti-linux-gnu"]="aarch64-linux-gnu"
+          LINUX_TRIPLES["armv7-linux-gnueabi"]="armv7-linux-gnueabi"
+          declare -A LINUX_CFLAGS
+          LINUX_CFLAGS["aarch64-linux-gnu"]="-mcpu=cortex-a53"
+          LINUX_CFLAGS["aarch64-pacret-linux-gnu"]="-mcpu=cortex-a53 -march=armv8.3a -mbranch-protection=pac-ret+leaf"
+          LINUX_CFLAGS["aarch64-pacret-bti-linux-gnu"]="-mcpu=cortex-a53 -march=armv8.3a -mbranch-protection=pac-ret+leaf+bti"
+          LINUX_CFLAGS["armv7-linux-gnueabi"]="-mcpu=cortex-a9 -mfloat-abi=softfp -mfpu=neon"
+          for VARIANT in "${!LINUX_TRIPLES[@]}"; do
+              TRIPLE="${LINUX_TRIPLES[${VARIANT}]}"
+              SYSROOT="${AARCH64_SYSROOT}"
+              if [[ "${TRIPLE}" = "armv7-linux-gnueabi" ]]; then
+                SYSROOT="${ARM32_SYSROOT}"
+              fi
+              MUSL_INC="${INSTALL_DIR}/${TRIPLE}/libc/include"
+              CMAKE_CFLAGS="--target=${TRIPLE} -nostdlib -nostdinc -isystem ${MUSL_INC} -isystem ${SYSROOT}/include -ccc-gcc-name ${TRIPLE}-g++ -ffunction-sections -fdata-sections -D_GNU_SOURCE ${LINUX_CFLAGS[${VARIANT}]}"
+              mkdir -p "${BUILD_DIR}/${VARIANT}"
+              pushd "${BUILD_DIR}/${VARIANT}" >/dev/null
+              cmake -G Ninja -S "${SRC_DIR}/runtimes" \
+                  -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}/${VARIANT}" \
+                  -DCMAKE_BUILD_TYPE="Release" \
+                  -DCMAKE_C_COMPILER="clang" \
+                  -DCMAKE_CXX_COMPILER="clang++" \
+                  -DCMAKE_SYSTEM_NAME="Linux" \
+                  -DCMAKE_C_FLAGS_RELEASE="${CFLAGS_RELEASE}" \
+                  -DCMAKE_CXX_FLAGS_RELEASE="${CFLAGS_RELEASE}" \
+                  -DCMAKE_C_FLAGS="${CMAKE_CFLAGS}" \
+                  -DCMAKE_CXX_FLAGS="${CMAKE_CFLAGS}" \
+                  -DCMAKE_ASM_FLAGS="${CMAKE_CFLAGS}" \
+                  -DLIBCXX_ENABLE_SHARED="False" \
+                  -DLIBCXX_HAS_MUSL_LIBC="True" \
+                  -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT="False" \
+                  -DLIBCXXABI_USE_LLVM_UNWINDER="True" \
+                  -DLIBCXXABI_ENABLE_SHARED="False" \
+                  -DLIBCXXABI_ENABLE_WERROR="True" \
+                  -DLIBUNWIND_ENABLE_SHARED="False" \
+                  -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind"
+              ninja
+              ninja install
+              popd
           done
 
       - name: Tar the Toolchain

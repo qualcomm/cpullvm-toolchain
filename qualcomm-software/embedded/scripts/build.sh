@@ -41,6 +41,7 @@ Usage:
 Options:
   --artifact-dir <path>       Directory to copy final tarball
   --skip-tests                Skip LLVM test steps
+  --arm-sysroot <path>        Arm sysroot (default: /usr/arm-linux-gnueabi)
   --aarch64-sysroot <path>    AArch64 sysroot (default: /usr/aarch64-linux-gnu)
   --clean                     Delete and recreate build/install dirs
 
@@ -56,7 +57,8 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --artifact-dir) ARTIFACT_DIR="$2"; shift 2 ;;
     --skip-tests) SKIP_TESTS="true"; shift ;;
-    --aarch64-sysroot) AARCH64_SYSROOT="$2"; shift 2 ;;
+    --arm-sysroot) ARM32_SYSROOT_OPT="$2"; shift 2 ;;
+    --aarch64-sysroot) AARCH64_SYSROOT_OPT="$2"; shift 2 ;;
     --clean) CLEAN="true"; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown arg: $1"; usage; exit 1 ;;
@@ -68,10 +70,12 @@ BUILD_MODE="Release"
 ASSERTION_MODE="OFF"
 ARM32_LINUX_TRIPLE="arm-linux-gnueabi"
 AARCH64_LINUX_TRIPLE="aarch64-linux-gnu"
+ARM32_SYSROOT="${ARM32_SYSROOT_OPT:-/usr/arm-linux-gnueabi}"
+AARCH64_SYSROOT="${AARCH64_SYSROOT_OPT:-/usr/aarch64-linux-gnu}"
 COMPILER_RT_ARM32_LINUX_BUILDDIR="${WORKSPACE}/build/compiler-rt/arm32/linux"
 COMPILER_RT_AARCH64_LINUX_BUILDDIR="${WORKSPACE}/build/compiler-rt/aarch64/linux"
 COMPILER_RT_ARM32_LINUX_FLAGS="--target=arm-linux-gnueabi -mcpu=cortex-a9 -mfloat-abi=softfp -mfpu=neon"
-COMPILER_RT_AARCH64_LINUX_FLAGS="--sysroot=${AARCH64_SYSROOT:-/usr/aarch64-linux-gnu} --target=aarch64-linux-gnu -mcpu=cortex-a53"
+COMPILER_RT_AARCH64_LINUX_FLAGS="--sysroot=${AARCH64_SYSROOT} --target=aarch64-linux-gnu -mcpu=cortex-a53"
 ARM32_BM_TRIPLE="arm-none-eabi"
 AARCH64_BM_TRIPLE="aarch64-none-elf"
 COMPILER_RT_ARM32_BM_BUILDDIR="${WORKSPACE}/build/compiler-rt/arm32/baremetal"
@@ -295,6 +299,7 @@ done
 # --- c++ libs ---
 echo "Build c++ libs ..."
 
+# Baremetal libc++ configs
 declare -A Triples
 Triples["aarch64-none-elf"]="aarch64-none-elf"
 Triples["aarch64-pacret-b-key-bti-none-elf"]="aarch64-none-elf"
@@ -348,8 +353,56 @@ for VARIANT in "aarch64-none-elf" "aarch64-pacret-b-key-bti-none-elf" "armv7-non
     ninja
     ninja install
     popd >/dev/null
-echo "c++ libs install ..."
+echo "Baremetal c++ libs install ..."
 done
+
+# Linux libc++ configs
+declare -A LINUX_TRIPLES
+LINUX_TRIPLES["aarch64-linux-gnu"]="aarch64-linux-gnu"
+LINUX_TRIPLES["aarch64-pacret-linux-gnu"]="aarch64-linux-gnu"
+LINUX_TRIPLES["aarch64-pacret-bti-linux-gnu"]="aarch64-linux-gnu"
+LINUX_TRIPLES["armv7-linux-gnueabi"]="armv7-linux-gnueabi"
+declare -A LINUX_CFLAGS
+LINUX_CFLAGS["aarch64-linux-gnu"]="-mcpu=cortex-a53"
+LINUX_CFLAGS["aarch64-pacret-linux-gnu"]="-mcpu=cortex-a53 -march=armv8.3a -mbranch-protection=pac-ret+leaf"
+LINUX_CFLAGS["aarch64-pacret-bti-linux-gnu"]="-mcpu=cortex-a53 -march=armv8.3a -mbranch-protection=pac-ret+leaf+bti"
+LINUX_CFLAGS["armv7-linux-gnueabi"]="-mcpu=cortex-a9 -mfloat-abi=softfp -mfpu=neon"
+for VARIANT in "${!LINUX_TRIPLES[@]}"; do
+    TRIPLE="${LINUX_TRIPLES[${VARIANT}]}"
+    SYSROOT="${AARCH64_SYSROOT}"
+    if [[ "${TRIPLE}" = "armv7-linux-gnueabi" ]]; then
+      SYSROOT="${ARM32_SYSROOT}"
+    fi
+    MUSL_INC="${INSTALL_DIR}/${TRIPLE}/libc/include"
+    CMAKE_CFLAGS="--target=${TRIPLE} -nostdlib -nostdinc -isystem ${MUSL_INC} -isystem ${SYSROOT}/include -ccc-gcc-name ${TRIPLE}-g++ -ffunction-sections -fdata-sections -D_GNU_SOURCE ${LINUX_CFLAGS[${VARIANT}]}"
+    mkdir -p "${BUILD_DIR}/${VARIANT}"
+    pushd "${BUILD_DIR}/${VARIANT}" >/dev/null
+    cmake -G Ninja -S "${SRC_DIR}/runtimes" \
+        -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}/${VARIANT}" \
+        -DCMAKE_BUILD_TYPE="Release" \
+        -DCMAKE_C_COMPILER="clang" \
+        -DCMAKE_CXX_COMPILER="clang++" \
+        -DCMAKE_SYSTEM_NAME="Linux" \
+        -DCMAKE_C_FLAGS_RELEASE="${CFLAGS_RELEASE}" \
+        -DCMAKE_CXX_FLAGS_RELEASE="${CFLAGS_RELEASE}" \
+        -DCMAKE_C_FLAGS="${CMAKE_CFLAGS}" \
+        -DCMAKE_CXX_FLAGS="${CMAKE_CFLAGS}" \
+        -DCMAKE_ASM_FLAGS="${CMAKE_CFLAGS}" \
+        -DLIBCXX_ENABLE_SHARED="False" \
+        -DLIBCXX_HAS_MUSL_LIBC="True" \
+        -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT="False" \
+        -DLIBCXXABI_USE_LLVM_UNWINDER="True" \
+        -DLIBCXXABI_ENABLE_SHARED="False" \
+        -DLIBCXXABI_ENABLE_WERROR="True" \
+        -DLIBUNWIND_ENABLE_SHARED="False" \
+        -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind"
+    ninja -t clean all
+    ninja
+    ninja install
+    popd >/dev/null
+echo "Linux c++ libs install ..."
+done
+
 echo "Build and installation complete."
 
 # --- Create artifact ---
