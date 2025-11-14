@@ -8,4 +8,4 @@ jobs:
   base:
     uses: ./.github/workflows/base-build.yml
     with:
-      build-script: "src/qualcomm-software/embedded/scripts/build.sh"
+      build-script: "src/qualcomm-software/embedded/scripts/build.sh --artifact-dir /local/mnt/workspace/nightly-toolchain/${{ github.ref_name }}"

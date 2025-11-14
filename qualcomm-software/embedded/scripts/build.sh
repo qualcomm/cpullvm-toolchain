@@ -44,7 +44,7 @@ Options:
   --artifact-dir <path>       Directory to copy final tarball
   --skip-tests                Skip LLVM test steps
   --aarch64-sysroot <path>    AArch64 sysroot (default: /usr/aarch64-linux-gnu)
-  --aarch64-build             Aarch64 build
+  --aarch64-build             AArch64 build
   --clean                     Delete and recreate build/install dirs
 
 Examples:
@@ -87,7 +87,6 @@ COMPILER_RT_AARCH64_BM_FLAGS="--target=aarch64-none-elf -mcpu=cortex-a53 -ffunct
 # aarch64 cross compilation environment
 SYS_ROOT_AARCH64="/usr"
 AARCH64_LIBC="${SYS_ROOT_AARCH64}/aarch64-none-linux-gnu/libc"
-AARCH64_LINUX_FLAGS="--target=aarch64-linux-gnu --sysroot=${AARCH64_LIBC} --gcc-toolchain=${SYS_ROOT_AARCH64} -pthread"
 
 # --- Prepare build/install dirs of aarch64 ---
 if [[ "${CLEAN}" == "true" ]]; then
@@ -171,10 +170,8 @@ if [[ "${AARCH64_BUILD}" == "true" ]]; then
     -DCMAKE_C_COMPILER="clang" \
     -DCMAKE_CXX_COMPILER="clang++" \
     -DCMAKE_C_FLAGS="--target=aarch64-linux-gnu \
-                     --sysroot=${AARCH64_LIBC} \
                      --gcc-toolchain=${SYS_ROOT_AARCH64}" \
     -DCMAKE_CXX_FLAGS="--target=aarch64-linux-gnu \
-                       --sysroot=${AARCH64_LIBC} \
                        --gcc-toolchain=${SYS_ROOT_AARCH64}" \
     -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
     -DLLVM_TABLEGEN="${INSTALL_DIR}/bin/llvm-tblgen" \
