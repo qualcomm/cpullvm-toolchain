@@ -26,7 +26,7 @@ jobs:
       AARCH64_SYSROOT: "/usr/aarch64-linux-gnu"
       COMPILER_RT_ARM32_LINUX_BUILDDIR: "${{ github.workspace }}/build/compiler-rt/arm32/linux"
       COMPILER_RT_AARCH64_LINUX_BUILDDIR: "${{ github.workspace }}/build/compiler-rt/aarch64/linux"
-      COMPILER_RT_ARM32_LINUX_FLAGS: "--target=arm-linux-gnueabi -mcpu=cortex-a9 -mfloat-abi=softfp -mfpu=neon"
+      COMPILER_RT_ARM32_LINUX_FLAGS: "--sysroot=/usr/arm-linux-gnueabi --target=arm-linux-gnueabi -mcpu=cortex-a9 -mfloat-abi=softfp -mfpu=neon"
       COMPILER_RT_AARCH64_LINUX_FLAGS: "--sysroot=/usr/aarch64-linux-gnu --target=aarch64-linux-gnu -mcpu=cortex-a53"
       ARM32_BM_TRIPLE: "arm-none-eabi"
       AARCH64_BM_TRIPLE: "aarch64-none-elf"
