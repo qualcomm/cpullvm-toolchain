@@ -84,9 +84,7 @@ COMPILER_RT_AARCH64_BM_BUILDDIR="${WORKSPACE}/build/compiler-rt/aarch64/baremeta
 COMPILER_RT_ARM32_BM_FLAGS="--target=arm-none-eabi -mcpu=cortex-a9 -ffunction-sections -fdata-sections -mfloat-abi=softfp -mfpu=neon -nostdlibinc"
 COMPILER_RT_AARCH64_BM_FLAGS="--target=aarch64-none-elf -mcpu=cortex-a53 -ffunction-sections -fdata-sections -nostdlibinc"
 
-# aarch64 cross compilation environment
-SYS_ROOT_AARCH64="/usr"
-AARCH64_LIBC="${SYS_ROOT_AARCH64}/aarch64-none-linux-gnu/libc"
+GCC_ROOT_AARCH64="/usr"
 
 # --- Prepare build/install dirs of aarch64 ---
 if [[ "${CLEAN}" == "true" ]]; then
@@ -166,21 +164,19 @@ if [[ "${AARCH64_BUILD}" == "true" ]]; then
     -DLLVM_POLLY_LINK_INTO_TOOLS="ON" \
     -DCMAKE_SYSTEM_NAME="Linux" \
     -DCMAKE_SYSTEM_PROCESSOR="aarch64" \
-    -DCMAKE_SYSROOT="${AARCH64_LIBC}" \
+    -DCMAKE_SYSROOT="${AARCH64_SYSROOT}" \
     -DCMAKE_C_COMPILER="clang" \
     -DCMAKE_CXX_COMPILER="clang++" \
     -DCMAKE_C_FLAGS="--target=aarch64-linux-gnu \
-                     --gcc-toolchain=${SYS_ROOT_AARCH64}" \
+                     --gcc-toolchain=${GCC_ROOT_AARCH64}" \
     -DCMAKE_CXX_FLAGS="--target=aarch64-linux-gnu \
-                       --gcc-toolchain=${SYS_ROOT_AARCH64}" \
+                       --gcc-toolchain=${GCC_ROOT_AARCH64}" \
     -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
     -DLLVM_TABLEGEN="${INSTALL_DIR}/bin/llvm-tblgen" \
     -DCLANG_TABLEGEN="${INSTALL_DIR}/bin/clang-tblgen" \
     -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}"
 
-  log "Building LLVM"
-  ninja
-  log "Installing LLVM"
+  log "Building LLVM and Installing"
   ninja install
   popd >/dev/null
 fi
@@ -224,7 +220,6 @@ cmake -G Ninja \
   -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
   -DCXX_SUPPORTS_UNWINDLIB_NONE_FLAG:BOOL="OFF" \
   "${SRC_DIR}/compiler-rt"
-ninja
 ninja install
 popd >/dev/null
 
@@ -260,7 +255,6 @@ cmake -G Ninja \
     -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
     -DCXX_SUPPORTS_UNWINDLIB_NONE_FLAG:BOOL="OFF" \
     "${SRC_DIR}/compiler-rt"
-ninja
 ninja install
 popd >/dev/null
 
@@ -285,7 +279,6 @@ cmake -G Ninja \
     -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
     -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
     "${SRC_DIR}/compiler-rt"
-ninja
 ninja install
 popd >/dev/null
 
@@ -398,18 +391,19 @@ echo "Build and installation complete."
 
 # --- Create artifact ---
 log "Creating artifact tarball"
-pushd "${INSTALL_DIR}" >/dev/null
 short_sha="$(git -C "${SRC_DIR}" rev-parse --short HEAD)"
-tar_file="${ELD_BRANCH##*/}_${short_sha}_$(date +%Y%m%d).tgz"
 
 if [[ "${AARCH64_BUILD}" == "true" ]]; then
-    cp -r aarch64/bin aarch64/lib aarch64/libexec aarch64/share aarch64/tools .
-    rm -rf aarch64
+    cp -r "${INSTALL_DIR}"/aarch64* "${INSTALL_DIR}"/armv7* -t "${INSTALL_DIR_AARCH64}"
+    # FIXME: should this be lib/clang or lib/clang/21/lib/ only?
+    # rm -rf "${INSTALL_DIR_AARCH64}"/lib/clang
+    cp -r "${INSTALL_DIR}"/lib/clang "${INSTALL_DIR_AARCH64}"/lib
     tar_file="${ELD_BRANCH##*/}_${short_sha}_aarch64_$(date +%Y%m%d).tgz"
+    tar -czvf "${BUILD_DIR_AARCH64}/${tar_file}" "${INSTALL_DIR_AARCH64}"
+else
+    tar_file="${ELD_BRANCH##*/}_${short_sha}_$(date +%Y%m%d).tgz"
+    tar -czvf "${BUILD_DIR}/${tar_file}" "${INSTALL_DIR}"
 fi
-
-tar -czvf "${BUILD_DIR}/${tar_file}" .
-popd >/dev/null
 
 if [[ -n "${ARTIFACT_DIR}" ]]; then
     mkdir -p "${ARTIFACT_DIR}"
