@@ -165,7 +165,6 @@ if [[ "${AARCH64_BUILD}" == "true" ]]; then
     -DLLVM_POLLY_LINK_INTO_TOOLS="ON" \
     -DCMAKE_SYSTEM_NAME="Linux" \
     -DCMAKE_SYSTEM_PROCESSOR="aarch64" \
-    -DCMAKE_SYSROOT="${AARCH64_SYSROOT}" \
     -DCMAKE_C_COMPILER="clang" \
     -DCMAKE_CXX_COMPILER="clang++" \
     -DCMAKE_C_FLAGS="--target=aarch64-linux-gnu \
