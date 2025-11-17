@@ -394,10 +394,8 @@ log "Creating artifact tarball"
 short_sha="$(git -C "${SRC_DIR}" rev-parse --short HEAD)"
 
 if [[ "${AARCH64_BUILD}" == "true" ]]; then
-    cp -r "${INSTALL_DIR}"/aarch64* "${INSTALL_DIR}"/armv7* -t "${INSTALL_DIR_AARCH64}"
-    # FIXME: should this be lib/clang or lib/clang/21/lib/ only?
-    # rm -rf "${INSTALL_DIR_AARCH64}"/lib/clang
-    cp -r "${INSTALL_DIR}"/lib/clang "${INSTALL_DIR_AARCH64}"/lib
+    cp -r "${INSTALL_DIR}"/aarch64-* "${INSTALL_DIR}"/armv7-* "${INSTALL_DIR_AARCH64}/"
+    cp -r "${INSTALL_DIR}"/lib/clang/[0-9]*/lib "${INSTALL_DIR_AARCH64}"/lib/clang/[0-9]*/
     tar_file="${ELD_BRANCH##*/}_${short_sha}_aarch64_$(date +%Y%m%d).tgz"
     tar -czvf "${BUILD_DIR_AARCH64}/${tar_file}" "${INSTALL_DIR_AARCH64}"
 else
