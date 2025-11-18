@@ -156,6 +156,7 @@ if [[ "${AARCH64_BUILD}" == "true" ]]; then
     -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR_AARCH64}" \
     -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
     -DLLVM_TARGETS_TO_BUILD="ARM;AArch64" \
+    -DLLVM_HOST_TRIPLE="aarch64-linux-gnu" \
     -DELD_TARGETS_TO_BUILD="ARM;AArch64" \
     -DLLVM_EXTERNAL_PROJECTS="eld" \
     -DLLVM_EXTERNAL_ELD_SOURCE_DIR="${SRC_DIR}/llvm/tools/eld" \
@@ -396,17 +397,17 @@ short_sha="$(git -C "${SRC_DIR}" rev-parse --short HEAD)"
 if [[ "${AARCH64_BUILD}" == "true" ]]; then
     cp -r "${INSTALL_DIR}"/aarch64-* "${INSTALL_DIR}"/armv7-* "${INSTALL_DIR_AARCH64}/"
     cp -r "${INSTALL_DIR}"/lib/clang/[0-9]*/lib "${INSTALL_DIR_AARCH64}"/lib/clang/[0-9]*/
-    tar_file="${ELD_BRANCH##*/}_${short_sha}_aarch64_$(date +%Y%m%d).tgz"
-    tar -czvf "${BUILD_DIR_AARCH64}/${tar_file}" "${INSTALL_DIR_AARCH64}"
+    tar_file="${BUILD_DIR_AARCH64}/${ELD_BRANCH##*/}_${short_sha}_aarch64_$(date +%Y%m%d).tgz"
+    tar -czvf "${tar_file}" "${INSTALL_DIR_AARCH64}"
 else
-    tar_file="${ELD_BRANCH##*/}_${short_sha}_$(date +%Y%m%d).tgz"
-    tar -czvf "${BUILD_DIR}/${tar_file}" "${INSTALL_DIR}"
+    tar_file="${BUILD_DIR}/${ELD_BRANCH##*/}_${short_sha}_$(date +%Y%m%d).tgz"
+    tar -czvf "${tar_file}" "${INSTALL_DIR}"
 fi
 
 if [[ -n "${ARTIFACT_DIR}" ]]; then
     mkdir -p "${ARTIFACT_DIR}"
-    cp "${BUILD_DIR}/${tar_file}" "${ARTIFACT_DIR}/"
+    cp "${tar_file}" "${ARTIFACT_DIR}/"
     log "Artifact copied to ${ARTIFACT_DIR}/${tar_file}"
 else
-    warn "Artifact left at ${BUILD_DIR}/${tar_file}"
+    warn "Artifact left at ${tar_file}"
 fi
