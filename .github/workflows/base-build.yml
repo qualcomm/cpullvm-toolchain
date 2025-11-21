@@ -1,0 +1,42 @@
+name: base-build
+
+on:
+  workflow_call:
+    inputs:
+      build-script:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    steps:
+      - name: Cleanup workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Cleaning workspace: ${GITHUB_WORKSPACE}"
+          shopt -s dotglob nullglob
+          rm -rf "${GITHUB_WORKSPACE}/"*
+          rm -rf "${GITHUB_WORKSPACE}/"..?*
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref:        ${{ github.event.pull_request.head.sha || github.sha }}
+          path: src
+          clean: true
+
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          ${{ inputs.build-script }}

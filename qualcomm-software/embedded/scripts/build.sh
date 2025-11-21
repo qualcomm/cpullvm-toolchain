@@ -18,9 +18,9 @@ readonly ELD_BRANCH="main"
 readonly MUSL_EMBEDDED_REPO_URL="https://github.com/qualcomm/musl-embedded.git"
 readonly MUSL_EMBEDDED_BRANCH="main"
 
-SCRIPT_DIR=$(
-  cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd
-)
+SCRIPT_DIR="$(
+  cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" >/dev/null && pwd
+)"
 REPO_ROOT="$( git -C "${SCRIPT_DIR}" rev-parse --show-toplevel )"
 WORKSPACE="${REPO_ROOT}/.."
 SRC_DIR="${REPO_ROOT}"
@@ -30,7 +30,7 @@ ARTIFACT_DIR=""
 SKIP_TESTS="false"
 JOBS="${JOBS:-$(nproc)}"
 
-log() { echo -e "\033[1;34m[precheckin]\033[0m $*"; }
+log() { echo -e "\033[1;34m[log]\033[0m $*"; }
 warn() { echo -e "\033[1;33m[warn]\033[0m $*"; }
 
 usage() {
@@ -177,7 +177,6 @@ cmake -G Ninja \
   -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
   -DCXX_SUPPORTS_UNWINDLIB_NONE_FLAG:BOOL="OFF" \
   "${SRC_DIR}/compiler-rt"
-ninja
 ninja install
 popd >/dev/null
 
@@ -213,8 +212,6 @@ cmake -G Ninja \
     -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
     -DCXX_SUPPORTS_UNWINDLIB_NONE_FLAG:BOOL="OFF" \
     "${SRC_DIR}/compiler-rt"
-ninja -t clean all
-ninja
 ninja install
 popd >/dev/null
 
@@ -239,7 +236,6 @@ cmake -G Ninja \
     -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
     -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
     "${SRC_DIR}/compiler-rt"
-ninja
 ninja install
 popd >/dev/null
 
@@ -271,7 +267,6 @@ cmake -G Ninja \
     -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
     -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
     "${SRC_DIR}/compiler-rt"
-ninja -t clean all
 ninja
 ninja install
 popd >/dev/null
@@ -281,7 +276,7 @@ export PATH="${INSTALL_DIR}/bin:${PATH}"
 log "Building musl-embedded"
 MUSL_BUILDDIR="${WORKSPACE}/musl-embedded"
 source "${MUSL_BUILDDIR}/qualcomm-software/config/component_list.sh"
-for lib in ${musl_components[*]}; do
+for lib in "${musl_components[@]}"; do
   libName="$(echo "${lib}" | awk -F".sh," '{print $1}')"
   dirName="$(echo "${lib}" | awk -F"," '{print $2}')"
   pushd "${MUSL_BUILDDIR}" >/dev/null
@@ -305,9 +300,9 @@ CFLAGS["aarch64-pacret-b-key-bti-none-elf"]="-mcpu=cortex-a53 -nostartfiles -mar
 CFLAGS["armv7-none-eabi"]="-mcpu=cortex-a9 -mthumb -specs=nosys.specs"
 CFLAGS_RELEASE="-Os -DNDEBUG"
 for VARIANT in "aarch64-none-elf" "aarch64-pacret-b-key-bti-none-elf" "armv7-none-eabi"; do
-    TRIPLE="${Triples[${VARIANT}]}"
+    TRIPLE="${Triples[$VARIANT]}"
     MUSL_INC="${INSTALL_DIR}/${TRIPLE}/libc/include"
-    CMAKE_CFLAGS="-target ${TRIPLE} -nostdinc -isystem ${MUSL_INC} -ccc-gcc-name ${TRIPLE}-g++ -fno-unroll-loops -fno-optimize-sibling-calls -ffunction-sections -fdata-sections -fno-exceptions -D_GNU_SOURCE ${CFLAGS[${VARIANT}]}"
+    CMAKE_CFLAGS="-target ${TRIPLE} -nostdinc -isystem ${MUSL_INC} -ccc-gcc-name ${TRIPLE}-g++ -fno-unroll-loops -fno-optimize-sibling-calls -ffunction-sections -fdata-sections -fno-exceptions -D_GNU_SOURCE ${CFLAGS[$VARIANT]}"
     mkdir -p "${BUILD_DIR}/${VARIANT}"
     pushd "${BUILD_DIR}/${VARIANT}" >/dev/null
     cmake -G Ninja -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}/${VARIANT}" -DCMAKE_BUILD_TYPE="Release" -DCMAKE_C_COMPILER="clang" -DCMAKE_CXX_COMPILER="clang++" \
@@ -344,11 +339,10 @@ for VARIANT in "aarch64-none-elf" "aarch64-pacret-b-key-bti-none-elf" "armv7-non
         -DLIBUNWIND_SHARED_OUTPUT_NAME="unwind-shared" \
         -DUNIX="True" \
         -S "${SRC_DIR}/runtimes" "-DLLVM_ENABLE_RUNTIMES=libcxx;libcxxabi;libunwind"
-    ninja -t clean all
     ninja
     ninja install
     popd >/dev/null
-echo "c++ libs install ..."
+    echo "c++ libs install ..."
 done
 echo "Build and installation complete."
 
