@@ -1,6 +1,9 @@
-name: nightly-aarch64
+name: Nightly-aarch64
 
 on:
+  repository_dispatch:
+    types: [trigger-nightly-aarch64]
+
   schedule:
     - cron: '0 5 * * *' # 9 PM PT (UTC)
 
@@ -9,3 +12,5 @@ jobs:
     uses: ./.github/workflows/base-build.yml
     with:
       build-script: "src/qualcomm-software/embedded/scripts/build.sh --artifact-dir /local/mnt/workspace/nightly-toolchain/${{ github.ref_name }} --aarch64-build"
+      is-nightly: true
+      arch: aarch64
