@@ -61,5 +61,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nightly-${{ github.ref_name }}-${{ inputs.arch }}
-          path: ${{ env.ARTIFACT_DIR }}/*.tar.gz
+          path: ${{ env.ARTIFACT_DIR }}/*.txz
           retention-days: 30

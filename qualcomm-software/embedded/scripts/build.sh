@@ -1,3 +1,4 @@
+
 #!/usr/bin/env bash
 
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
@@ -31,9 +32,12 @@ INSTALL_DIR_AARCH64="${INSTALL_DIR}/aarch64"
 ARTIFACT_DIR=""
 SKIP_TESTS="false"
 JOBS="${JOBS:-$(nproc)}"
+CLEAN="false"
+AARCH64_BUILD="false"
+NIGHTLY="false"
 
-log() { echo -e "\033[1;34m[log]\033[0m $*"; }
-warn() { echo -e "\033[1;33m[warn]\033[0m $*"; }
+log()  { echo -e "\033[1;34m[log]\033[0m $(date '+%F %T') $*"; }
+warn() { echo -e "\033[1;33m[warn]\033[0m $(date '+%F %T') $*"; }
 
 usage() {
   cat <<'EOF'
@@ -45,6 +49,7 @@ Options:
   --skip-tests                Skip LLVM test steps
   --aarch64-sysroot <path>    AArch64 sysroot (default: /usr/aarch64-linux-gnu)
   --aarch64-build             AArch64 build
+  --nightly                   Nightly build
   --clean                     Delete and recreate build/install dirs
 
 Examples:
@@ -52,19 +57,17 @@ Examples:
 EOF
 }
 
-CLEAN="false"
-AARCH64_BUILD="false"
-
 # --- Parse args ---
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --artifact-dir) ARTIFACT_DIR="$2"; shift 2 ;;
     --skip-tests) SKIP_TESTS="true"; shift ;;
     --aarch64-build) AARCH64_BUILD="true"; shift ;;
+    --nightly) NIGHTLY="true"; shift ;;
     --aarch64-sysroot) AARCH64_SYSROOT="$2"; shift 2 ;;
     --clean) CLEAN="true"; shift ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "Unknown arg: $1"; usage; exit 1 ;;
+    *) warn "Unknown arg: $1"; usage; exit 1 ;;
   esac
 done
 
@@ -109,9 +112,9 @@ fi
 if [[ ! -d "${REPO_ROOT}/llvm/tools/eld/.git" ]]; then
   log "Cloning ELD to ${REPO_ROOT}/llvm/tools/eld"
   git clone "${ELD_REPO_URL}" "${SRC_DIR}/llvm/tools/eld" -b "${ELD_BRANCH}"
-  # Pin ELD to known commit
+  ELD_PINNED_COMMIT="65ea860802c41ef5c0becff9750a350495de27b0"
   pushd "${SRC_DIR}/llvm/tools/eld" >/dev/null
-  git checkout "65ea860802c41ef5c0becff9750a350495de27b0"
+  git checkout "${ELD_PINNED_COMMIT}"
   popd >/dev/null
 else
   log "ELD already present under llvm/tools, leaving as-is"
@@ -332,7 +335,7 @@ for lib in "${musl_components[@]}"; do
 done
 
 # --- c++ libs ---
-echo "Build c++ libs ..."
+log "Build c++ libs ..."
 
 declare -A Triples
 Triples["aarch64-none-elf"]="aarch64-none-elf"
@@ -386,28 +389,49 @@ for VARIANT in "aarch64-none-elf" "aarch64-pacret-b-key-bti-none-elf" "armv7-non
     ninja
     ninja install
     popd >/dev/null
-    echo "c++ libs install ..."
+    log "c++ libs install ..."
 done
-echo "Build and installation complete."
+log "Build and installation complete."
 
 # --- Create artifact ---
 log "Creating artifact tarball"
+
 short_sha="$(git -C "${SRC_DIR}" rev-parse --short HEAD)"
+suffix="$(date +%Y%m%d)"
+archive_root="${BUILD_DIR}"
+archive_dir="${INSTALL_DIR}"
+COMPRESS_EXT="tgz"
+COMPRESS_FLAG="-czvf"
+archive_name="${ELD_BRANCH##*/}_${short_sha}_${suffix}.${COMPRESS_EXT}"
 
 if [[ "${AARCH64_BUILD}" == "true" ]]; then
+    log "Preparing AARCH64 build"
+    mkdir -p "${INSTALL_DIR_AARCH64}"
     cp -r "${INSTALL_DIR}"/aarch64-* "${INSTALL_DIR}"/armv7-* "${INSTALL_DIR_AARCH64}/"
-    cp -r "${INSTALL_DIR}"/lib/clang/[0-9]*/lib "${INSTALL_DIR_AARCH64}"/lib/clang/[0-9]*/
-    tar_file="${BUILD_DIR_AARCH64}/${ELD_BRANCH##*/}_${short_sha}_aarch64_$(date +%Y%m%d).tgz"
-    tar -czvf "${tar_file}" "${INSTALL_DIR_AARCH64}"
-else
-    tar_file="${BUILD_DIR}/${ELD_BRANCH##*/}_${short_sha}_$(date +%Y%m%d).tgz"
-    tar -czvf "${tar_file}" "${INSTALL_DIR}"
+    cp -r "${INSTALL_DIR}"/lib/clang/[0-9]*/lib "${INSTALL_DIR_AARCH64}/lib/clang/[0-9]*/"
+    archive_root="${BUILD_DIR_AARCH64}"
+    archive_dir="${INSTALL_DIR_AARCH64}"
+    archive_name="${ELD_BRANCH##*/}_${short_sha}_aarch64_${suffix}.${COMPRESS_EXT}"
 fi
 
+if [[ "${NIGHTLY}" == "true" ]]; then
+    log "Applying NIGHTLY compression settings"
+    COMPRESS_EXT="txz"
+    COMPRESS_FLAG="-cJvf --threads=${JOBS:-$(nproc)}"
+    archive_name="${archive_name%.tgz}_nightly.${COMPRESS_EXT}"
+fi
+
+# Create tarball
+tar_file="${archive_root}/${archive_name}"
+log "Compressing ${archive_dir} into ${tar_file}"
+tar ${COMPRESS_FLAG} "${tar_file}" "${archive_dir}"
+
+# Copy artifact if destination provided
 if [[ -n "${ARTIFACT_DIR}" ]]; then
     mkdir -p "${ARTIFACT_DIR}"
     cp "${tar_file}" "${ARTIFACT_DIR}/"
-    log "Artifact copied to ${ARTIFACT_DIR}/${tar_file}"
+    log "Artifact copied to ${ARTIFACT_DIR}/${archive_name}"
 else
     warn "Artifact left at ${tar_file}"
 fi
+
