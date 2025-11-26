@@ -11,6 +11,6 @@ jobs:
   base:
     uses: ./.github/workflows/base-build.yml
     with:
-      build-script: "src/qualcomm-software/embedded/scripts/build.sh --artifact-dir /local/mnt/workspace/nightly-toolchain/${{ github.ref_name }} --aarch64-build"
+      build-script: "src/qualcomm-software/embedded/scripts/build.sh"
       is-nightly: true
       arch: aarch64

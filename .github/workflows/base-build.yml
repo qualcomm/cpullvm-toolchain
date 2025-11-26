@@ -1,3 +1,4 @@
+
 name: base-build
 
 on:
@@ -13,7 +14,6 @@ on:
         required: false
         type: string
 
-
 permissions:
   contents: read
 
@@ -24,6 +24,8 @@ concurrency:
 jobs:
   build:
     runs-on: self-hosted
+    env:
+      ARTIFACT_DIR: ${{ github.workspace }}/nightly-toolchain
 
     steps:
       - name: Cleanup workspace
@@ -47,12 +49,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ${{ inputs.build-script }}
+          build_script="${{ inputs.build-script }}"
+          if [ "${{ inputs.is-nightly }}" = "true" ]; then
+            build_script="$build_script --artifact-dir $ARTIFACT_DIR"
+          fi
+          echo "Running: $build_script"
+          $build_script
 
       - name: Upload Artifact
         if: ${{ inputs.is-nightly && success() }}
         uses: actions/upload-artifact@v4
         with:
           name: nightly-${{ github.ref_name }}-${{ inputs.arch }}
-          path: /local/mnt/workspace/nightly-toolchain/${{ github.ref_name }}/*.tar.gz
+          path: ${{ env.ARTIFACT_DIR }}/*.tar.gz
           retention-days: 30
