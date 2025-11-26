@@ -53,6 +53,6 @@ jobs:
         if: ${{ inputs.is-nightly && success() }}
         uses: actions/upload-artifact@v4
         with:
-          name: nightly-${{ github.ref_name.replace('/', '-') }}-${{ inputs.arch }}
+          name: nightly-${{ github.ref_name }}-${{ inputs.arch }}
           path: /local/mnt/workspace/nightly-toolchain/${{ github.ref_name }}/*.tar.gz
           retention-days: 30
