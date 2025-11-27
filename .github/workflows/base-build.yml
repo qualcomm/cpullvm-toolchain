@@ -58,7 +58,7 @@ jobs:
           set -euo pipefail
           build_script="${{ inputs.build-script }}"
           if [ "${{ inputs.is-nightly }}" = "true" ]; then
-            build_script="$build_script --artifact-dir $ARTIFACT_DIR"
+            build_script="$build_script --artifact-dir $ARTIFACT_DIR --nightly"
           fi
           echo "Running: $build_script"
           $build_script
