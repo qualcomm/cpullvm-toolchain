@@ -1,4 +1,4 @@
-name: Nightly-AArch64-linux
+name: Nightly-Linux-AArch64
 
 on:
   repository_dispatch:
@@ -11,6 +11,6 @@ jobs:
   base:
     uses: ./.github/workflows/base-build.yml
     with:
-      build-script: "src/qualcomm-software/embedded/scripts/build.sh --aarch64-build"
+      build-script: "src/qualcomm-software/embedded/scripts/build.sh --aarch64-build --nightly"
       is-nightly: true
-      arch: aarch64
+      arch: AArch64

@@ -1,4 +1,4 @@
-name: Nightly-x86-linux
+name: Nightly-Linux-x86_64
 
 on:
   repository_dispatch:
@@ -11,6 +11,6 @@ jobs:
   base:
     uses: ./.github/workflows/base-build.yml
     with:
-      build-script: "src/qualcomm-software/embedded/scripts/build.sh"
+      build-script: "src/qualcomm-software/embedded/scripts/build.sh --nightly"
       is-nightly: true
-      arch: x86
+      arch: x86_64

@@ -13,6 +13,10 @@
 
 set -euo pipefail
 
+log()  { echo -e "\033[1;34m[log]\033[0m $(date '+%F %T') $*"; }
+warn() { echo -e "\033[1;33m[warn]\033[0m $(date '+%F %T') $*"; }
+trap 'warn "Script failed at line $LINENO: \"$BASH_COMMAND\" (exit code: $?)"; exit 1' ERR
+
 readonly ELD_REPO_URL="https://github.com/qualcomm/eld.git"
 readonly ELD_BRANCH="release/21.x"
 
@@ -36,8 +40,6 @@ CLEAN="false"
 AARCH64_BUILD="false"
 NIGHTLY="false"
 
-log()  { echo -e "\033[1;34m[log]\033[0m $(date '+%F %T') $*"; }
-warn() { echo -e "\033[1;33m[warn]\033[0m $(date '+%F %T') $*"; }
 
 usage() {
   cat <<'EOF'
@@ -112,7 +114,7 @@ fi
 if [[ ! -d "${REPO_ROOT}/llvm/tools/eld/.git" ]]; then
   log "Cloning ELD to ${REPO_ROOT}/llvm/tools/eld"
   git clone "${ELD_REPO_URL}" "${SRC_DIR}/llvm/tools/eld" -b "${ELD_BRANCH}"
-  ELD_PINNED_COMMIT="65ea860802c41ef5c0becff9750a350495de27b0"
+  ELD_PINNED_COMMIT="${ELD_PINNED_COMMIT:-65ea860802c41ef5c0becff9750a350495de27b0}"
   pushd "${SRC_DIR}/llvm/tools/eld" >/dev/null
   git checkout "${ELD_PINNED_COMMIT}"
   popd >/dev/null
@@ -402,7 +404,7 @@ archive_root="${BUILD_DIR}"
 archive_dir="${INSTALL_DIR}"
 COMPRESS_EXT="tgz"
 COMPRESS_FLAG="-czvf"
-archive_name="${ELD_BRANCH##*/}_${short_sha}_${suffix}.${COMPRESS_EXT}"
+archive_name="cpullvm-toolchain-${ELD_BRANCH##*/}-Linux-x86_64-${short_sha}-${suffix}.${COMPRESS_EXT}"
 
 if [[ "${AARCH64_BUILD}" == "true" ]]; then
     log "Preparing AARCH64 build"
@@ -411,7 +413,7 @@ if [[ "${AARCH64_BUILD}" == "true" ]]; then
     cp -r "${INSTALL_DIR}"/lib/clang/[0-9]*/lib "${INSTALL_DIR_AARCH64}/lib/clang/[0-9]*/"
     archive_root="${BUILD_DIR_AARCH64}"
     archive_dir="${INSTALL_DIR_AARCH64}"
-    archive_name="${ELD_BRANCH##*/}_${short_sha}_aarch64_${suffix}.${COMPRESS_EXT}"
+    archive_name="cpullvm-toolchain-${ELD_BRANCH##*/}-Linux-AArch64-${short_sha}-${suffix}.${COMPRESS_EXT}"
 fi
 
 if [[ "${NIGHTLY}" == "true" ]]; then
