@@ -44,14 +44,6 @@ jobs:
           path: src
           clean: true
 
-      - name: Cache LLVM and toolchain build
-        uses: actions/cache@v3
-        with:
-          path: build
-          key: ${{ runner.os }}-llvm-${{ inputs.arch }}-${{ github.ref_name }}
-          restore-keys: |
-            ${{ runner.os }}-llvm-${{ inputs.arch }}-
-
       - name: Build
         shell: bash
         run: |
