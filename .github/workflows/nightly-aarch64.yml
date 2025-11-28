@@ -1,6 +1,7 @@
 name: Nightly-Linux-AArch64
 
 on:
+  workflow_dispatch:
   repository_dispatch:
     types: [trigger-nightly-aarch64-linux]
 
