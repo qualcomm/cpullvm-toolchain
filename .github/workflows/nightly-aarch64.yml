@@ -1,0 +1,11 @@
+name: Nightly-AArch64-Stub
+
+on:
+  workflow_dispatch:  # minimal trigger so GitHub indexes it
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: No-op
+
