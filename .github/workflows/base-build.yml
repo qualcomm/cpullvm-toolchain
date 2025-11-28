@@ -1,3 +1,4 @@
+
 name: base-build
 
 on:
@@ -5,6 +6,12 @@ on:
     inputs:
       build-script:
         required: true
+        type: string
+      is-nightly:
+        required: false
+        type: boolean
+      arch:
+        required: false
         type: string
 
 permissions:
@@ -17,6 +24,8 @@ concurrency:
 jobs:
   build:
     runs-on: self-hosted
+    env:
+      ARTIFACT_DIR: ${{ github.workspace }}/nightly-toolchain
 
     steps:
       - name: Cleanup workspace
@@ -25,8 +34,7 @@ jobs:
           set -euo pipefail
           echo "Cleaning workspace: ${GITHUB_WORKSPACE}"
           shopt -s dotglob nullglob
-          rm -rf "${GITHUB_WORKSPACE}/"*
-          rm -rf "${GITHUB_WORKSPACE}/"..?*
+          rm -rf "${GITHUB_WORKSPACE:?}/"*
 
       - name: Checkout source
         uses: actions/checkout@v4
@@ -40,4 +48,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ${{ inputs.build-script }}
+          build_script="${{ inputs.build-script }}"
+          if [ "${{ inputs.is-nightly }}" = "true" ]; then
+            build_script="$build_script --artifact-dir $ARTIFACT_DIR --nightly"
+          fi
+          echo "Running: $build_script"
+          $build_script
+
+      - name: Upload Artifact
+        if: ${{ inputs.is-nightly && success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpullvm-toolchain-${{ github.ref_name }}-Linux-${{ inputs.arch }}
+          path: ${{ env.ARTIFACT_DIR }}/*.{txz,tgz}
+          if-no-files-found: ignore
+          retention-days: 30

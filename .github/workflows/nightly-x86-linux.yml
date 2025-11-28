@@ -1,0 +1,16 @@
+name: Nightly-Linux-x86_64
+
+on:
+  repository_dispatch:
+    types: [trigger-nightly-x86-linux]
+
+  schedule:
+    - cron: '0 5 * * *' # 9 PM PT (UTC)
+
+jobs:
+  base:
+    uses: ./.github/workflows/base-build.yml
+    with:
+      build-script: "src/qualcomm-software/embedded/scripts/build.sh"
+      is-nightly: true
+      arch: x86_64
