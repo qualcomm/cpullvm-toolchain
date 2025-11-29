@@ -49,7 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           build_script="${{ inputs.build-script }}"
-          build_script="$build_script --artifact-dir $ARTIFACT_DIR --nightly" # Remove this line
+          build_script="$build_script --artifact-dir $ARTIFACT_DIR --nightly" #Remove this line
           if [ "${{ inputs.is-nightly }}" = "true" ]; then
             build_script="$build_script --artifact-dir $ARTIFACT_DIR --nightly"
           fi
@@ -57,7 +57,7 @@ jobs:
           $build_script
 
       - name: Upload Artifact
-        if: ${{ inputs.is-nightly && success() }}
+        ##################if: ${{ inputs.is-nightly && success() }}
         uses: actions/upload-artifact@v4
         with:
           name: cpullvm-toolchain-${{ github.ref_name }}-Linux-${{ inputs.arch }}
