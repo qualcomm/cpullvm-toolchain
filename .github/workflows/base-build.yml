@@ -60,7 +60,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpullvm-toolchain-${{ github.run_id }}-Linux-${{ inputs.arch }}
-          root-directory: ${{ env.ARTIFACT_DIR }}
           path: |
             ${{ env.ARTIFACT_DIR }}/*.txz
             ${{ env.ARTIFACT_DIR }}/*.tgz
