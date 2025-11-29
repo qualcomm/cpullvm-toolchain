@@ -419,8 +419,10 @@ fi
 if [[ "${NIGHTLY}" == "true" ]]; then
     log "Applying NIGHTLY compression settings"
     COMPRESS_EXT="txz"
-    COMPRESS_FLAG="-cJvf --threads=${JOBS:-$(nproc)}"
+    COMPRESS_FLAG="-cJvf"
     archive_name="${archive_name%.tgz}_nightly.${COMPRESS_EXT}"
+    XZ_THREADS="${JOBS:-$(nproc)}"
+    export XZ_OPT="--threads=${XZ_THREADS}"
 fi
 
 # Create tarball
