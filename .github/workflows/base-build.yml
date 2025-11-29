@@ -1,4 +1,3 @@
-
 name: base-build
 
 on:
@@ -34,7 +33,7 @@ jobs:
           set -euo pipefail
           echo "Cleaning workspace: ${GITHUB_WORKSPACE}"
           shopt -s dotglob nullglob
-          rm -rf "${GITHUB_WORKSPACE:?}/"*
+          ###########rm -rf "${GITHUB_WORKSPACE:?}/"*
 
       - name: Checkout source
         uses: actions/checkout@v4
@@ -54,13 +53,16 @@ jobs:
             build_script="$build_script --artifact-dir $ARTIFACT_DIR --nightly"
           fi
           echo "Running: $build_script"
-          $build_script
+          ###############$build_script
 
       - name: Upload Artifact
         ##################if: ${{ inputs.is-nightly && success() }}
         uses: actions/upload-artifact@v4
         with:
-          name: cpullvm-toolchain-${{ github.ref_name }}-Linux-${{ inputs.arch }}
-          path: ${{ env.ARTIFACT_DIR }}/*.{txz,tgz}
+          name: cpullvm-toolchain-${{ github.run_id }}-Linux-${{ inputs.arch }}
+          root-directory: ${{ env.ARTIFACT_DIR }}
+          path: |
+            ${{ env.ARTIFACT_DIR }}/*.txz
+            ${{ env.ARTIFACT_DIR }}/*.tgz
           if-no-files-found: ignore
           retention-days: 30
