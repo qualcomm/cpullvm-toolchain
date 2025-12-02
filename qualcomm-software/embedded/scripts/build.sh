@@ -428,7 +428,7 @@ fi
 # Create tarball
 tar_file="${archive_root}/${archive_name}"
 log "Compressing ${archive_dir} into ${tar_file}"
-tar ${COMPRESS_FLAG} "${tar_file}" "${archive_dir}"
+tar ${COMPRESS_FLAG} "${tar_file}" -C "${archive_dir}" .
 
 # Copy artifact if destination provided
 if [[ -n "${ARTIFACT_DIR}" ]]; then
@@ -438,4 +438,3 @@ if [[ -n "${ARTIFACT_DIR}" ]]; then
 else
     warn "Artifact left at ${tar_file}"
 fi
-
