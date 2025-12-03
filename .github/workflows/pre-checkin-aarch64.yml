@@ -2,6 +2,9 @@ name: pre-checkin-aarch64
 
 on:
   pull_request:
+    paths-ignore:
+      - 'qualcomm-software/embedded/scripts/build.bat'
+      - '.github/workflows/pre-checkin-win.yml'
 
 jobs:
   base:

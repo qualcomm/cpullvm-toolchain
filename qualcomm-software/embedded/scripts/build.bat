@@ -1,27 +1,6 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-REM =========================
-REM :: Main Entry
-REM =========================
-goto :main
-
-REM =========================
-REM :: Subroutines
-REM =========================
-:check_status
-if %errorlevel% neq 0 (
-    echo.
-    echo *** ERROR: %~1 ***
-    echo *** Previous command failed with exit code %errorlevel% ***
-    exit /b %errorlevel%
-)
-goto :eof
-
-REM =========================
-REM :: Main
-REM =========================
-:main
 REM === Derive directories ===
 set "SCRIPT_DIR_RAW=%~dp0"
 if "%SCRIPT_DIR_RAW:~-1%"=="\" (
@@ -30,7 +9,7 @@ if "%SCRIPT_DIR_RAW:~-1%"=="\" (
     set "SCRIPT_DIR=%SCRIPT_DIR_RAW%"
 )
 
-for /f "delims=" %%I in ('git -C "%SCRIPT_DIR%" rev-parse --show-toplevel') do set "REPO_ROOT=%%I"
+for /f "delims=" %%I in ('git -C "%SCRIPT_DIR%" rev-parse --show-toplevel') do set "REPO_ROOT=%%I" || exit /b 1
 for %%I in ("%REPO_ROOT%\..") do set "WORKSPACE=%%~fI"
 
 set "SRC_DIR=%REPO_ROOT%"
@@ -46,8 +25,8 @@ if not defined ASSERTION_MODE set "ASSERTION_MODE=OFF"
 
 REM === Constants ===
 set "ELD_REPO_URL=https://github.com/qualcomm/eld.git"
-set "ELD_BRANCH=main"
-set "ELD_COMMIT=65ea860802c41ef5c0becff9750a350495de27b0"
+set "ELD_BRANCH=release/21.x"
+set "ELD_COMMIT=25ea417cbb7525b1b02fd5d8cb6ec19dee3b9f13"
 
 set "MUSL_EMBEDDED_REPO_URL=https://github.com/qualcomm/musl-embedded.git"
 set "MUSL_EMBEDDED_BRANCH=main"
@@ -66,11 +45,11 @@ echo JOBS         = %JOBS%
 echo.
 
 REM === Tool sanity checks ===
-where git    >nul 2>nul || (echo *** ERROR: git not found on PATH *** & exit /b 1)
-where python >nul 2>nul || (echo *** ERROR: python not found on PATH *** & exit /b 1)
-where cmake  >nul 2>nul || (echo *** ERROR: cmake not found on PATH *** & exit /b 1)
-where ninja  >nul 2>nul || (echo *** ERROR: ninja not found on PATH *** & exit /b 1)
-where clang-cl >nul 2>nul || (echo *** ERROR: clang-cl not found on PATH *** & exit /b 1)
+where git       >nul 2>nul || (echo *** ERROR: git not found on PATH *** & exit /b 1)
+where python    >nul 2>nul || (echo *** ERROR: python not found on PATH *** & exit /b 1)
+where cmake     >nul 2>nul || (echo *** ERROR: cmake not found on PATH *** & exit /b 1)
+where ninja     >nul 2>nul || (echo *** ERROR: ninja not found on PATH *** & exit /b 1)
+where clang-cl  >nul 2>nul || (echo *** ERROR: clang-cl not found on PATH *** & exit /b 1)
 
 REM === Resolve VS (vcvarsall) via vswhere ===
 for /f "usebackq tokens=*" %%V in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VS_INSTALL=%%V"
@@ -85,36 +64,38 @@ if not exist "%VCVARSALL%" (
 )
 
 REM === Configure environment ===
-call "%VCVARSALL%" x64
-call :check_status "vcvarsall failed"
+call "%VCVARSALL%" x64 || exit /b %errorlevel%
 
 REM === Clean (optional) ===
 if /I "%CLEAN%"=="true" (
     echo [precheckin] Cleaning "%BUILD_DIR%" and "%INSTALL_DIR%"
-    if exist "%BUILD_DIR%"   rmdir /S /Q "%BUILD_DIR%"
-    if exist "%INSTALL_DIR%" rmdir /S /Q "%INSTALL_DIR%"
+    if exist "%BUILD_DIR%"   rmdir /S /Q "%BUILD_DIR%"   || exit /b %errorlevel%
+    if exist "%INSTALL_DIR%" rmdir /S /Q "%INSTALL_DIR%" || exit /b %errorlevel%
 )
 
 REM === Prepare workspace ===
 echo [precheckin] Preparing workspace at: "%WORKSPACE%"
-mkdir "%BUILD_DIR%"   2>nul
-mkdir "%INSTALL_DIR%" 2>nul
+mkdir "%BUILD_DIR%"   2>nul || exit /b %errorlevel%
+mkdir "%INSTALL_DIR%" 2>nul || exit /b %errorlevel%
 
 REM === Clone repos if missing ===
 if not exist "%REPO_ROOT%\musl-embedded\.git" (
     echo [precheckin] Cloning musl-embedded...
-    git clone %MUSL_EMBEDDED_REPO_URL% "%REPO_ROOT%\musl-embedded" -b %MUSL_EMBEDDED_BRANCH%
-    call :check_status "clone musl-embedded failed"
+    git clone %MUSL_EMBEDDED_REPO_URL% "%REPO_ROOT%\musl-embedded" -b %MUSL_EMBEDDED_BRANCH% || exit /b %errorlevel%
 )
 
 if not exist "%ELD_DIR%\.git" (
     echo [precheckin] Cloning ELD...
-    git clone %ELD_REPO_URL% "%ELD_DIR%"
-    cd "%ELD_DIR%"
-    git fetch --all
-    git checkout %ELD_COMMIT%
-    call :check_status "clone ELD failed"
+    git clone %ELD_REPO_URL% "%ELD_DIR%" || exit /b %errorlevel%
+    pushd "%ELD_DIR%" || exit /b %errorlevel%
+    git checkout %ELD_COMMIT% || (popd & exit /b %errorlevel%)
+    popd
 )
+
+REM === Apply patches ===
+pushd "%SRC_DIR%" || exit /b %errorlevel%
+python "qualcomm-software/embedded/tools/patchctl.py" apply -f "qualcomm-software/embedded/patchsets.yml" || (popd & exit /b %errorlevel%)
+popd
 
 REM === Build ===
 echo [precheckin] Configuring CMake...
@@ -133,35 +114,23 @@ cmake -G Ninja ^
   -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL ^
   -DCMAKE_BUILD_TYPE="%BUILD_MODE%" ^
   -DLLVM_ENABLE_ASSERTIONS="%ASSERTION_MODE%" ^
-  -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir"
-call :check_status "cmake configure failed"
+  -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" || exit /b %errorlevel%
 
 echo [precheckin] Building LLVM...
-pushd "%BUILD_DIR%\llvm"
-ninja -j %JOBS%
-call :check_status "ninja build failed"
+pushd "%BUILD_DIR%\llvm" || exit /b %errorlevel%
+ninja                 || (popd & exit /b %errorlevel%)
 
 echo [precheckin] Installing LLVM...
-ninja install
-call :check_status "ninja install failed"
+ninja install         || (popd & exit /b %errorlevel%)
 
 REM === LIT / check targets ===
-ninja check-llvm
-call :check_status "check-llvm failed"
- 
-ninja check-lld
-call :check_status "check-lld failed"
+ninja check-llvm      || (popd & exit /b %errorlevel%)
+ninja check-lld       || (popd & exit /b %errorlevel%)
+ninja check-eld       || (popd & exit /b %errorlevel%)
+ninja check-clang     || (popd & exit /b %errorlevel%)
+ninja check-polly     || (popd & exit /b %errorlevel%)
 
-ninja check-eld
-call :check_status "check-eld failed"
- 
-ninja check-clang
-call :check_status "check-clang failed"
- 
-ninja check-polly
-call :check_status "check-polly failed"
 popd
 
 echo [precheckin] Build completed successfully!
-
 exit /b 0

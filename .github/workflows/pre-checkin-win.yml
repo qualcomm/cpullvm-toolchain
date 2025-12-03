@@ -1,89 +1,21 @@
 name: pre-checkin-win-x86_64
 
 on:
-  pull_request:
+  pull_request: ### this will be removed before merging, its for testing.
+  workflow_dispatch:
 
 jobs:
   build-windows:
     runs-on: windows-latest
 
-    env:
-      BUILD_MODE: Release
-      ASSERTION_MODE: OFF
-      JOBS: 8
-      CLEAN: false
-      ELD_REPO_URL: https://github.com/qualcomm/eld.git
-      ELD_BRANCH: main
-      ELD_COMMIT: 65ea860802c41ef5c0becff9750a350495de27b0
-      MUSL_EMBEDDED_REPO_URL: https://github.com/qualcomm/musl-embedded.git
-      MUSL_EMBEDDED_BRANCH: main
-
     steps:
-      # Ensure latest checkout action
-      - name: Checkout PR branch (if pull_request)
-        if: ${{ github.event_name == 'pull_request' }}
+      - name: Checkout source
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
-          path: llvm-top
+          path: src
           fetch-depth: 0
-          persist-credentials: false # Best practice for PRs from forks
-
-      - name: Checkout default branch (non-PR)
-        if: ${{ github.event_name != 'pull_request' }}
-        uses: actions/checkout@v4
-        with:
-          path: llvm-top
-          fetch-depth: 0
-
-      # Setup Python explicitly for reliability
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      # Prepare directories
-      - name: Prepare build and install directories
-        run: |
-          mkdir build
-          mkdir install
-        shell: pwsh
-
-      # Clone musl-embedded repo if not present
-      - name: Clone musl-embedded
-        run: |
-          if (!(Test-Path musl-embedded/.git)) {
-            git clone $env:MUSL_EMBEDDED_REPO_URL musl-embedded -b $env:MUSL_EMBEDDED_BRANCH
-          }
-        shell: pwsh
-
-      # Clone ELD repo and checkout specific commit
-      - name: Clone ELD
-        working-directory: llvm-top
-        run: |
-          if (!(Test-Path llvm/tools/eld/.git)) {
-            git clone $env:ELD_REPO_URL llvm/tools/eld
-            cd llvm/tools/eld
-            git fetch --all
-            git checkout $env:ELD_COMMIT
-          }
-        shell: pwsh
-
-      - name: Configure Git identity
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-        shell: pwsh
-
-      # Apply patches using Python script
-      - name: Apply patches
-        working-directory: llvm-top
-        run: |
-          python qualcomm-software/embedded/tools/patchctl.py apply -f qualcomm-software/embedded/patchsets.yml
-
 
       - name: Build
-        working-directory: llvm-top
+        working-directory: src
         run: |
-           qualcomm-software/embedded/scripts/build.bat
+           ./qualcomm-software/embedded/scripts/build.bat
