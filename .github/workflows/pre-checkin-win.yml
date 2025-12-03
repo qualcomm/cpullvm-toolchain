@@ -1,7 +1,11 @@
 name: pre-checkin-win-x86_64
 
 on:
-  pull_request: ### this will be removed before merging, its for testing.
+  pull_request:
+    paths-ignore:
+      - 'qualcomm-software/embedded/scripts/build.sh'
+      - '.github/workflows/pre-checkin.yml'
+      - '.github/workflows/pre-checkin-aarch64.yml'
   workflow_dispatch:
 
 jobs:
@@ -15,7 +19,22 @@ jobs:
           path: src
           fetch-depth: 0
 
+      - name: Configure Git for patch application
+        working-directory: src
+        shell: cmd
+        run: >
+          git config --local user.name "Qualcomm CI" &&
+          git config --local user.email "ci@qti.qualcomm.com" &&
+          git config --local core.autocrlf false &&
+          git config --local core.safecrlf true
+
       - name: Build
         working-directory: src
-        run: |
-           ./qualcomm-software/embedded/scripts/build.bat
+        shell: cmd
+        env:
+          GIT_AUTHOR_NAME: Qualcomm CI
+          GIT_AUTHOR_EMAIL: ci@qti.qualcomm.com
+          GIT_COMMITTER_NAME: Qualcomm CI
+          GIT_COMMITTER_EMAIL: ci@qti.qualcomm.com
+        run: >
+          .\qualcomm-software\embedded\scripts\build.bat
