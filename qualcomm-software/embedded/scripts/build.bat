@@ -79,9 +79,9 @@ mkdir "%BUILD_DIR%"   2>nul || exit /b %errorlevel%
 mkdir "%INSTALL_DIR%" 2>nul || exit /b %errorlevel%
 
 REM === Clone repos if missing ===
-if not exist "%REPO_ROOT%\musl-embedded\.git" (
+if not exist "%WORKSPACE%\musl-embedded\.git" (
     echo [precheckin] Cloning musl-embedded...
-    git clone %MUSL_EMBEDDED_REPO_URL% "%REPO_ROOT%\musl-embedded" -b %MUSL_EMBEDDED_BRANCH% || exit /b %errorlevel%
+    git clone %MUSL_EMBEDDED_REPO_URL% "%WORKSPACE%\musl-embedded" -b %MUSL_EMBEDDED_BRANCH% || exit /b %errorlevel%
 )
 
 if not exist "%ELD_DIR%\.git" (
