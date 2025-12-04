@@ -127,3 +127,4 @@ if ($FAIL_COUNT -ne 0) {
 } else {
     Write-Host "[log] Build and all tests completed successfully!"
     exit 0
+}
