@@ -118,19 +118,56 @@ cmake -G Ninja ^
 
 echo [precheckin] Building LLVM...
 pushd "%BUILD_DIR%\llvm" || exit /b %errorlevel%
-ninja                 || (popd & exit /b %errorlevel%)
+ninja                 || exit /b %errorlevel%
 
 echo [precheckin] Installing LLVM...
-ninja install         || (popd & exit /b %errorlevel%)
+ninja install         || exit /b %errorlevel%
+
 
 REM === LIT / check targets ===
-ninja check-llvm      || (popd & exit /b %errorlevel%)
-ninja check-lld       || (popd & exit /b %errorlevel%)
-ninja check-eld       || (popd & exit /b %errorlevel%)
-ninja check-clang     || (popd & exit /b %errorlevel%)
-ninja check-polly     || (popd & exit /b %errorlevel%)
+echo [precheckin] ===== BEGIN TEST SUITE [%DATE% %TIME%] =====
+
+set "FAIL_COUNT=0"
+
+echo [precheckin] Running LLVM tests...
+ninja check-llvm || (
+    echo [ERROR] LLVM tests failed!
+    set /a FAIL_COUNT+=1
+)
+
+echo [precheckin] Running LLD tests...
+ninja check-lld || (
+    echo [ERROR] LLD tests failed!
+    set /a FAIL_COUNT+=1
+)
+
+echo [precheckin] Running ELD tests...
+ninja check-eld || (
+    echo [ERROR] ELD tests failed!
+    set /a FAIL_COUNT+=1
+)
+
+echo [precheckin] Running Clang tests...
+ninja check-clang || (
+    echo [ERROR] Clang tests failed!
+    set /a FAIL_COUNT+=1
+)
+
+echo [precheckin] Running Polly tests...
+ninja check-polly || (
+    echo [ERROR] Polly tests failed!
+    set /a FAIL_COUNT+=1
+)
+
+echo [precheckin] ===== END TEST SUITE [%DATE% %TIME%] =====
 
 popd
 
-echo [precheckin] Build completed successfully!
-exit /b 0
+REM === Summary ===
+if %FAIL_COUNT% NEQ 0 (
+    echo [precheckin] ? Build completed, but %FAIL_COUNT% test suite(s) failed.
+    exit /b 1
+) else (
+    echo [precheckin] ? Build and all tests completed successfully!
+    exit /b 0
+)
