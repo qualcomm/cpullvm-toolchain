@@ -68,24 +68,24 @@ call "%VCVARSALL%" x64 || exit /b %errorlevel%
 
 REM === Clean (optional) ===
 if /I "%CLEAN%"=="true" (
-    echo [precheckin] Cleaning "%BUILD_DIR%" and "%INSTALL_DIR%"
+    echo [log] Cleaning "%BUILD_DIR%" and "%INSTALL_DIR%"
     if exist "%BUILD_DIR%"   rmdir /S /Q "%BUILD_DIR%"   || exit /b %errorlevel%
     if exist "%INSTALL_DIR%" rmdir /S /Q "%INSTALL_DIR%" || exit /b %errorlevel%
 )
 
 REM === Prepare workspace ===
-echo [precheckin] Preparing workspace at: "%WORKSPACE%"
+echo [log] Preparing workspace at: "%WORKSPACE%"
 mkdir "%BUILD_DIR%"   2>nul || exit /b %errorlevel%
 mkdir "%INSTALL_DIR%" 2>nul || exit /b %errorlevel%
 
 REM === Clone repos if missing ===
 if not exist "%WORKSPACE%\musl-embedded\.git" (
-    echo [precheckin] Cloning musl-embedded...
+    echo [log] Cloning musl-embedded...
     git clone %MUSL_EMBEDDED_REPO_URL% "%WORKSPACE%\musl-embedded" -b %MUSL_EMBEDDED_BRANCH% || exit /b %errorlevel%
 )
 
 if not exist "%ELD_DIR%\.git" (
-    echo [precheckin] Cloning ELD...
+    echo [log] Cloning ELD...
     git clone %ELD_REPO_URL% "%ELD_DIR%" || exit /b %errorlevel%
     pushd "%ELD_DIR%" || exit /b %errorlevel%
     git checkout %ELD_COMMIT% || (popd & exit /b %errorlevel%)
@@ -98,7 +98,7 @@ python "qualcomm-software/embedded/tools/patchctl.py" apply -f "qualcomm-softwar
 popd
 
 REM === Build ===
-echo [precheckin] Configuring CMake...
+echo [log] Configuring CMake...
 cmake -G Ninja ^
   -S "%SRC_DIR%\llvm" ^
   -B "%BUILD_DIR%\llvm" ^
@@ -116,58 +116,58 @@ cmake -G Ninja ^
   -DLLVM_ENABLE_ASSERTIONS="%ASSERTION_MODE%" ^
   -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" || exit /b %errorlevel%
 
-echo [precheckin] Building LLVM...
+echo [log] Building LLVM...
 pushd "%BUILD_DIR%\llvm" || exit /b %errorlevel%
 ninja                 || exit /b %errorlevel%
 
-echo [precheckin] Installing LLVM...
+echo [log] Installing LLVM...
 ninja install         || exit /b %errorlevel%
 
 
 REM === LIT / check targets ===
-echo [precheckin] ===== BEGIN TEST SUITE [%DATE% %TIME%] =====
+echo [log] ===== BEGIN TEST SUITE [%DATE% %TIME%] =====
 
 set "FAIL_COUNT=0"
 
-echo [precheckin] Running LLVM tests...
+echo [log] Running LLVM tests...
 ninja check-llvm || (
     echo [ERROR] LLVM tests failed!
     set /a FAIL_COUNT+=1
 )
 
-echo [precheckin] Running LLD tests...
+echo [log] Running LLD tests...
 ninja check-lld || (
     echo [ERROR] LLD tests failed!
     set /a FAIL_COUNT+=1
 )
 
-echo [precheckin] Running ELD tests...
+echo [log] Running ELD tests...
 ninja check-eld || (
     echo [ERROR] ELD tests failed!
     set /a FAIL_COUNT+=1
 )
 
-echo [precheckin] Running Clang tests...
+echo [log] Running Clang tests...
 ninja check-clang || (
     echo [ERROR] Clang tests failed!
     set /a FAIL_COUNT+=1
 )
 
-echo [precheckin] Running Polly tests...
+echo [log] Running Polly tests...
 ninja check-polly || (
     echo [ERROR] Polly tests failed!
     set /a FAIL_COUNT+=1
 )
 
-echo [precheckin] ===== END TEST SUITE [%DATE% %TIME%] =====
+echo [log] ===== END TEST SUITE [%DATE% %TIME%] =====
 
 popd
 
 REM === Summary ===
 if %FAIL_COUNT% NEQ 0 (
-    echo [precheckin] ? Build completed, but %FAIL_COUNT% test suite(s) failed.
+    echo [log] Build completed, but %FAIL_COUNT% test suite(s) failed.
     exit /b 1
 ) else (
-    echo [precheckin] ? Build and all tests completed successfully!
+    echo [log] Build and all tests completed successfully!
     exit /b 0
 )
