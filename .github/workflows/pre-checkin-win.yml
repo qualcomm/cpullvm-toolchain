@@ -4,28 +4,24 @@ name: nightly-win-x86_64
 on:
   pull_request:
   schedule:
-    - cron: '0 2 * * *' # Runs nightly at 2 AM UTC
+    - cron: '0 2 * * *'
   workflow_dispatch:
 
 jobs:
   build-windows:
     runs-on: windows-latest
-
     steps:
-      # Checkout main repo
       - name: Checkout source
         uses: actions/checkout@v4
         with:
           path: src
           fetch-depth: 1
 
-      # Global Git settings for line endings
       - name: Configure global Git settings
         run: |
           git config --global core.autocrlf false
           git config --global core.eol lf
 
-      # Cache LLVM build artifacts
       - name: Cache LLVM build
         uses: actions/cache@v4
         with:
@@ -34,7 +30,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-llvm-
 
-      # Configure Git for patch application (local settings)
       - name: Configure Git for patch application
         working-directory: src
         shell: pwsh
@@ -43,7 +38,6 @@ jobs:
           git config --local user.email "ci@qti.qualcomm.com"
           git config --local core.safecrlf true
 
-      # Run PowerShell build script
       - name: Build
         working-directory: src
         shell: pwsh
