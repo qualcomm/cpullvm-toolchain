@@ -10,25 +10,31 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+
+    # Ensure long paths and LF line endings before any checkout
     steps:
-      - name: Checkout source
+      - name: Preconfigure Git (LF line endings, long paths)
+        shell: bash
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+          git config --global core.longpaths true
+
+      - name: Checkout source (to src/)
         uses: actions/checkout@v4
         with:
           path: src
           fetch-depth: 1
 
-      - name: Configure global Git settings
+      - name: Renormalize line endings to LF
+        working-directory: src
+        shell: bash
         run: |
-          git config --global core.autocrlf false
-          git config --global core.eol lf
-
-      - name: Cache LLVM build
-        uses: actions/cache@v4
-        with:
-          path: build/llvm
-          key: ${{ runner.os }}-llvm-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-llvm-
+          git config --local core.autocrlf false
+          git config --local core.eol lf
+          # Rewrite working tree using clean filters
+          git rm -q --cached -r .
+          git reset -q --hard
 
       - name: Configure Git for patch application
         working-directory: src
@@ -38,6 +44,22 @@ jobs:
           git config --local user.email "ci@qti.qualcomm.com"
           git config --local core.safecrlf true
 
+      - name: Cache LLVM build
+        uses: actions/cache@v4
+        with:
+          path: build/llvm
+          key: ${{ runner.os }}-llvm-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-llvm-
+
+      - name: Prepare lit temp directory
+        shell: pwsh
+        working-directory: src
+        run: |
+          $litTmp = Join-Path "$PWD\..\build\llvm" "lit-tmp"
+          New-Item -ItemType Directory -Force -Path $litTmp | Out-Null
+          Write-Host "Using lit temp dir: $litTmp"
+
       - name: Build
         working-directory: src
         shell: pwsh
@@ -46,5 +68,7 @@ jobs:
           GIT_AUTHOR_EMAIL: ci@qti.qualcomm.com
           GIT_COMMITTER_NAME: Qualcomm CI
           GIT_COMMITTER_EMAIL: ci@qti.qualcomm.com
+          TMP:  ${{ github.workspace }}\build\llvm\lit-tmp
+          TEMP: ${{ github.workspace }}\build\llvm\lit-tmp
         run: |
           ./qualcomm-software/embedded/scripts/build.ps1

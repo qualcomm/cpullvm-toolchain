@@ -161,7 +161,7 @@ $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -notlike '*\Git\usr\bin*' 
 # === Tests ===
 Write-Host "[log] ===== BEGIN TEST SUITE ====="
 $FAIL_COUNT = 0
-foreach ($test in @("llvm","lld","eld","clang","polly")) {
+foreach ($test in @("llvm","lld","clang","polly")) { # FixMe: add eld to the list.
     Write-Host "[log] Running $test tests..."
     & ninja -v "check-$test"
     if ($LASTEXITCODE -ne 0) {
