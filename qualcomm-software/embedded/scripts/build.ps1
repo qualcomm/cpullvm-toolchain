@@ -23,7 +23,7 @@ if (-not $env:ASSERTION_MODE) { $env:ASSERTION_MODE = "OFF" }
 # === Constants ===
 $ELD_REPO_URL = "https://github.com/qualcomm/eld.git"
 $ELD_BRANCH   = "release/21.x"
-$ELD_COMMIT   = "25ea417cbb7525b1b02fd5d8cb6ec19dee3b9f13"
+$ELD_COMMIT   = "370856639e0aa1d381d80d0562c0b7fbc4257301"
 
 $MUSL_EMBEDDED_REPO_URL = "https://github.com/qualcomm/musl-embedded.git"
 $MUSL_EMBEDDED_BRANCH   = "main"
@@ -177,7 +177,7 @@ Write-Host "[log] Using lit temp dir: $litTmp"
 # === Tests ===
 Write-Host "[log] ===== BEGIN TEST SUITE ====="
 $FAIL_COUNT = 0
-foreach ($test in @("llvm","lld","clang","polly")) { #FixMe: add eld
+foreach ($test in @("llvm","lld","eld","clang","polly")) {
     Write-Host "[log] Running $test tests..."
     & ninja -v "check-$test"
     if ($LASTEXITCODE -ne 0) {
