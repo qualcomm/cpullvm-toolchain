@@ -152,16 +152,32 @@ if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: ninja install failed (exit=$L
 Write-Host "[log] Building test utilities required by lit/ELD..."
 & ninja FileCheck not opt llvm-ar llvm-nm llvm-objdump llvm-readelf llvm-dwarfdump `
        llvm-addr2line llvm-strip obj2yaml yaml2obj
-if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: building test utilities failed (exit=$LASTEXITCODE) ***"; exit $LASTEXITCODE }
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "*** ERROR: building test utilities failed (exit=$LASTEXITCODE) ***"
+    exit $LASTEXITCODE
+}
 
-# === Prefer our build bin and avoid Git usr\bin shadowing during tests ===
+# === Prefer our build bin and ensure Git Unix tools are available ===
 $env:PATH = "$BUILD_DIR\llvm\bin;$env:PATH"
-$env:PATH = ($env:PATH -split ';' | Where-Object { $_ -notlike '*\Git\usr\bin*' }) -join ';'
+$gitUsr = Join-Path ${env:ProgramFiles} "Git\usr\bin"
+if (Test-Path $gitUsr) {
+    $env:PATH = "$env:PATH;$gitUsr"
+    Write-Host "[log] Added Git Unix tools to PATH: $gitUsr"
+} else {
+    Write-Warning "[warn] Git usr\bin not found; polly-check-format may fail (missing diff)."
+}
+
+# === Avoid short-name paths in lit output ===
+$litTmp = Join-Path "$BUILD_DIR\llvm" "lit-tmp"
+New-Item -ItemType Directory -Force -Path $litTmp | Out-Null
+$env:TEMP = $litTmp
+$env:TMP  = $litTmp
+Write-Host "[log] Using lit temp dir: $litTmp"
 
 # === Tests ===
 Write-Host "[log] ===== BEGIN TEST SUITE ====="
 $FAIL_COUNT = 0
-foreach ($test in @("llvm","lld","clang","polly")) { # FixMe: add eld to the list.
+foreach ($test in @("llvm","lld","clang","polly")) { #FixMe: add eld
     Write-Host "[log] Running $test tests..."
     & ninja -v "check-$test"
     if ($LASTEXITCODE -ne 0) {
