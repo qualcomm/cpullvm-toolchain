@@ -158,6 +158,13 @@ if (Test-Path $gitUsr) {
     Write-Warning "[warn] Git usr\bin not found; polly-check-format may fail (missing diff)."
 }
 
+# === Avoid short-name paths in lit output ===
+$litTmp = Join-Path "$BUILD_DIR\llvm" "lit-tmp"
+New-Item -ItemType Directory -Force -Path $litTmp | Out-Null
+$env:TEMP = $litTmp
+$env:TMP  = $litTmp
+Write-Host "[log] Using lit temp dir: $litTmp"
+
 # === Tests ===
 Write-Host "[log] ===== BEGIN TEST SUITE ====="
 $FAIL_COUNT = 0
