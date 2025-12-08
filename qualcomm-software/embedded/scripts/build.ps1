@@ -52,7 +52,7 @@ if (-not (Test-Path $vswhere)) {
     exit 1
 }
 
-# 2) Query the latest VS with VC tools component
+# Query the latest VS with VC tools component
 $VS_INSTALL = & $vswhere -latest -products * `
     -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
     -property installationPath
@@ -61,21 +61,21 @@ if (-not $VS_INSTALL) {
     exit 1
 }
 
-# 3) Get vcvarsall.bat and import the environment for x64
+# Get vcvarsall.bat and import the environment for x64
 $VCVARSALL = Join-Path $VS_INSTALL "VC\Auxiliary\Build\vcvarsall.bat"
 if (-not (Test-Path $VCVARSALL)) {
     Write-Error "*** ERROR: vcvarsall.bat not found at $VCVARSALL ***"
     exit 1
 }
 
-# Load VS environment into the current PowerShell process (use 'call' to be safe)
+# Load VS environment into the current PowerShell process
 cmd /c "call `"$VCVARSALL`" x64 && set" | ForEach-Object {
     if ($_ -match '^(.*?)=(.*)$') {
         [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process')
     }
 }
 
-# === Tool sanity checks (after VS env is loaded) ===
+# Tool sanity checks
 foreach ($tool in @("git","python","cmake","ninja","clang-cl")) {
     if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
         Write-Error "*** ERROR: $tool not found on PATH ***"
@@ -148,15 +148,6 @@ if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: ninja build failed (exit=$LAS
 & ninja install
 if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: ninja install failed (exit=$LASTEXITCODE) ***"; exit $LASTEXITCODE }
 
-# === Ensure test utilities exist (ELD/lit depend on these tools) ===
-Write-Host "[log] Building test utilities required by lit/ELD..."
-& ninja FileCheck not opt llvm-ar llvm-nm llvm-objdump llvm-readelf llvm-dwarfdump `
-       llvm-addr2line llvm-strip obj2yaml yaml2obj
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "*** ERROR: building test utilities failed (exit=$LASTEXITCODE) ***"
-    exit $LASTEXITCODE
-}
-
 # === Prefer our build bin and ensure Git Unix tools are available ===
 $env:PATH = "$BUILD_DIR\llvm\bin;$env:PATH"
 $gitUsr = Join-Path ${env:ProgramFiles} "Git\usr\bin"
@@ -166,13 +157,6 @@ if (Test-Path $gitUsr) {
 } else {
     Write-Warning "[warn] Git usr\bin not found; polly-check-format may fail (missing diff)."
 }
-
-# === Avoid short-name paths in lit output ===
-$litTmp = Join-Path "$BUILD_DIR\llvm" "lit-tmp"
-New-Item -ItemType Directory -Force -Path $litTmp | Out-Null
-$env:TEMP = $litTmp
-$env:TMP  = $litTmp
-Write-Host "[log] Using lit temp dir: $litTmp"
 
 # === Tests ===
 Write-Host "[log] ===== BEGIN TEST SUITE ====="

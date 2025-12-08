@@ -3,7 +3,7 @@ name: pre-checkin
 on:
   pull_request:
     paths-ignore:
-      - 'qualcomm-software/embedded/scripts/build.bat'
+      - 'qualcomm-software/embedded/scripts/build.ps1'
       - '.github/workflows/pre-checkin-win.yml'
 
 jobs:
