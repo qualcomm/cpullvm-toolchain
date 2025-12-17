@@ -1,4 +1,3 @@
-
 name: nightly-win-x86_64
 
 on:
@@ -25,8 +24,29 @@ jobs:
           path: src
           fetch-depth: 1
 
+      - name: Renormalize line endings to LF
+        working-directory: src
+        shell: bash
+        run: |
+          git config --local core.autocrlf false
+          git config --local core.eol lf
+          # Rewrite working tree using clean filters
+          git rm -q --cached -r .
+          git reset -q --hard
+
+      - name: Prepare lit temp directory
+        shell: pwsh
+        working-directory: src
+        run: |
+          $litTmp = Join-Path "$PWD\..\build\llvm" "lit-tmp"
+          New-Item -ItemType Directory -Force -Path $litTmp | Out-Null
+                   Write-Host "Using lit temp dir: $litTmp"
+
       - name: Build
         working-directory: src
         shell: pwsh
+        env:
+          TMP:  ${{ github.workspace }}\build\llvm\lit-tmp
+          TEMP: ${{ github.workspace }}\build\llvm\lit-tmp
         run: |
           ./qualcomm-software/embedded/scripts/build.ps1

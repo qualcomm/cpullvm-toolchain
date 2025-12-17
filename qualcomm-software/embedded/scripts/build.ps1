@@ -148,6 +148,15 @@ if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: ninja build failed (exit=$LAS
 & ninja install
 if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: ninja install failed (exit=$LASTEXITCODE) ***"; exit $LASTEXITCODE }
 
+# === Ensure test utilities exist (ELD/lit depend on these tools) ===
+Write-Host "[log] Building test utilities required by lit/ELD..."
+& ninja FileCheck not opt llvm-ar llvm-nm llvm-objdump llvm-readelf llvm-dwarfdump `
+       llvm-addr2line llvm-strip obj2yaml yaml2obj
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "*** ERROR: building test utilities failed (exit=$LASTEXITCODE) ***"
+    exit $LASTEXITCODE
+}
+
 # === Prefer our build bin and ensure Git Unix tools are available ===
 $env:PATH = "$BUILD_DIR\llvm\bin;$env:PATH"
 $gitUsr = Join-Path ${env:ProgramFiles} "Git\usr\bin"
