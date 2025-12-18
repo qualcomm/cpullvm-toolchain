@@ -23,7 +23,7 @@ if (-not $env:ASSERTION_MODE) { $env:ASSERTION_MODE = "OFF" }
 # === Constants ===
 $ELD_REPO_URL = "https://github.com/qualcomm/eld.git"
 $ELD_BRANCH   = "release/21.x"
-$ELD_COMMIT   = "370856639e0aa1d381d80d0562c0b7fbc4257301"
+$ELD_COMMIT   = "25ea417cbb7525b1b02fd5d8cb6ec19dee3b9f13" 
 
 $MUSL_EMBEDDED_REPO_URL = "https://github.com/qualcomm/musl-embedded.git"
 $MUSL_EMBEDDED_BRANCH   = "main"

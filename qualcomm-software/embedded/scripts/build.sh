@@ -114,7 +114,7 @@ fi
 if [[ ! -d "${REPO_ROOT}/llvm/tools/eld/.git" ]]; then
   log "Cloning ELD to ${REPO_ROOT}/llvm/tools/eld"
   git clone "${ELD_REPO_URL}" "${SRC_DIR}/llvm/tools/eld" -b "${ELD_BRANCH}"
-  ELD_PINNED_COMMIT="${ELD_PINNED_COMMIT:-370856639e0aa1d381d80d0562c0b7fbc4257301}"
+  ELD_PINNED_COMMIT="${ELD_PINNED_COMMIT:-25ea417cbb7525b1b02fd5d8cb6ec19dee3b9f13}"
   pushd "${SRC_DIR}/llvm/tools/eld" >/dev/null
   git checkout "${ELD_PINNED_COMMIT}"
   popd >/dev/null
