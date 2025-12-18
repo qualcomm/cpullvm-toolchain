@@ -30,17 +30,6 @@ jobs:
         run: |
           git config --local core.autocrlf false
           git config --local core.eol lf
-          # Rewrite working tree using clean filters
-          git rm -q --cached -r .
-          git reset -q --hard
-
-      - name: Prepare lit temp directory
-        shell: pwsh
-        working-directory: src
-        run: |
-          $litTmp = Join-Path "$PWD\..\build\llvm" "lit-tmp"
-          New-Item -ItemType Directory -Force -Path $litTmp | Out-Null
-          Write-Host "Using lit temp dir: $litTmp"
 
       - name: Build
         working-directory: src
