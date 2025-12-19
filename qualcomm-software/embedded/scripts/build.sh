@@ -103,7 +103,7 @@ if [[ ! -d "${REPO_ROOT}/llvm/tools/eld/.git" ]]; then
   git clone "${ELD_REPO_URL}" "${SRC_DIR}/llvm/tools/eld" -b "${ELD_BRANCH}"
   # Pin ELD to known commit
   pushd "${SRC_DIR}/llvm/tools/eld" >/dev/null
-  git checkout "65ea860802c41ef5c0becff9750a350495de27b0"
+  git checkout "df5b7845e0ac216ad0ee04d8770d327b6f8c7acd"
   popd >/dev/null
 else
   log "ELD already present under llvm/tools, leaving as-is"
