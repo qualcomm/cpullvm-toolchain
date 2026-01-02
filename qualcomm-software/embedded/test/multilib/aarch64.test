@@ -1,0 +1,9 @@
+# FIXME: we lose a lot of test coverage as we don't cover many variants.
+# Might be worth keeping around the original multilib json *just* for testing.
+# Should also revisit whether there are relevant tests we can reuse even without
+# the original multilib.
+
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -fno-exceptions | FileCheck %s --check-prefix=CHECK-AARCH64
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -fno-exceptions | FileCheck %s --check-prefix=CHECK-AARCH64
+# CHECK-AARCH64: aarch64-none-elf/aarch64a{{$}}
+# CHECK-AARCH64-EMPTY:
