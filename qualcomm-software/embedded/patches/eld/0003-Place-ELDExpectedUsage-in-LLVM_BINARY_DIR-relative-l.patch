@@ -1,0 +1,42 @@
+From 92ea1b21404d45209bf2bb0756ccc42105eec1ce Mon Sep 17 00:00:00 2001
+From: Jonathon Penix <jpenix@quicinc.com>
+Date: Sun, 25 Jan 2026 15:24:27 -0800
+Subject: [PATCH 3/3] Place ELDExpectedUsage in `LLVM_BINARY_DIR`-relative
+ location
+
+ELDExpected.test looks for ELDExpectedUsage in an `%llvmobjroot`-
+relative dir (which IIUC boils down to a `LLVM_BINARY_DIR`-relative dir).
+ELDExpectedUsage is currently installed in a `CMAKE_BINARY_DIR`-relative
+dir. `LLVM_BINARY_DIR` and `CMAKE_BINARY_DIR` aren't always the same--they
+can be different when llvm is added as a subdirectory. When this is the
+case, we see test failures due to the mismatched location--see [1] for
+details.
+
+To fix this, just place ELDExpectedUsage in a `LLVM_BINARY_DIR`-relative
+location as that is what the tests expect and it matches the behavior
+when `LLVM_BINARY_DIR == CMAKE_BINARY_DIR`.
+
+This partially fixes [1], the symlink/wrapper part is handled in [2].
+
+[1] https://github.com/qualcomm/eld/issues/710
+[2] https://github.com/qualcomm/eld/pull/738
+
+Signed-off-by: Jonathon Penix <jpenix@quicinc.com>
+---
+ test/Common/standalone/PluginAPI/CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/test/Common/standalone/PluginAPI/CMakeLists.txt b/test/Common/standalone/PluginAPI/CMakeLists.txt
+index f19ed7e5..b37a6264 100644
+--- a/test/Common/standalone/PluginAPI/CMakeLists.txt
++++ b/test/Common/standalone/PluginAPI/CMakeLists.txt
+@@ -3,5 +3,5 @@ target_include_directories(ELDExpectedUsage
+                            PRIVATE ${CMAKE_SOURCE_DIR}/include/eld/PluginAPI)
+ target_link_libraries(ELDExpectedUsage PRIVATE LW)
+ set_target_properties(ELDExpectedUsage PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+-                                                  ${CMAKE_BINARY_DIR}/bin/tests)
++                                                  ${LLVM_BINARY_DIR}/bin/tests)
+ set_target_properties(ELDExpectedUsage PROPERTIES INSTALL_RPATH "\$ORIGIN/../../lib")
+-- 
+2.43.0
+
