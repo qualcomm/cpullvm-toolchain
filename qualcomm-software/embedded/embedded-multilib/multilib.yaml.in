@@ -56,6 +56,10 @@ Variants:
 
 Mappings:
 
+# Map extended sets of extensions back to the variants provided
+# for RISC-V targets.
+@riscv_march_mappings@
+
 # Map higher architecture versions to subsets of them, so that a
 # compatible library can be found even for architectures we don't have
 # specific variants for.
