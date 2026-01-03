@@ -25,7 +25,7 @@ set(llvmproject_src_dir ${TOOLCHAIN_SOURCE_DIR}/../..)
 # CMake arguments are loaded from the JSON file depending on which C
 # library is used, so this must be set before the JSON is processed.
 set(C_LIBRARY "picolibc" CACHE STRING "Which C library to use.")
-set_property(CACHE C_LIBRARY PROPERTY STRINGS picolibc)
+set_property(CACHE C_LIBRARY PROPERTY STRINGS picolibc musl-embedded)
 
 set(VARIANT_JSON "" CACHE STRING "JSON file to load args from.")
 if(VARIANT_JSON)
@@ -85,6 +85,13 @@ set(ENABLE_LIBC_TESTS ${ENABLE_LIBC_TESTS_def} CACHE BOOL "Enable libc tests (pi
 set(ENABLE_COMPILER_RT_TESTS ${ENABLE_COMPILER_RT_TESTS_def} CACHE BOOL "Enable compiler-rt tests.")
 set(ENABLE_LIBCXX_TESTS ${ENABLE_LIBCXX_TESTS_def} CACHE BOOL "Enable libcxx tests.")
 set(LLVM_BINARY_DIR "" CACHE PATH "Path to LLVM toolchain root to build libraries with")
+
+# Set up a few arbitrary pass-through flags for MUSL. This probably isn't the best idea,
+# but historically, our flag usage is such that it is a bit unclear how to do this in
+# a more princicpled way. This should be revisited and probably clean up, but for now
+# just mirror what we used to do.
+set(EXTRA_MUSL_CONFIG_FLAGS ${EXTRA_MUSL_CONFIG_FLAGS_def} CACHE BOOL "Extra configure options for musl-embedded.")
+set(EXTRA_MUSL_CFLAGS ${EXTRA_MUSL_CFLAGS_def} CACHE BOOL "Extra flags to be used when compiling musl-embedded.")
 
 set(PROJECT_PREFIX "subproj" CACHE STRING "Directory to build subprojects in.")
 set(VARIANT_BUILD_ID "${VARIANT}" CACHE STRING "Name to use to identify build directories." )
@@ -509,6 +516,72 @@ if(C_LIBRARY STREQUAL picolibc)
 
 endif()
 
+###############################################################################
+# musl-embedded
+###############################################################################
+if(C_LIBRARY STREQUAL musl-embedded)
+    if(ENABLE_LIBC_TESTS)
+        message(FATAL_ERROR "Tests cannot be enabled using musl-embedded.")
+    endif()
+
+    if(WIN32)
+        message(FATAL_ERROR "Building MUSL is not supported on Windows hosts")
+    endif()
+
+    include(${TOOLCHAIN_SOURCE_DIR}/cmake/fetch_musl-embedded.cmake)
+
+    include(ProcessorCount)
+    set(make_flags)
+    ProcessorCount(nproc)
+    if(NOT nproc EQUAL 0)
+        set(make_flags -j${nproc})
+    endif()
+
+    if(LIBRARY_BUILD_TYPE STREQUAL minsizerelease)
+        set(musl_opt_flags "-Os")
+    elseif((LIBRARY_BUILD_TYPE STREQUAL release) OR (LIBRARY_BUILD_TYPE STREQUAL releasewithdebuginfo))
+        set(musl_opt_flags "-O3")
+    endif()
+
+    # FIXME: if we need the extra `uselocks`/`standalone` variants, we
+    # can add a passthrough here and make them separate variants.
+    set(musl_embedded_flags
+        --disable-wrapper
+        --quic-arm-baremetal
+        --disable-visibility
+        ${EXTRA_MUSL_CONFIG_FLAGS}
+        "CROSS_COMPILE=${LLVM_BINARY_DIR}/bin/llvm-"
+        "CC=${LLVM_BINARY_DIR}/bin/clang --target=${target_triple} -fuse-ld=eld"
+        "CFLAGS=${lib_compile_flags} ${musl_opt_flags} -fPIC -fvisibility=hidden -DVISIBILITY_HIDDEN -fno-rounding-math ${EXTRA_MUSL_CFLAGS}"
+        "LIBCC=${TEMP_LIB_DIR}/libclang_rt.builtins.a")
+
+    ExternalProject_Add(
+        ${C_LIBRARY}
+        STAMP_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/stamp
+        BINARY_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/build
+        DOWNLOAD_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/dl
+        TMP_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/tmp
+        SOURCE_DIR ${musl_SOURCE_DIR}
+        INSTALL_DIR ${TEMP_LIB_DIR}
+        DEPENDS compiler_rt-install
+        CONFIGURE_COMMAND
+            <SOURCE_DIR>/configure
+            --prefix=${TEMP_LIB_DIR}
+            ${musl_embedded_flags}
+        BUILD_COMMAND
+            make ${make_flags}
+        INSTALL_COMMAND
+            make install
+        USES_TERMINAL_CONFIGURE TRUE
+        USES_TERMINAL_BUILD TRUE
+        USES_TERMINAL_INSTALL TRUE
+        # Always run the build command so that incremental builds are correct.
+        CONFIGURE_HANDLED_BY_BUILD TRUE
+        TEST_EXCLUDE_FROM_MAIN TRUE
+        STEP_TARGETS configure build install
+    )
+endif()
+
 
 add_dependencies(clib-configure ${C_LIBRARY}-configure)
 add_dependencies(clib-build ${C_LIBRARY}-build)
@@ -560,6 +633,21 @@ if(ENABLE_CXX_LIBS)
                 -DLLVM_EXTERNAL_LIT=${external_lit_path}
             )
         endif()
+    elseif(C_LIBRARY STREQUAL musl-embedded)
+        set(cxxlibs_extra_cmake_options
+            -DLIBCXX_HAS_MUSL_LIBC=ON
+            -DLIBCXXABI_ENABLE_THREADS=OFF
+            -DLIBCXX_ENABLE_RANDOM_DEVICE=OFF
+            -DLIBCXX_ENABLE_THREADS=OFF
+            -DLIBCXX_ENABLE_FILESYSTEM=OFF
+            -DLIBCXX_ENABLE_LOCALIZATION=OFF
+            -DLIBUNWIND_ENABLE_THREADS=OFF
+            -DLIBCXXABI_ENABLE_EXCEPTIONS=${ENABLE_EXCEPTIONS}
+            -DLIBCXXABI_ENABLE_STATIC_UNWINDER=${ENABLE_EXCEPTIONS}
+            -DLIBCXX_ENABLE_EXCEPTIONS=${ENABLE_EXCEPTIONS}
+            -DLIBCXX_ENABLE_RTTI=${ENABLE_RTTI}
+            )
+        set(lib_compile_flags "${lib_compile_flags} -fno-unroll-loops -fno-optimize-sibling-calls -D_GNU_SOURCE")
     endif()
 
     ExternalProject_Add(
