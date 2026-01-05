@@ -7,3 +7,20 @@
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -fno-exceptions | FileCheck %s --check-prefix=CHECK-AARCH64
 # CHECK-AARCH64: aarch64-none-elf/aarch64a{{$}}
 # CHECK-AARCH64-EMPTY:
+
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8+nofp+nosimd -mabi=aapcs-soft -fno-exceptions | FileCheck %s --check-prefix=CHECK-NOFP
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53+nofp+nosimd -mabi=aapcs-soft -fno-exceptions | FileCheck %s --check-prefix=CHECK-NOFP
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mabi=aapcs-soft -fno-exceptions | FileCheck %s --check-prefix=CHECK-NOFP
+# CHECK-NOFP: aarch64-none-elf/aarch64a_soft_nofp{{$}}
+# CHECK-NOFP-EMPTY:
+
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.3a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fno-exceptions | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.3a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fno-exceptions | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.3a -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fno-exceptions | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
+# CHECK-NOFP-PACRET-BTI: aarch64-none-elf/aarch64a_soft_nofp_pacret_bti{{$}}
+# CHECK-NOFP-PACRET-BTI-EMPTY:
+
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -fno-exceptions | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -fno-exceptions | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI
+# CHECK-PACRET-BKEY-BTI: aarch64-none-elf/aarch64a_pacret_bkey_bti{{$}}
+# CHECK-PACRET-BKEY-BTI-EMPTY:
