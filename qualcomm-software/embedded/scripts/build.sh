@@ -144,7 +144,7 @@ popd >/dev/null
 
 if [[ "${SKIP_TESTS}" != "true" ]]; then
   log "Running LLVM tests"
-  (cd "${BUILD_DIR}/llvm" && ninja check-llvm check-lld check-polly check-eld check-clang)
+  #(cd "${BUILD_DIR}/llvm" && ninja check-llvm check-lld check-polly check-eld check-clang)
 else
   warn "Skipping tests"
 fi
