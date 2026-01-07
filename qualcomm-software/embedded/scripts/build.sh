@@ -149,7 +149,7 @@ else
   warn "Skipping tests"
 fi
 
-eixt 0
+exit 0
 # --- Compute clang resource dir ---
 RESOURCE_DIR="$("${INSTALL_DIR}/bin/clang" -print-resource-dir)"
 log "RESOURCE_DIR=${RESOURCE_DIR}"
