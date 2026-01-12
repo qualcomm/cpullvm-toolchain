@@ -110,6 +110,12 @@ if (-not (Test-Path "$ELD_DIR\.git")) {
 # === Apply patches ===
 Push-Location $SRC_DIR
 python "qualcomm-software/embedded/tools/patchctl.py" apply -f "qualcomm-software/embedded/patchsets.yml"
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "*** ERROR: Patch apply failed (exit=$LASTEXITCODE) ***"
+    exit $LASTEXITCODE
+}
+
 Pop-Location
 
 # === Build ===
