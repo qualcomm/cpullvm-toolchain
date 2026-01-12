@@ -143,7 +143,6 @@ cmake -G Ninja `
   -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" `
   -DLLVM_INCLUDE_TESTS=ON `
   -DLLVM_INSTALL_UTILS=ON `
-  -DLLVM_LIT_ARGS="-v -j $env:JOBS --time-tests" `
   $(if ($pythonExe) { "-DPython3_EXECUTABLE=`"$pythonExe`"" } else { "" })
 
 Write-Host "[log] Building LLVM..."
