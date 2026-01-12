@@ -24,6 +24,12 @@ jobs:
           path: src
           fetch-depth: 1
 
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Verify PyYAML
+        run: python -c "import yaml; print('PyYAML OK:', yaml.__version__)"
+
       - name: Build
         working-directory: src
         shell: pwsh
