@@ -1,7 +1,6 @@
 name: nightly-win-x86_64
 
 on:
-  pull_request: # removed before merge.
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
