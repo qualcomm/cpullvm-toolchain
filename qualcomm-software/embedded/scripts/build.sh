@@ -17,7 +17,7 @@ warn() { echo -e "\033[1;33m[warn]\033[0m $(date '+%F %T') $*"; }
 trap 'warn "Script failed at line $LINENO: \"$BASH_COMMAND\" (exit code: $?)"; exit 1' ERR
 
 readonly ELD_REPO_URL="https://github.com/qualcomm/eld.git"
-readonly ELD_BRANCH="release/21.x"
+readonly ELD_BRANCH="main"
 
 readonly MUSL_EMBEDDED_REPO_URL="https://github.com/qualcomm/musl-embedded.git"
 readonly MUSL_EMBEDDED_BRANCH="main"
