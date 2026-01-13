@@ -106,6 +106,10 @@ mkdir -p "${BUILD_DIR}" "${INSTALL_DIR}"
 if [[ ! -d "${WORKSPACE}/musl-embedded/.git" ]]; then
   log "Cloning musl-embedded into ${WORKSPACE}/musl-embedded"
   git clone "${MUSL_EMBEDDED_REPO_URL}" "${WORKSPACE}/musl-embedded" -b "${MUSL_EMBEDDED_BRANCH}"
+  MUSL_PINNED_COMMIT="${MUSL_PINNED_COMMIT:-9166c884baeb07ca283faef8d5c98f2c6a320054}"
+  pushd "${WORKSPACE}/musl-embedded" >/dev/null
+  git checkout "${MUSL_PINNED_COMMIT}"
+  popd >/dev/null
 else
   log "musl-embedded already present, leaving as-is"
 fi
