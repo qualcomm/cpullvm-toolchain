@@ -84,10 +84,8 @@ foreach ($tool in @("git","python","cmake","ninja","clang-cl")) {
 }
 
 # === Clean ===
-if ($env:CLEAN -eq "true") {
-    Write-Host "[log] Cleaning $BUILD_DIR and $INSTALL_DIR"
-    Remove-Item -Recurse -Force $BUILD_DIR,$INSTALL_DIR -ErrorAction SilentlyContinue
-}
+Write-Host "[log] Cleaning $BUILD_DIR and $INSTALL_DIR"
+Remove-Item -Recurse -Force $BUILD_DIR,$INSTALL_DIR -ErrorAction SilentlyContinue
 
 # === Prepare workspace ===
 Write-Host "[log] Preparing workspace at: $WORKSPACE"
@@ -125,7 +123,7 @@ Write-Host "[log] Configuring CMake..."
 $pythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
 if ($pythonExe) { Write-Host "[log] Using Python: $pythonExe" } else { Write-Host "[warn] Python not found via Get-Command; relying on PATH" }
 
-cmake -G Ninja `
+cmake -G "Visual Studio 17 2022" -A x64 `
   -S "$SRC_DIR\llvm" `
   -B "$BUILD_DIR\llvm" `
   -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" `
@@ -135,23 +133,20 @@ cmake -G Ninja `
   -DLLVM_DEFAULT_TARGET_TRIPLE="aarch64-unknown-linux-gnu" `
   -DLIBCLANG_BUILD_STATIC=ON `
   -DLLVM_POLLY_LINK_INTO_TOOLS=ON `
-  -DCMAKE_C_COMPILER=clang-cl `
-  -DCMAKE_CXX_COMPILER=clang-cl `
   -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL `
-  -DCMAKE_BUILD_TYPE="$env:BUILD_MODE" `
   -DLLVM_ENABLE_ASSERTIONS="$env:ASSERTION_MODE" `
   -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" `
-  -DLLVM_INCLUDE_TESTS=ON `
-  -DLLVM_INSTALL_UTILS=ON `
   $(if ($pythonExe) { "-DPython3_EXECUTABLE=`"$pythonExe`"" } else { "" })
 
-Write-Host "[log] Building LLVM..."
 Push-Location "$BUILD_DIR\llvm"
-& ninja
-if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: ninja build failed (exit=$LASTEXITCODE) ***"; exit $LASTEXITCODE }
+Write-Host "[log] Building LLVM..."
+cmake --build . --config $env:BUILD_MODE -- /m
+if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: build failed (exit=$LASTEXITCODE) ***"; exit $LASTEXITCODE }
 
-& ninja install
-if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: ninja install failed (exit=$LASTEXITCODE) ***"; exit $LASTEXITCODE }
+# Install target
+Write-Host "[log] Install target..."
+cmake --build . --config $env:BUILD_MODE --target INSTALL -- /m
+if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: install failed (exit=$LASTEXITCODE) ***"; exit $LASTEXITCODE }
 
 # === Prefer our build bin and ensure Git Unix tools are available ===
 $env:PATH = "$BUILD_DIR\llvm\bin;$env:PATH"
