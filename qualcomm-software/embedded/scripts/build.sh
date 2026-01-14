@@ -48,6 +48,7 @@ Usage:
 Options:
   --artifact-dir <path>       Directory to copy final tarball
   --skip-tests                Skip LLVM test steps
+  --arm-sysroot <path>        Arm sysroot (default: /usr/arm-linux-gnueabi)
   --aarch64-sysroot <path>    AArch64 sysroot (default: /usr/aarch64-linux-gnu)
   --aarch64-build             AArch64 build
   --nightly                   Nightly build
