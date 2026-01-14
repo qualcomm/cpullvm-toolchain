@@ -12,6 +12,10 @@
 
 set -euo pipefail
 
+log()  { echo -e "\033[1;34m[log]\033[0m $(date '+%F %T') $*"; }
+warn() { echo -e "\033[1;33m[warn]\033[0m $(date '+%F %T') $*"; }
+trap 'warn "Script failed at line $LINENO: \"$BASH_COMMAND\" (exit code: $?)"; exit 1' ERR
+
 readonly ELD_REPO_URL="https://github.com/qualcomm/eld.git"
 readonly ELD_BRANCH="main"
 
@@ -26,12 +30,15 @@ WORKSPACE="${REPO_ROOT}/.."
 SRC_DIR="${REPO_ROOT}"
 BUILD_DIR="${WORKSPACE}/build"
 INSTALL_DIR="${WORKSPACE}/install"
+BUILD_DIR_AARCH64="${BUILD_DIR}/aarch64"
+INSTALL_DIR_AARCH64="${INSTALL_DIR}/aarch64"
 ARTIFACT_DIR=""
 SKIP_TESTS="false"
 JOBS="${JOBS:-$(nproc)}"
+CLEAN="false"
+AARCH64_BUILD="false"
+NIGHTLY="false"
 
-log() { echo -e "\033[1;34m[log]\033[0m $*"; }
-warn() { echo -e "\033[1;33m[warn]\033[0m $*"; }
 
 usage() {
   cat <<'EOF'
@@ -43,6 +50,8 @@ Options:
   --skip-tests                Skip LLVM test steps
   --arm-sysroot <path>        Arm sysroot (default: /usr/arm-linux-gnueabi)
   --aarch64-sysroot <path>    AArch64 sysroot (default: /usr/aarch64-linux-gnu)
+  --aarch64-build             AArch64 build
+  --nightly                   Nightly build
   --clean                     Delete and recreate build/install dirs
 
 Examples:
@@ -50,18 +59,18 @@ Examples:
 EOF
 }
 
-CLEAN="false"
-
 # --- Parse args ---
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --artifact-dir) ARTIFACT_DIR="$2"; shift 2 ;;
     --skip-tests) SKIP_TESTS="true"; shift ;;
     --arm-sysroot) ARM32_SYSROOT_OPT="$2"; shift 2 ;;
+    --aarch64-build) AARCH64_BUILD="true"; shift ;;
+    --nightly) NIGHTLY="true"; shift ;;
     --aarch64-sysroot) AARCH64_SYSROOT_OPT="$2"; shift 2 ;;
     --clean) CLEAN="true"; shift ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "Unknown arg: $1"; usage; exit 1 ;;
+    *) warn "Unknown arg: $1"; usage; exit 1 ;;
   esac
 done
 
@@ -83,10 +92,12 @@ COMPILER_RT_AARCH64_BM_BUILDDIR="${WORKSPACE}/build/compiler-rt/aarch64/baremeta
 COMPILER_RT_ARM32_BM_FLAGS="--target=arm-none-eabi -mcpu=cortex-a9 -ffunction-sections -fdata-sections -mfloat-abi=softfp -mfpu=neon -nostdlibinc"
 COMPILER_RT_AARCH64_BM_FLAGS="--target=aarch64-none-elf -mcpu=cortex-a53 -ffunction-sections -fdata-sections -nostdlibinc"
 
-# --- Prepare build/install dirs ---
+GCC_ROOT_AARCH64="/usr"
+
+# --- Prepare build/install dirs of aarch64 ---
 if [[ "${CLEAN}" == "true" ]]; then
-  log "Cleaning ${BUILD_DIR} and ${INSTALL_DIR}"
-  rm -rf "${BUILD_DIR}" "${INSTALL_DIR}"
+  log "Cleaning ${BUILD_DIR} ${INSTALL_DIR} ${BUILD_DIR_AARCH64} and ${INSTALL_DIR_AARCH64}"
+  rm -rf "${BUILD_DIR}" "${INSTALL_DIR}" "${BUILD_DIR_AARCH64}" "${INSTALL_DIR_AARCH64}"
 fi
 
 # --- Workspace prep ---
@@ -105,9 +116,9 @@ fi
 if [[ ! -d "${REPO_ROOT}/llvm/tools/eld/.git" ]]; then
   log "Cloning ELD to ${REPO_ROOT}/llvm/tools/eld"
   git clone "${ELD_REPO_URL}" "${SRC_DIR}/llvm/tools/eld" -b "${ELD_BRANCH}"
-  # Pin ELD to known commit
+  ELD_PINNED_COMMIT="${ELD_PINNED_COMMIT:-31c4385321b75c82d03f7244bd5cb4d1d422d1a0}"
   pushd "${SRC_DIR}/llvm/tools/eld" >/dev/null
-  git checkout "df5b7845e0ac216ad0ee04d8770d327b6f8c7acd"
+  git checkout "${ELD_PINNED_COMMIT}"
   popd >/dev/null
 else
   log "ELD already present under llvm/tools, leaving as-is"
@@ -117,7 +128,7 @@ fi
 log "Applying patches"
 python3 "${SRC_DIR}/qualcomm-software/embedded/tools/patchctl.py" apply -f "${SRC_DIR}/qualcomm-software/embedded/patchsets.yml"
 
-# --- Build LLVM ---
+# --- Build LLVM (native) ---
 log "Configuring LLVM"
 mkdir -p "${BUILD_DIR}/llvm"
 pushd "${BUILD_DIR}/llvm" >/dev/null
@@ -142,7 +153,43 @@ log "Installing LLVM"
 ninja install
 popd >/dev/null
 
-if [[ "${SKIP_TESTS}" != "true" ]]; then
+if [[ "${AARCH64_BUILD}" == "true" ]]; then
+  log "[Stage 2] Configuring Cross-compiling LLVM for AArch64..."
+  mkdir -p "${BUILD_DIR_AARCH64}" "${INSTALL_DIR_AARCH64}"
+
+  pushd "${BUILD_DIR_AARCH64}" >/dev/null
+  cmake -G Ninja \
+    -S "${SRC_DIR}/llvm" \
+    -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR_AARCH64}" \
+    -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
+    -DLLVM_TARGETS_TO_BUILD="ARM;AArch64" \
+    -DLLVM_HOST_TRIPLE="aarch64-linux-gnu" \
+    -DELD_TARGETS_TO_BUILD="ARM;AArch64" \
+    -DLLVM_EXTERNAL_PROJECTS="eld" \
+    -DLLVM_EXTERNAL_ELD_SOURCE_DIR="${SRC_DIR}/llvm/tools/eld" \
+    -DLLVM_DEFAULT_TARGET_TRIPLE="${AARCH64_LINUX_TRIPLE}" \
+    -DLLVM_BUILD_RUNTIME="OFF" \
+    -DLIBCLANG_BUILD_STATIC="ON" \
+    -DLLVM_POLLY_LINK_INTO_TOOLS="ON" \
+    -DCMAKE_SYSTEM_NAME="Linux" \
+    -DCMAKE_SYSTEM_PROCESSOR="aarch64" \
+    -DCMAKE_C_COMPILER="clang" \
+    -DCMAKE_CXX_COMPILER="clang++" \
+    -DCMAKE_C_FLAGS="--target=aarch64-linux-gnu \
+                     --gcc-toolchain=${GCC_ROOT_AARCH64}" \
+    -DCMAKE_CXX_FLAGS="--target=aarch64-linux-gnu \
+                       --gcc-toolchain=${GCC_ROOT_AARCH64}" \
+    -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
+    -DLLVM_TABLEGEN="${INSTALL_DIR}/bin/llvm-tblgen" \
+    -DCLANG_TABLEGEN="${INSTALL_DIR}/bin/clang-tblgen" \
+    -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}"
+
+  log "Building LLVM and Installing"
+  ninja install
+  popd >/dev/null
+fi
+
+if [[ "${SKIP_TESTS}" != "true" && "${AARCH64_BUILD}" != "true" ]]; then
   log "Running LLVM tests"
   (cd "${BUILD_DIR}/llvm" && ninja check-llvm check-lld check-polly check-eld check-clang)
 else
@@ -292,9 +339,8 @@ for lib in "${musl_components[@]}"; do
 done
 
 # --- c++ libs ---
-echo "Build c++ libs ..."
+log "Build c++ libs ..."
 
-# Baremetal libc++ configs
 declare -A Triples
 Triples["aarch64-none-elf"]="aarch64-none-elf"
 Triples["aarch64-pacret-b-key-bti-none-elf"]="aarch64-none-elf"
@@ -347,7 +393,7 @@ for VARIANT in "aarch64-none-elf" "aarch64-pacret-b-key-bti-none-elf" "armv7-non
     ninja
     ninja install
     popd >/dev/null
-    echo "Baremetal C++ libs install ..."
+    log "c++ libs install ..."
 done
 
 # Linux libc++ configs
@@ -392,23 +438,52 @@ for VARIANT in "${!LINUX_TRIPLES[@]}"; do
         -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind"
     ninja install
     popd >/dev/null
-    echo "Linux C++ libs install ..."
+    log "Linux C++ libs install ..."
 done
 
-echo "Build and installation complete."
+
+log "Build and installation complete."
 
 # --- Create artifact ---
 log "Creating artifact tarball"
-pushd "${INSTALL_DIR}" >/dev/null
-short_sha="$(git -C "${SRC_DIR}" rev-parse --short HEAD)"
-tar_file="${ELD_BRANCH}_${short_sha}_$(date +%Y%m%d).tgz"
-tar -czvf "${BUILD_DIR}/${tar_file}" "."
-popd >/dev/null
 
+short_sha="$(git -C "${SRC_DIR}" rev-parse --short HEAD)"
+suffix="$(date +%Y%m%d)"
+archive_root="${BUILD_DIR}"
+archive_dir="${INSTALL_DIR}"
+COMPRESS_EXT="tgz"
+COMPRESS_FLAG="-czvf"
+archive_name="cpullvm-toolchain-${ELD_BRANCH##*/}-Linux-x86_64-${short_sha}-${suffix}.${COMPRESS_EXT}"
+
+if [[ "${AARCH64_BUILD}" == "true" ]]; then
+    log "Preparing AARCH64 build"
+    mkdir -p "${INSTALL_DIR_AARCH64}"
+    cp -r "${INSTALL_DIR}"/aarch64-* "${INSTALL_DIR}"/armv7-* "${INSTALL_DIR_AARCH64}/"
+    cp -r "${INSTALL_DIR}"/lib/clang/[0-9]*/lib "${INSTALL_DIR_AARCH64}/lib/clang/[0-9]*/"
+    archive_root="${BUILD_DIR_AARCH64}"
+    archive_dir="${INSTALL_DIR_AARCH64}"
+    archive_name="cpullvm-toolchain-${ELD_BRANCH##*/}-Linux-AArch64-${short_sha}-${suffix}.${COMPRESS_EXT}"
+fi
+
+if [[ "${NIGHTLY}" == "true" ]]; then
+    log "Applying NIGHTLY compression settings"
+    COMPRESS_EXT="txz"
+    COMPRESS_FLAG="-cJvf"
+    archive_name="${archive_name%.tgz}_nightly.${COMPRESS_EXT}"
+    XZ_THREADS="${JOBS:-$(nproc)}"
+    export XZ_OPT="--threads=${XZ_THREADS}"
+fi
+
+# Create tarball
+tar_file="${archive_root}/${archive_name}"
+log "Compressing ${archive_dir} into ${tar_file}"
+tar ${COMPRESS_FLAG} "${tar_file}" -C "${archive_dir}" .
+
+# Copy artifact if destination provided
 if [[ -n "${ARTIFACT_DIR}" ]]; then
-  mkdir -p "${ARTIFACT_DIR}"
-  cp "${BUILD_DIR}/${tar_file}" "${ARTIFACT_DIR}/"
-  log "Artifact copied to ${ARTIFACT_DIR}/${tar_file}"
+    mkdir -p "${ARTIFACT_DIR}"
+    cp "${tar_file}" "${ARTIFACT_DIR}/"
+    log "Artifact copied to ${ARTIFACT_DIR}/${archive_name}"
 else
-  warn "Artifact left at ${BUILD_DIR}/${tar_file}"
+    warn "Artifact left at ${tar_file}"
 fi
