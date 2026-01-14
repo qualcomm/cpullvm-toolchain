@@ -1,4 +1,3 @@
-
 # build.ps1
 
 # Fail fast on errors thrown by PowerShell cmdlets
@@ -119,11 +118,13 @@ Pop-Location
 # === Build ===
 Write-Host "[log] Configuring CMake..."
 
+
 # Provide Python to CMake/lit if available
 $pythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
 if ($pythonExe) { Write-Host "[log] Using Python: $pythonExe" } else { Write-Host "[warn] Python not found via Get-Command; relying on PATH" }
 
-cmake -G "Visual Studio 17 2022" -A x64 `
+# --- Generation (switch to Ninja; options unchanged) ---
+cmake -G "Ninja" `
   -S "$SRC_DIR\llvm" `
   -B "$BUILD_DIR\llvm" `
   -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" `
@@ -136,16 +137,19 @@ cmake -G "Visual Studio 17 2022" -A x64 `
   -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL `
   -DLLVM_ENABLE_ASSERTIONS="$env:ASSERTION_MODE" `
   -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" `
-  $(if ($pythonExe) { "-DPython3_EXECUTABLE=`"$pythonExe`"" } else { "" })
+  $(if ($pythonExe) { "-DPython3_EXECUTABLE=`"$pythonExe`"" } else { "" }) `
+  -DCMAKE_BUILD_TYPE="$env:BUILD_MODE"
 
 Push-Location "$BUILD_DIR\llvm"
-Write-Host "[log] Building LLVM..."
-cmake --build . --config $env:BUILD_MODE -- /m
+
+# --- Build (Ninja) ---
+Write-Host "[log] Building LLVM with Ninja..."
+ninja -j $env:JOBS
 if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: build failed (exit=$LASTEXITCODE) ***"; exit $LASTEXITCODE }
 
-# Install target
+# --- Install (Ninja) ---
 Write-Host "[log] Install target..."
-cmake --build . --config $env:BUILD_MODE --target INSTALL -- /m
+ninja install
 if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: install failed (exit=$LASTEXITCODE) ***"; exit $LASTEXITCODE }
 
 # === Prefer our build bin and ensure Git Unix tools are available ===
