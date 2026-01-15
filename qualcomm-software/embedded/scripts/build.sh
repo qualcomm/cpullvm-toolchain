@@ -17,7 +17,7 @@ warn() { echo -e "\033[1;33m[warn]\033[0m $(date '+%F %T') $*"; }
 trap 'warn "Script failed at line $LINENO: \"$BASH_COMMAND\" (exit code: $?)"; exit 1' ERR
 
 readonly ELD_REPO_URL="https://github.com/qualcomm/eld.git"
-readonly ELD_BRANCH="main"
+readonly ELD_BRANCH="release/22.x"
 
 readonly MUSL_EMBEDDED_REPO_URL="https://github.com/qualcomm/musl-embedded.git"
 readonly MUSL_EMBEDDED_BRANCH="main"
@@ -108,6 +108,9 @@ mkdir -p "${BUILD_DIR}" "${INSTALL_DIR}"
 if [[ ! -d "${WORKSPACE}/musl-embedded/.git" ]]; then
   log "Cloning musl-embedded into ${WORKSPACE}/musl-embedded"
   git clone "${MUSL_EMBEDDED_REPO_URL}" "${WORKSPACE}/musl-embedded" -b "${MUSL_EMBEDDED_BRANCH}"
+  MUSL_PINNED_COMMIT="${MUSL_PINNED_COMMIT:-760b7e8ceb9a394e575498ebf8ac79834e9a907c}"
+  pushd "${WORKSPACE}/musl-embedded" >/dev/null
+  git checkout "${MUSL_PINNED_COMMIT}"
 else
   log "musl-embedded already present, leaving as-is"
 fi
@@ -116,7 +119,7 @@ fi
 if [[ ! -d "${REPO_ROOT}/llvm/tools/eld/.git" ]]; then
   log "Cloning ELD to ${REPO_ROOT}/llvm/tools/eld"
   git clone "${ELD_REPO_URL}" "${SRC_DIR}/llvm/tools/eld" -b "${ELD_BRANCH}"
-  ELD_PINNED_COMMIT="${ELD_PINNED_COMMIT:-31c4385321b75c82d03f7244bd5cb4d1d422d1a0}"
+  ELD_PINNED_COMMIT="${ELD_PINNED_COMMIT:-96a7dffdf65a68714c8311111d6a6d54a3a150db}"
   pushd "${SRC_DIR}/llvm/tools/eld" >/dev/null
   git checkout "${ELD_PINNED_COMMIT}"
   popd >/dev/null
