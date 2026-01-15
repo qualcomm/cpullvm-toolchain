@@ -111,6 +111,7 @@ if [[ ! -d "${WORKSPACE}/musl-embedded/.git" ]]; then
   MUSL_PINNED_COMMIT="${MUSL_PINNED_COMMIT:-760b7e8ceb9a394e575498ebf8ac79834e9a907c}"
   pushd "${WORKSPACE}/musl-embedded" >/dev/null
   git checkout "${MUSL_PINNED_COMMIT}"
+  popd >/dev/null
 else
   log "musl-embedded already present, leaving as-is"
 fi
