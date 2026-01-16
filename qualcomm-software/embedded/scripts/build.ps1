@@ -134,8 +134,6 @@ cmake -G "Ninja" `
   -DLLVM_DEFAULT_TARGET_TRIPLE="aarch64-unknown-linux-gnu" `
   -DLIBCLANG_BUILD_STATIC=ON `
   -DLLVM_POLLY_LINK_INTO_TOOLS=ON `
-  -DCMAKE_C_COMPILER=clang-cl `
-  -DCMAKE_CXX_COMPILER=clang-cl `
   -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL `
   -DLLVM_ENABLE_ASSERTIONS="$env:ASSERTION_MODE" `
   -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" `
