@@ -134,6 +134,8 @@ cmake -G "Ninja" `
   -DLLVM_DEFAULT_TARGET_TRIPLE="aarch64-unknown-linux-gnu" `
   -DLIBCLANG_BUILD_STATIC=ON `
   -DLLVM_POLLY_LINK_INTO_TOOLS=ON `
+  -DCMAKE_C_COMPILER=clang-cl `
+  -DCMAKE_CXX_COMPILER=clang-cl `
   -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL `
   -DLLVM_ENABLE_ASSERTIONS="$env:ASSERTION_MODE" `
   -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" `
@@ -144,12 +146,12 @@ Push-Location "$BUILD_DIR\llvm"
 
 # --- Build (Ninja) ---
 Write-Host "[log] Building LLVM with Ninja..."
-ninja -j $env:JOBS
+& ninja
 if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: build failed (exit=$LASTEXITCODE) ***"; exit $LASTEXITCODE }
 
 # --- Install (Ninja) ---
 Write-Host "[log] Install target..."
-ninja install
+& ninja install
 if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: install failed (exit=$LASTEXITCODE) ***"; exit $LASTEXITCODE }
 
 # === Prefer our build bin and ensure Git Unix tools are available ===
