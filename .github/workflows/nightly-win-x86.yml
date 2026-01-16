@@ -4,10 +4,13 @@ on:
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
+  pull_request:
 
 jobs:
   build-windows:
     runs-on: windows-latest
+    env:
+      ARTIFACT_DIR: ${{ github.workspace }}/nightly-toolchain
 
     steps:
       - name: Preconfigure Git (LF line endings, long paths)
@@ -39,3 +42,14 @@ jobs:
           GIT_COMMITTER_EMAIL: ci@qti.qualcomm.com
         run: |
           ./qualcomm-software/embedded/scripts/build.ps1
+          
+      - name: Upload Artifact
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpullvm-toolchain-${{ github.run_id }}-Windows-x86
+          path: |
+            ${{ env.ARTIFACT_DIR }}/*.txz
+            ${{ env.ARTIFACT_DIR }}/*.tgz
+          if-no-files-found: ignore
+          retention-days: 30

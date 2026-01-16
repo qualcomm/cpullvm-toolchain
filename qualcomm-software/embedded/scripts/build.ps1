@@ -14,7 +14,6 @@ $INSTALL_DIR = "$WORKSPACE\install"
 $ELD_DIR     = "$REPO_ROOT\llvm\tools\eld"
 
 # === Config defaults ===
-if (-not $env:CLEAN)          { $env:CLEAN          = "false" }
 if (-not $env:JOBS)           { $env:JOBS           = $env:NUMBER_OF_PROCESSORS }
 if (-not $env:BUILD_MODE)     { $env:BUILD_MODE     = "Release" }
 if (-not $env:ASSERTION_MODE) { $env:ASSERTION_MODE = "OFF" }
@@ -22,7 +21,7 @@ if (-not $env:ASSERTION_MODE) { $env:ASSERTION_MODE = "OFF" }
 # === Constants ===
 $ELD_REPO_URL = "https://github.com/qualcomm/eld.git"
 $ELD_BRANCH   = "main"
-$ELD_COMMIT   = "31c4385321b75c82d03f7244bd5cb4d1d422d1a0"
+$ELD_COMMIT   = "96a7dffdf65a68714c8311111d6a6d54a3a150db"
 
 $MUSL_EMBEDDED_REPO_URL = "https://github.com/qualcomm/musl-embedded.git"
 $MUSL_EMBEDDED_BRANCH   = "main"
@@ -134,6 +133,8 @@ cmake -G "Ninja" `
   -DLLVM_DEFAULT_TARGET_TRIPLE="aarch64-unknown-linux-gnu" `
   -DLIBCLANG_BUILD_STATIC=ON `
   -DLLVM_POLLY_LINK_INTO_TOOLS=ON `
+  -DCMAKE_C_COMPILER=clang-cl `
+  -DCMAKE_CXX_COMPILER=clang-cl `
   -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL `
   -DLLVM_ENABLE_ASSERTIONS="$env:ASSERTION_MODE" `
   -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" `
@@ -144,12 +145,12 @@ Push-Location "$BUILD_DIR\llvm"
 
 # --- Build (Ninja) ---
 Write-Host "[log] Building LLVM with Ninja..."
-ninja -j $env:JOBS
+& ninja
 if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: build failed (exit=$LASTEXITCODE) ***"; exit $LASTEXITCODE }
 
 # --- Install (Ninja) ---
 Write-Host "[log] Install target..."
-ninja install
+& ninja install
 if ($LASTEXITCODE -ne 0) { Write-Error "*** ERROR: install failed (exit=$LASTEXITCODE) ***"; exit $LASTEXITCODE }
 
 # === Prefer our build bin and ensure Git Unix tools are available ===
@@ -182,7 +183,111 @@ Pop-Location
 if ($FAIL_COUNT -ne 0) {
     Write-Host "[log] Build completed, but $FAIL_COUNT test suite(s) failed."
     exit 1
+}
+Write-Host "[log] Build and all tests completed successfully!"
+
+# --- Create artifact (PowerShell) ---
+
+# Simple local log helpers (avoid clobbering earlier ones if present)
+$__w_log  = { param($m) Write-Host    "[log] $m" }
+$__w_warn = { param($m) Write-Warning "[warn] $m" }
+
+
+# Compute identifiers
+$short_sha = (git -C $SRC_DIR rev-parse --short HEAD).Trim()
+$suffix    = Get-Date -Format "yyyyMMdd"
+
+# Artifact roots and name (switch 'Linux' -> 'Windows' to reflect this build)
+$archive_root = "$WORKSPACE\artifacts"
+$archive_dir  = $INSTALL_DIR
+$base_name    = "cpullvm-toolchain-$($ELD_BRANCH.Split('/')[-1])-Windows-x86_64-$short_sha-$suffix"
+
+& $__w_log "Applying NIGHTLY compression settings"
+$COMPRESS_EXT = "txz"
+$archive_name = "${base_name}_nightly.$COMPRESS_EXT"
+
+$env:XZ_OPT   = "--threads=$JOBS"
+
+# Ensure output directory exists
+if (-not (Test-Path $archive_root)) { New-Item -ItemType Directory -Force -Path $archive_root | Out-Null }
+
+$tar_file = Join-Path $archive_root $archive_name
+& $__w_log "Compressing '$archive_dir' into '$tar_file'"
+
+function Test-TarSupportsXz {
+    try {
+        $help = & tar --help 2>&1
+        if ($LASTEXITCODE -ne 0) { return $false }
+        return ($help -match '-J' -or $help -match 'xz')
+    } catch { return $false }
+}
+
+function Get-7ZipPath {
+    $candidates = @(
+        (Get-Command 7z -ErrorAction SilentlyContinue | ForEach-Object { $_.Source }),
+        "C:\Program Files\7-Zip\7z.exe",
+        "C:\Program Files (x86)\7-Zip\7z.exe"
+    ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+    return $candidates
+}
+
+$usedTool = $null
+
+# Preferred: tar with xz support (Git for Windows ships bsdtar)
+$tarCmd = Get-Command tar -ErrorAction SilentlyContinue
+if ($tarCmd) {
+    if (Test-TarSupportsXz) {
+        # tar -cJf <archive.txz> -C <dir> .
+        & tar -cJf "$tar_file" -C "$archive_dir" .
+        if ($LASTEXITCODE -ne 0) { throw "tar failed with exit code $LASTEXITCODE" }
+        $usedTool = "tar -cJf"
+    } else {
+        & $__w_warn "tar found but XZ (-J) not supported; falling back to 7‑Zip."
+    }
 } else {
-    Write-Host "[log] Build and all tests completed successfully!"
-    exit 0
+    & $__w_warn "tar not found; attempting 7‑Zip fallback."
+}
+
+# Fallback: 7‑Zip (create .tar, then compress to .xz -> .txz)
+if (-not $usedTool) {
+    $sevenZip = Get-7ZipPath
+    if (-not $sevenZip) {
+        throw "No tar with xz support and no 7‑Zip found. Install Git for Windows (bsdtar) or 7‑Zip."
+    }
+
+    $tempTar = [System.IO.Path]::ChangeExtension($tar_file, ".tar")
+    $tempXz  = [System.IO.Path]::ChangeExtension($tar_file, ".xz")
+    if (Test-Path $tempTar) { Remove-Item -Force $tempTar }
+    if (Test-Path $tempXz)  { Remove-Item -Force $tempXz  }
+
+    & $__w_log "7‑Zip: creating tar archive '$tempTar'"
+    Push-Location $archive_dir
+    try {
+        & "$sevenZip" a -bso0 -bse1 -ttar "$tempTar" "."
+        if ($LASTEXITCODE -ne 0) { throw "7z (create tar) failed with exit code $LASTEXITCODE" }
+    } finally {
+        Pop-Location
+    }
+
+    & $__w_log "7‑Zip: compressing to XZ '$tempXz' (threads=$JOBS)"
+    & "$sevenZip" a -bso0 -bse1 -txz -mx=9 -mmt=$JOBS "$tempXz" "$tempTar"
+    if ($LASTEXITCODE -ne 0) { throw "7z (xz compress) failed with exit code $LASTEXITCODE" }
+
+    Move-Item -Force "$tempXz" "$tar_file"
+    Remove-Item -Force "$tempTar"
+    $usedTool = "7z (tar + xz)"
+}
+
+& $__w_log "Artifact created with: $usedTool"
+& $__w_log "Artifact path: $tar_file"
+
+# Optional: copy to ARTIFACT_DIR
+if ($env:ARTIFACT_DIR -and $env:ARTIFACT_DIR.Trim().Length -gt 0) {
+    $destDir = $env:ARTIFACT_DIR
+    if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Force -Path $destDir | Out-Null }
+    $destFile = Join-Path $destDir (Split-Path -Leaf $tar_file)
+    Copy-Item -Force "$tar_file" "$destFile"
+    & $__w_log "Artifact copied to $destFile"
+} else {
+    & $__w_warn "Artifact left at $tar_file"
 }
