@@ -117,12 +117,30 @@ Pop-Location
 # === Build ===
 Write-Host "[log] Configuring CMake..."
 
-
 # Provide Python to CMake/lit if available
 $pythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
 if ($pythonExe) { Write-Host "[log] Using Python: $pythonExe" } else { Write-Host "[warn] Python not found via Get-Command; relying on PATH" }
 
-# --- Generation (switch to Ninja; options unchanged) ---
+# --- Prefer llvm-rc over Windows rc.exe to avoid cmcldeps/rc.exe hangs ---
+$llvmRcCandidates = @(
+  (Join-Path $VS_INSTALL 'VC\Tools\Llvm\x64\bin\llvm-rc.exe'),  # VS-bundled LLVM
+  'C:\Program Files\LLVM\bin\llvm-rc.exe'                       # Standalone LLVM on GH runner
+)
+$llvmRc = $llvmRcCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+$cmakeRcArg = ''
+if ($llvmRc) {
+    Write-Host "[log] Using llvm-rc: $llvmRc"
+    # Normalize to forward slashes to keep CMake from parsing backslash escapes
+    $llvmRcForCMake = $llvmRc -replace '\\','/'
+    # FILEPATH type prevents quoting glitches in the generated CMakeRCCompiler.cmake
+    $cmakeRcArg = "-DCMAKE_RC_COMPILER:FILEPATH=$llvmRcForCMake"
+    Write-Host "[diag] CMAKE_RC_COMPILER = $llvmRcForCMake"
+} else {
+    Write-Warning "[warn] llvm-rc.exe not found; falling back to Windows rc.exe (may hang)."
+}
+
+# --- Generation ---
 cmake -G "Ninja" `
   -S "$SRC_DIR\llvm" `
   -B "$BUILD_DIR\llvm" `
@@ -139,6 +157,7 @@ cmake -G "Ninja" `
   -DLLVM_ENABLE_ASSERTIONS="$env:ASSERTION_MODE" `
   -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" `
   $(if ($pythonExe) { "-DPython3_EXECUTABLE=`"$pythonExe`"" } else { "" }) `
+  $cmakeRcArg `
   -DCMAKE_BUILD_TYPE="$env:BUILD_MODE"
 
 Push-Location "$BUILD_DIR\llvm"
