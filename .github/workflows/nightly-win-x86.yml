@@ -2,7 +2,7 @@ name: nightly-win-x86_64
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 5 * * *'
   workflow_dispatch:
   pull_request:
 
@@ -24,7 +24,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: src
-          fetch-depth: 1
 
       - name: Install PyYAML
         run: pip install pyyaml
@@ -52,4 +51,4 @@ jobs:
             ${{ env.ARTIFACT_DIR }}/*.txz
             ${{ env.ARTIFACT_DIR }}/*.tgz
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: 7
