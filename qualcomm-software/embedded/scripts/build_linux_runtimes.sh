@@ -15,21 +15,51 @@ Options:
   --base-install-dir <path>   Directory for the install
   --resource-dir <path>       Resource directory for installing runtimes
   --llvm-src-dir <path>       Directory of the LLVM sources
+  --musl-emb-src-dir <path>   Directory of the musl-embedded source dir
   --download-dir <path>       Directory where extra projects are downloaded into
 EOF
 }
 
 # Given a string containing compile flags (hopefully containing a
-# `--target<triple>`), echo the `<triple>` or exit if not found.
+# `--target=<triple>`), echo the `<triple>` or exit if not found.
 get_target_from_flags() {
   local target_flag_regex="--target=([a-z0-9-]+)"
   [[ "$1" =~ ${target_flag_regex} ]]
   local target="${BASH_REMATCH[1]}"
   if [ -z "${target}" ]; then
-    echo "Could not parse --target from string $1!"
+    echo "Could not parse target from string ${1}!"
     exit 1
   fi
   echo "${target}"
+}
+
+# Given a string containing compile flags (hopefully containing a
+# `--target=<triple>`), echo the arch or exit if not found.
+get_arch_from_flags() {
+  local target=$(get_target_from_flags "$1")
+  local arch="$(echo ${target} | cut -d '-' -f1)"
+  if [ -z "${arch[0]}" ]; then
+    echo "Could not parse arch from string $1!"
+    exit 1
+  fi
+  echo "${arch[0]}"
+}
+
+# Given an arch appropriate for clang (from something like
+# `--target=<arch>-linux-gnu`), echo the appropriate arch for installing
+# kernel headers.
+get_kernel_arch() {
+  if [[ "$1" == "aarch64" ]]; then
+    echo "arm64"
+  elif [[ "$1" == "arm" ]]; then
+    echo "arm"
+  # Seems riscv is the only supported RISC-V ARCH?
+  elif [[ "$1" =~ riscv ]]; then
+    echo "riscv"
+  else
+    echo "UNKNOWN_ARCH"
+    exit 1
+  fi
 }
 
 while [[ $# -gt 0 ]]; do
@@ -38,6 +68,7 @@ while [[ $# -gt 0 ]]; do
     --base-install-dir) BASE_INSTALL_DIR="$2"; shift 2;;
     --resource-dir) RESOURCE_DIR="$2"; shift 2 ;;
     --llvm-src-dir) LLVM_BASE_DIR="$2"; shift 2 ;;
+    --musl-emb-src-dir) MUSL_EMB_SRC_DIR="$2"; shift 2 ;;
     --download-dir) DOWNLOAD_DIR="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown arg: $1"; usage; exit 1 ;;
@@ -49,13 +80,14 @@ if [ -z "${BASE_BUILD_DIR}" ] ||
    [ -z "${BASE_INSTALL_DIR}" ] ||
    [ -z "${RESOURCE_DIR}" ] ||
    [ -z "${LLVM_BASE_DIR}" ] ||
+   [ -z "${MUSL_EMB_SRC_DIR}" ] ||
    [ -z "${DOWNLOAD_DIR}" ]; then
   echo "All options must be specified"; usage; exit 1
 fi
 
 # Double check that the resource dirs match. We could remove the flag,
-# but I want something that prevents accidentally installing things to
-# random other toolchains during testing.
+# but having something that prevents accidentally installing things to
+# random other toolchains during testing is helpful.
 if [[ "$(clang -print-resource-dir)" != "${RESOURCE_DIR}" ]]; then
   echo "clang's resource dir does not match --resource-dir"; usage; exit 1
 fi
@@ -89,11 +121,55 @@ popd >/dev/null
 # Variants to build and the basic set of compile flags to use for each. There's
 # surely more elegant ways of doing this, but this doesn't require any extra
 # dependencies and is intended as temporary code.
-VARIANTS=("rv32imac_ilp32" "rv64imac_lp64" "rv64gc_lp64d")
+VARIANTS=(
+  "rv32imac_ilp32"
+  "rv64imac_lp64"
+  "rv64gc_lp64d"
+  "aarch64a"
+  "aarch64a_pacret"
+  "aarch64a_pacret_bti"
+  "armv7_softfp_neon"
+)
+
+# We place things into folders based on the target here (which maybe isn't
+# ideal) so prefer the mostly-normalized form that clang seems to search for
+# builtins, default libs, etc.
 declare -A VARIANT_BUILD_FLAGS
 VARIANT_BUILD_FLAGS["rv32imac_ilp32"]="--target=riscv32-unknown-linux-gnu -march=rv32imac -mabi=ilp32"
 VARIANT_BUILD_FLAGS["rv64imac_lp64"]="--target=riscv64-unknown-linux-gnu -march=rv64imac -mabi=lp64"
 VARIANT_BUILD_FLAGS["rv64gc_lp64d"]="--target=riscv64-unknown-linux-gnu -march=rv64gc -mabi=lp64d"
+# Note that there's minor devations in the flags here--in the past, only musl
+# either was not built with -mcpu=cortex-a53 (aarch64) or was built with
+# ex: -mcpu=krait (arm). There was also some odd mixing of armv8.3 vs armv8.5
+# across libraries. Intentionally aligning these across libraries for each
+# variant.
+VARIANT_BUILD_FLAGS["aarch64a"]="--target=aarch64-unknown-linux-gnu -mcpu=cortex-a53"
+VARIANT_BUILD_FLAGS["aarch64a_pacret"]="--target=aarch64-unknown-linux-gnu -mcpu=cortex-a53 -march=armv8.3a -mbranch-protection=pac-ret+leaf"
+VARIANT_BUILD_FLAGS["aarch64a_pacret_bti"]="--target=aarch64-unknown-linux-gnu -mcpu=cortex-a53 -march=armv8.3a -mbranch-protection=pac-ret+leaf+bti"
+# The full normalized form here seems to be "thumbv7-unknown-linux-gnueabi" but
+# that doesn't seem to be what clang searches--use "arm-unknown-linux-gnueabi"
+# instead.
+VARIANT_BUILD_FLAGS["armv7_softfp_neon"]="--target=arm-unknown-linux-gnueabi -mcpu=cortex-a9 -mfloat-abi=softfp -mfpu=neon"
+
+# Our musl builds in the past have used different "base" sets of compile flags
+# for each target arch. Build out that mapping here.
+declare -A ARCH_MUSL_CFLAGS
+ARCH_MUSL_CFLAGS["riscv32"]="-Os"
+ARCH_MUSL_CFLAGS["riscv64"]="-Os"
+ARCH_MUSL_CFLAGS["aarch64"]="-mstrict-align -fPIC -fno-rounding-math -O3"
+ARCH_MUSL_CFLAGS["arm"]="-mno-unaligned-access -fPIC -fno-rounding-math -O3"
+
+# We also have some new variant-specific configuration going on. Map that out
+# as well. Just list all variants--it'll be cleaned up later.
+declare -A VARIANT_MUSL_CONFIGS
+VARIANT_MUSL_CONFIGS["rv32imac_ilp32"]=""
+VARIANT_MUSL_CONFIGS["rv64imac_lp64"]=""
+VARIANT_MUSL_CONFIGS["rv64gc_lp64d"]=""
+VARIANT_MUSL_CONFIGS["aarch64a"]="--quic-aarch64-optmem"
+VARIANT_MUSL_CONFIGS["aarch64a_pacret"]="--quic-aarch64-optmem"
+VARIANT_MUSL_CONFIGS["aarch64a_pacret_bti"]="--quic-aarch64-optmem \
+                                             --quic-aarch64-mark-bti"
+VARIANT_MUSL_CONFIGS["armv7_softfp_neon"]=""
 
 for VARIANT in "${VARIANTS[@]}"; do
   echo "Building libraries for ${VARIANT}"
@@ -107,38 +183,52 @@ for VARIANT in "${VARIANTS[@]}"; do
   VARIANT_TMP_SYSROOT="${VARIANT_BASE_BUILD_DIR}/tmp_sysroot"
   mkdir -p "${VARIANT_TMP_SYSROOT}"
 
+  VARIANT_TARGET="$(get_target_from_flags ${BUILD_FLAGS})"
+  VARIANT_ARCH="$(get_arch_from_flags ${VARIANT_BUILD_FLAGS[$VARIANT]})"
+  VARIANT_KERNEL_ARCH="$(get_kernel_arch ${VARIANT_ARCH})"
+
+  # Historically, our RISC-V and Arm/AArch64 builds use slightly different
+  # flags, sources, etc. Sort that all out here so we can treat the two
+  # consistently below.
+  MUSL_DIR="${MUSL_EMB_SRC_DIR}"
+  EXTRA_MUSL_CONFIGS="${VARIANT_MUSL_CONFIGS[$VARIANT]}"
+  CMAKE_OPT_LEVEL="Release"
+  if [[ "${VARIANT_ARCH}" =~ riscv ]]; then
+    MUSL_DIR="${MUSL_SOURCE_BASE_DIR}"
+    EXTRA_MUSL_CONFIGS="${EXTRA_MUSL_CONFIGS} \
+                        --disable-shared"
+    CMAKE_OPT_LEVEL="MinSizeRel"
+  fi
+
   # Install kernel headers. They get their own folder so they aren't added to
   # the distribution
   echo "Installing kernel headers for ${VARIANT}"
   KERNEL_BUILD_BASE="${VARIANT_BASE_BUILD_DIR}/kernel"
   make -C "${KERNEL_SOURCE_BASE_DIR}" clean
-  # Seems riscv is the only supported RISC-V ARCH?
   make -C "${KERNEL_SOURCE_BASE_DIR}" \
           headers_install \
           INSTALL_HDR_PATH="${KERNEL_BUILD_BASE}" \
-          ARCH=riscv
+          ARCH="${VARIANT_KERNEL_ARCH}"
 
   # Flags common to all libraries.
   LIB_BUILD_FLAGS="${BUILD_FLAGS} -isystem${KERNEL_BUILD_BASE}/include --sysroot=${VARIANT_TMP_SYSROOT}"
   LIB_BUILD_FLAGS="${LIB_BUILD_FLAGS} -ffunction-sections -fdata-sections"
 
-  # Parse out the --target flag rather than map it above
-  VARIANT_TARGET="$(get_target_from_flags ${BUILD_FLAGS})"
-
   # Install musl headers
   # This is probably overkill for headers-only (nothing should be compiled)
-  # but just use our normal configure step.
+  # but just use our normal configure step, minus the builtins (as they
+  # don't exist yet anyway)
   echo "Installing musl headers for ${VARIANT}"
   VARIANT_MUSL_BUILD_DIR="${VARIANT_BASE_BUILD_DIR}"/musl
   mkdir -p "${VARIANT_MUSL_BUILD_DIR}"
   pushd "${VARIANT_MUSL_BUILD_DIR}" >/dev/null
-  "${MUSL_SOURCE_BASE_DIR}"/configure \
-                            --disable-shared \
+  "${MUSL_DIR}"/configure \
+                            ${EXTRA_MUSL_CONFIGS} \
                             --disable-wrapper \
                             --prefix="${VARIANT_TMP_SYSROOT}" \
                             CROSS_COMPILE="llvm-" \
                             CC="clang --target=${VARIANT_TARGET} -fuse-ld=eld" \
-                            CFLAGS="${LIB_BUILD_FLAGS} -Os"
+                            CFLAGS="${LIB_BUILD_FLAGS} ${ARCH_MUSL_CFLAGS[$VARIANT_ARCH]}"
   make install-headers
   popd >/dev/null
 
@@ -151,7 +241,7 @@ for VARIANT in "${VARIANTS[@]}"; do
   cmake -G Ninja \
       -DCMAKE_INSTALL_PREFIX="${RESOURCE_DIR}" \
       -DCMAKE_SYSROOT="${TMP_RESOURCE_DIR}" \
-      -DCMAKE_BUILD_TYPE="MinSizeRel" \
+      -DCMAKE_BUILD_TYPE="${CMAKE_OPT_LEVEL}" \
       -DCMAKE_C_COMPILER="clang" \
       -DCMAKE_CXX_COMPILER="clang++" \
       -DCMAKE_TRY_COMPILE_TARGET_TYPE="STATIC_LIBRARY" \
@@ -189,8 +279,8 @@ for VARIANT in "${VARIANTS[@]}"; do
   #      `clang --target=<arch>-linux-gnu test.c <extra flags>`
   #   2. Locating the builtins through `--print-libgcc-file-name`. This can
   #      happen in ex: `add_compiler_rt_runtime`.
-  # We have lots of options to work around the first case. In the second case, I
-  # can't find any way to actually influence where clang looks for compiler-rt
+  # We have lots of options to work around the first case. In the second case,
+  # there doesn't seem to be a way to influence where clang looks for compiler-rt
   # (without source changes) in a way that helps us--it always looks into
   # some "fixed" path that, at best, is common for variants of the same triple.
   #
@@ -201,27 +291,32 @@ for VARIANT in "${VARIANTS[@]}"; do
   # the next variant. Once all variants are built, we can go through and install
   # everything in the correct location again.
   #
-  # UPDATE/FIXME: I've since learned `--resource-dir <dir>` is a thing--I think
-  # this improves the situation a bit in that we can set up per-variant
-  # resource dirs for building rather than share the single "real" one in clang.
-  # I *think* that should at least allow us to relax the sequential ordering
-  # between same-target variants. This script is throwaway code so I'm not
-  # going to make this change here--I'll address this post refactor.
+  # UPDATE/FIXME: Apparently `--resource-dir <dir>` is a thing--this improves
+  # the situation a bit in that we can set up per-variant resource dirs for
+  # building rather than share the single "real" one in clang. That should
+  # at least allow us to relax the sequential ordering between same-target
+  # variants. This script is throwaway code so don't make this change here--
+  # we'll address this post refactor.
   mkdir -p "${VARIANT_TMP_SYSROOT}/lib"
-  cp -r "${RESOURCE_DIR}/lib/${VARIANT_TARGET}" "${VARIANT_TMP_SYSROOT}/lib"
+  VARIANT_RESOURCE_DIR="${RESOURCE_DIR}/lib/${VARIANT_TARGET}"
+  cp -r "${VARIANT_RESOURCE_DIR}" "${VARIANT_TMP_SYSROOT}/lib"
 
   # Install musl, including the libraries this time.
+  # FIXME: we already configured above, is reconfiguring actually helpful? (Does
+  # it matter that the builtin path didn't exist previously?)
   echo "Installing musl libraries for ${VARIANT}"
   pushd "${VARIANT_MUSL_BUILD_DIR}" >/dev/null
+  make distclean
   # TODO: we should probably standardize which linker we're using (lld vs eld)
   # but that can wait--this matches what we've done in the past.
-  "${MUSL_SOURCE_BASE_DIR}"/configure \
-                            --disable-shared \
-                            --disable-wrapper \
-                            --prefix="${VARIANT_TMP_SYSROOT}" \
-                            CROSS_COMPILE="llvm-" \
-                            CC="clang --target=${VARIANT_TARGET} -fuse-ld=eld" \
-                            CFLAGS="${LIB_BUILD_FLAGS} -Os"
+  "${MUSL_DIR}"/configure \
+      ${EXTRA_MUSL_CONFIGS} \
+      --disable-wrapper \
+      --prefix="${VARIANT_TMP_SYSROOT}" \
+      CROSS_COMPILE="llvm-" \
+      CC="clang --target=${VARIANT_TARGET} -fuse-ld=eld" \
+      CFLAGS="${LIB_BUILD_FLAGS} ${ARCH_MUSL_CFLAGS[$VARIANT_ARCH]}" \
+      LIBCC="${VARIANT_RESOURCE_DIR}/libclang_rt.builtins.a"
   make -j"${JOBS}"
   make install
   popd >/dev/null
@@ -236,7 +331,7 @@ for VARIANT in "${VARIANTS[@]}"; do
   cmake -G Ninja \
       -DCMAKE_INSTALL_PREFIX="${VARIANT_TMP_SYSROOT}" \
       -DCMAKE_SYSROOT="${TMP_RESOURCE_DIR}" \
-      -DCMAKE_BUILD_TYPE="MinSizeRel" \
+      -DCMAKE_BUILD_TYPE="${CMAKE_OPT_LEVEL}" \
       -DCMAKE_C_COMPILER="clang" \
       -DCMAKE_CXX_COMPILER="clang++" \
       -DCMAKE_SYSTEM_NAME="Linux" \
@@ -263,9 +358,36 @@ for VARIANT in "${VARIANTS[@]}"; do
   ninja -C "${LIBCXX_BUILD_DIR}" install
 
   # Install the rest of compiler-rt now.
+
+  # The goal here is to disable rtsan and gwp_asan:
+  #   * For rtsan, our musl-embedded is too old to support the fopencookie
+  #     extension, which rtsan relies on.
+  #   * For gwp_asan, it requires execinfo.h which is a glibc-specific
+  #     header--no musl version ships this (or an equivalent).
+  # The actual list corresponds to `ALL_SANITIZERS` in LLVM, minus rtsan and
+  # gwp_asan. Just do this for all targets since aarch64 is the only arch that
+  # rtsan supports that we care about and gwp_asan seems to be generally broken
+  # when building against musl. Might be worth trying to pull the list out of
+  # LLVM sources, but for now this should be sufficient.
+  SAN_TO_BUILD="asan;dfsan;msan;hwasan;tsan;tysan;safestack;cfi;scudo_standalone;ubsan_minimal;nsan;asan_abi"
+
+  # For Arm specifically, we need to disable anything that touches sanitizer
+  # common. Our musl-embedded is old enough that time_t is 32bits and the
+  # sanitizer common code thinks we should have a 64bit time_t (see
+  # https://github.com/llvm/llvm-project/blob/c94739a5d523883663d237ad9072275ff6c847b1/compiler-rt/lib/sanitizer_common/sanitizer_platform_limits_posix.h#L393-L398)
+  # and this disagreement causes issues down the line in ex:
+  # https://github.com/llvm/llvm-project/blob/c94739a5d523883663d237ad9072275ff6c847b1/compiler-rt/lib/sanitizer_common/sanitizer_platform_limits_posix.cpp#L1292
+  # and we fail the static asserts.
+  EXTRA_CRT_CONFIGS=""
+  if [[ "${VARIANT_ARCH}" =~ arm ]]; then
+    EXTRA_CRT_CONFIGS="-DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+                       -DCOMPILER_RT_BUILD_CTX_PROFILE=OFF \
+                       -DCOMPILER_RT_BUILD_MEMPROF=OFF"
+  fi
+
   # As a continuation of the hack above, just install these into the temp
   # sysroot and we'll move them later.
-  # FIXME: Disable fuzzers as well to work around (I think) an upstream bug.
+  # FIXME: Disable fuzzers as well to work around (seemingly) an upstream bug.
   # `partially_link_libcxx` in fuzzer/CMakeLists.txt has a custom command that
   # invokes the linker, but it just uses the toolchain default. So, we get
   # errors as it picks up the host ld.bfd when linking for riscv64 rather than
@@ -277,9 +399,9 @@ for VARIANT in "${VARIANTS[@]}"; do
   echo "Installing compiler-rt for ${VARIANT}"
   COMPILER_RT_BUILD_DIR="${VARIANT_BASE_BUILD_DIR}/compiler-rt"
   cmake -G Ninja \
-      -DCMAKE_INSTALL_PREFIX="${RESOURCE_DIR}" \
+      -DCMAKE_INSTALL_PREFIX="${VARIANT_TMP_SYSROOT}" \
       -DCMAKE_SYSROOT="${TMP_RESOURCE_DIR}" \
-      -DCMAKE_BUILD_TYPE="MinSizeRel" \
+      -DCMAKE_BUILD_TYPE="${CMAKE_OPT_LEVEL}" \
       -DCMAKE_C_COMPILER="clang" \
       -DCMAKE_CXX_COMPILER="clang++" \
       -DCMAKE_SYSTEM_NAME="Linux" \
@@ -295,11 +417,14 @@ for VARIANT in "${VARIANTS[@]}"; do
       -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON \
       -DCOMPILER_RT_BUILD_BUILTINS=OFF \
       -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+      -DCOMPILER_RT_SANITIZERS_TO_BUILD="${SAN_TO_BUILD}" \
+      -DCOMPILER_RT_BUILD_ORC=OFF \
       -DCOMPILER_RT_BUILD_XRAY=OFF \
       -DLLVM_ENABLE_RUNTIMES=compiler-rt \
       -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld --rtlib=compiler-rt -stdlib=libc++" \
       -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld --rtlib=compiler-rt -stdlib=libc++" \
       -DCMAKE_MODULE_LINKER_FLAGS="-fuse-ld=lld --rtlib=compiler-rt -stdlib=libc++" \
+      ${EXTRA_CRT_CONFIGS} \
       -B "${COMPILER_RT_BUILD_DIR}" \
       -S "${LLVM_BASE_DIR}/runtimes"
   ninja -C "${COMPILER_RT_BUILD_DIR}" install
@@ -313,9 +438,9 @@ done
 # like this:
 #   - libc/libc++: <install>/<target>/<variant>
 #   - compiler-rt: <resource dir>/lib/<target>/<variant>
-# I don't think this layout is ideal, but it is close to what we had in the
+# This layout isn't ideal, but it is close to what we had in the
 # past. When we know what to do with the installed libc++ module files
-# we can revisit this.
+# and sanitizer binaries we can revisit this.
 echo "Copying libraries to their final locations"
 for VARIANT in "${VARIANTS[@]}"; do
   VARIANT_TMP_SYSROOT="${BASE_BUILD_DIR}/${VARIANT}/tmp_sysroot"

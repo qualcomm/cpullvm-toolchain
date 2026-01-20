@@ -1,16 +1,18 @@
-From 7089c6d2cfb6509b127ee2792dca1f51cc4f3cfe Mon Sep 17 00:00:00 2001
-From: Zhaoshi Zheng <zhaoshiz@quicinc.com>
-Date: Thu, 8 Jan 2026 14:19:00 -0800
+From ee4f89120d294e0ef196b8187f4bbfbd0964d1f4 Mon Sep 17 00:00:00 2001
+From: Jonathon Penix <jpenix@quicinc.com>
+Date: Tue, 20 Jan 2026 19:06:31 -0800
 Subject: [PATCH] [ARM][compiler-rt] Add a few more variants for builtins
 
 Adding following variants: pacret, pacret-bti and pacret-b-key-bti. They are
 needed by corresponding musl variants.
+
+These should build for baremetal only.
 ---
  compiler-rt/lib/builtins/CMakeLists.txt | 24 +++++++++++++++++++++++-
  1 file changed, 23 insertions(+), 1 deletion(-)
 
 diff --git a/compiler-rt/lib/builtins/CMakeLists.txt b/compiler-rt/lib/builtins/CMakeLists.txt
-index c3dbd65998f1..5f68e4fde584 100644
+index c3dbd65998f1..78735ff6ea99 100644
 --- a/compiler-rt/lib/builtins/CMakeLists.txt
 +++ b/compiler-rt/lib/builtins/CMakeLists.txt
 @@ -1029,7 +1029,29 @@ else ()
@@ -18,7 +20,7 @@ index c3dbd65998f1..5f68e4fde584 100644
                                CXX_STANDARD 17
                                PARENT_TARGET builtins)
 -
-+      if(arch MATCHES "aarch64")
++      if(arch MATCHES "aarch64" AND COMPILER_RT_BAREMETAL_BUILD)
 +        add_compiler_rt_runtime(clang_rt.builtins-pacret-b-key-bti
 +                                STATIC
 +                                ARCHS ${arch}
@@ -45,5 +47,5 @@ index c3dbd65998f1..5f68e4fde584 100644
        # an independent compiler-rt build (see: compiler-rt/test/builtins/CMakeLists.txt)
        get_compiler_rt_output_dir(${arch} BUILTIN_LIB_OUTPUT_DIR)
 -- 
-2.34.1
+2.43.0
 
