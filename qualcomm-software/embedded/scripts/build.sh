@@ -444,6 +444,14 @@ for VARIANT in "${!LINUX_TRIPLES[@]}"; do
     log "Linux C++ libs install ..."
 done
 
+# RISC-V Linux libraries
+log "Install RISC-V Linux libraries"
+"${SCRIPT_DIR}"/build_riscv_linux_runtimes.sh \
+                    --base-build-dir "${BUILD_DIR}" \
+                    --base-install-dir "${INSTALL_DIR}" \
+                    --resource-dir "${RESOURCE_DIR}" \
+                    --llvm-src-dir "${SRC_DIR}" \
+                    --download-dir "${WORKSPACE}"
 
 log "Build and installation complete."
 
