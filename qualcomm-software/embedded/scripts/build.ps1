@@ -207,7 +207,7 @@ Write-Host "[log] Build and all tests completed successfully!"
 
 # --- Create artifact (PowerShell) ---
 
-# Simple local log helpers (avoid clobbering earlier ones if present)
+# Simple local log helpers
 $__w_log  = { param($m) Write-Host    "[log] $m" }
 $__w_warn = { param($m) Write-Warning "[warn] $m" }
 
@@ -216,7 +216,7 @@ $__w_warn = { param($m) Write-Warning "[warn] $m" }
 $short_sha = (git -C $SRC_DIR rev-parse --short HEAD).Trim()
 $suffix    = Get-Date -Format "yyyyMMdd"
 
-# Artifact roots and name (switch 'Linux' -> 'Windows' to reflect this build)
+# Artifact roots and name
 $archive_root = "$WORKSPACE\artifacts"
 $archive_dir  = $INSTALL_DIR
 $base_name    = "cpullvm-toolchain-$($ELD_BRANCH.Split('/')[-1])-Windows-x86_64-$short_sha-$suffix"
@@ -300,7 +300,7 @@ if (-not $usedTool) {
 & $__w_log "Artifact created with: $usedTool"
 & $__w_log "Artifact path: $tar_file"
 
-# Optional: copy to ARTIFACT_DIR
+# copy to ARTIFACT_DIR
 if ($env:ARTIFACT_DIR -and $env:ARTIFACT_DIR.Trim().Length -gt 0) {
     $destDir = $env:ARTIFACT_DIR
     if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Force -Path $destDir | Out-Null }
