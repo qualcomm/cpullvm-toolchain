@@ -2,6 +2,10 @@ name: pre-checkin
 
 on:
   pull_request:
+  paths-ignore:
+    - 'qualcomm-software/embedded/scripts/build.ps1'
+    - '.github/workflows/nightly-win-x86.yml'
+
 
 jobs:
   base:
