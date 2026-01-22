@@ -1,5 +1,3 @@
-# build.ps1
-
 # Fail fast on errors thrown by PowerShell cmdlets
 $ErrorActionPreference = "Stop"
 
@@ -36,7 +34,22 @@ Write-Host "[log] BUILD_MODE   = $env:BUILD_MODE"
 Write-Host "[log] ASSERTIONS   = $env:ASSERTION_MODE"
 Write-Host "[log] JOBS         = $env:JOBS"
 
-# === Resolve Visual Studio (vcvarsall.bat) ===
+# === Host architecture detection ===
+$hostArch = $env:PROCESSOR_ARCHITECTURE
+switch -Regex ($hostArch) {
+  'ARM64' { $hostArch = 'ARM64' }
+  'AMD64' { $hostArch = 'x64' }
+  default { $hostArch = 'x64' } # safe default
+}
+Write-Host "[log] Host architecture detected: $hostArch"
+
+# Allow overriding to x64 tools on WoA via emulation (optional)
+$useX64Tools = ($env:USE_X64_TOOLS -eq '1')
+if ($hostArch -eq 'ARM64' -and $useX64Tools) {
+    Write-Warning "[warn] Forcing x64 toolchain under emulation on Windows on Arm (USE_X64_TOOLS=1). Expect slower builds."
+}
+
+# === Resolve Visual Studio (vswhere) ===
 $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
 if (-not (Test-Path $vswhere)) {
     $vswhere = Join-Path ${env:ProgramFiles} "Microsoft Visual Studio\Installer\vswhere.exe"
@@ -50,24 +63,37 @@ if (-not (Test-Path $vswhere)) {
     exit 1
 }
 
-# Query the latest VS with VC tools component
+# === Choose VS component and vcvars target ===
+$vsRequires  = $null
+$vcvarsTarget = $null
+if ($hostArch -eq 'ARM64' -and -not $useX64Tools) {
+    $vsRequires   = 'Microsoft.VisualStudio.Component.VC.Tools.ARM64'
+    $vcvarsTarget = 'arm64'
+    Write-Host "[log] Using native ARM64 MSVC toolset"
+} else {
+    $vsRequires   = 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
+    $vcvarsTarget = 'x64'
+    Write-Host "[log] Using x64 MSVC toolset"
+}
+
+# Query the latest VS with required component
 $VS_INSTALL = & $vswhere -latest -products * `
-    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+    -requires $vsRequires `
     -property installationPath
 if (-not $VS_INSTALL) {
-    Write-Error "*** ERROR: Visual Studio installation not found via vswhere ***"
+    Write-Error "*** ERROR: Visual Studio installation with '$vsRequires' not found via vswhere ***"
     exit 1
 }
 
-# Get vcvarsall.bat and import the environment for x64
+# Get vcvarsall.bat and import the environment for selected host
 $VCVARSALL = Join-Path $VS_INSTALL "VC\Auxiliary\Build\vcvarsall.bat"
 if (-not (Test-Path $VCVARSALL)) {
     Write-Error "*** ERROR: vcvarsall.bat not found at $VCVARSALL ***"
     exit 1
 }
 
-# Load VS environment into the current PowerShell process
-cmd /c "call `"$VCVARSALL`" x64 && set" | ForEach-Object {
+Write-Host "[log] Loading VS environment: vcvarsall $vcvarsTarget"
+cmd /c "call `"$VCVARSALL`" $vcvarsTarget && set" | ForEach-Object {
     if ($_ -match '^(.*?)=(.*)$') {
         [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process')
     }
@@ -121,12 +147,14 @@ Write-Host "[log] Configuring CMake..."
 $pythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
 if ($pythonExe) { Write-Host "[log] Using Python: $pythonExe" } else { Write-Host "[warn] Python not found via Get-Command; relying on PATH" }
 
-# --- Prefer llvm-rc over Windows rc.exe to avoid cmcldeps/rc.exe hangs ---
+# --- Resource compiler selection (prefer llvm-rc) ---
 $llvmRcCandidates = @(
-  (Join-Path $VS_INSTALL 'VC\Tools\Llvm\x64\bin\llvm-rc.exe'),  # VS-bundled LLVM
-  'C:\Program Files\LLVM\bin\llvm-rc.exe'                       # Standalone LLVM on GH runner
-)
-$llvmRc = $llvmRcCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+  (Join-Path $VS_INSTALL 'VC\Tools\Llvm\{0}\bin\llvm-rc.exe' -f $vcvarsTarget), # ...\Llvm\arm64\bin or ...\Llvm\x64\bin
+  (Join-Path $VS_INSTALL 'VC\Tools\Llvm\bin\llvm-rc.exe'),                      # generic bin in some layouts
+  'C:\Program Files\LLVM\bin\llvm-rc.exe'                                       # Standalone LLVM
+) | Where-Object { Test-Path $_ }
+
+$llvmRc = $llvmRcCandidates | Select-Object -First 1
 
 $cmakeRcArg = ''
 if ($llvmRc) {
@@ -211,7 +239,6 @@ Write-Host "[log] Build and all tests completed successfully!"
 $__w_log  = { param($m) Write-Host    "[log] $m" }
 $__w_warn = { param($m) Write-Warning "[warn] $m" }
 
-
 # Compute identifiers
 $short_sha = (git -C $SRC_DIR rev-parse --short HEAD).Trim()
 $suffix    = Get-Date -Format "yyyyMMdd"
@@ -219,7 +246,11 @@ $suffix    = Get-Date -Format "yyyyMMdd"
 # Artifact roots and name
 $archive_root = "$WORKSPACE\artifacts"
 $archive_dir  = $INSTALL_DIR
-$base_name    = "cpullvm-toolchain-$($ELD_BRANCH.Split('/')[-1])-Windows-x86_64-$short_sha-$suffix"
+
+# === select artifact arch label by host/toolset ===
+$artifactArch = if ($hostArch -eq 'ARM64' -and -not $useX64Tools) { 'arm64' } else { 'x86_64' }
+
+$base_name    = "cpullvm-toolchain-$($ELD_BRANCH.Split('/')[-1])-Windows-$artifactArch-$short_sha-$suffix"
 
 & $__w_log "Applying NIGHTLY compression settings"
 $COMPRESS_EXT = "txz"
@@ -256,7 +287,6 @@ $usedTool = $null
 $tarCmd = Get-Command tar -ErrorAction SilentlyContinue
 if ($tarCmd) {
     if (Test-TarSupportsXz) {
-        # tar -cJf <archive.txz> -C <dir> .
         & tar -cJf "$tar_file" -C "$archive_dir" .
         if ($LASTEXITCODE -ne 0) { throw "tar failed with exit code $LASTEXITCODE" }
         $usedTool = "tar -cJf"
