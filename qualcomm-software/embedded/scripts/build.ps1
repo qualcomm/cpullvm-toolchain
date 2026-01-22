@@ -1,4 +1,3 @@
-
 # Fail fast on errors thrown by PowerShell cmdlets
 $ErrorActionPreference = "Stop"
 
@@ -35,7 +34,7 @@ Write-Host "[log] BUILD_MODE   = $env:BUILD_MODE"
 Write-Host "[log] ASSERTIONS   = $env:ASSERTION_MODE"
 Write-Host "[log] JOBS         = $env:JOBS"
 
-# === Host architecture detection (minimal change) ===
+# === Host architecture detection ===
 $hostArch = $env:PROCESSOR_ARCHITECTURE
 switch -Regex ($hostArch) {
   'ARM64' { $hostArch = 'ARM64' }
@@ -64,7 +63,7 @@ if (-not (Test-Path $vswhere)) {
     exit 1
 }
 
-# === Choose VS component and vcvars target (minimal change) ===
+# === Choose VS component and vcvars target ===
 $vsRequires  = $null
 $vcvarsTarget = $null
 if ($hostArch -eq 'ARM64' -and -not $useX64Tools) {
@@ -148,7 +147,7 @@ Write-Host "[log] Configuring CMake..."
 $pythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
 if ($pythonExe) { Write-Host "[log] Using Python: $pythonExe" } else { Write-Host "[warn] Python not found via Get-Command; relying on PATH" }
 
-# --- Prefer llvm-rc over Windows rc.exe; probe both arm64/x64 layouts (minimal change) ---
+# --- Resource compiler selection (prefer llvm-rc) ---
 $llvmRcCandidates = @(
   (Join-Path $VS_INSTALL 'VC\Tools\Llvm\{0}\bin\llvm-rc.exe' -f $vcvarsTarget), # ...\Llvm\arm64\bin or ...\Llvm\x64\bin
   (Join-Path $VS_INSTALL 'VC\Tools\Llvm\bin\llvm-rc.exe'),                      # generic bin in some layouts
@@ -248,7 +247,7 @@ $suffix    = Get-Date -Format "yyyyMMdd"
 $archive_root = "$WORKSPACE\artifacts"
 $archive_dir  = $INSTALL_DIR
 
-# === Minimal change: select artifact arch label by host/toolset ===
+# === select artifact arch label by host/toolset ===
 $artifactArch = if ($hostArch -eq 'ARM64' -and -not $useX64Tools) { 'arm64' } else { 'x86_64' }
 
 $base_name    = "cpullvm-toolchain-$($ELD_BRANCH.Split('/')[-1])-Windows-$artifactArch-$short_sha-$suffix"
@@ -288,7 +287,6 @@ $usedTool = $null
 $tarCmd = Get-Command tar -ErrorAction SilentlyContinue
 if ($tarCmd) {
     if (Test-TarSupportsXz) {
-        # tar -cJf <archive.txz> -C <dir> .
         & tar -cJf "$tar_file" -C "$archive_dir" .
         if ($LASTEXITCODE -ne 0) { throw "tar failed with exit code $LASTEXITCODE" }
         $usedTool = "tar -cJf"
