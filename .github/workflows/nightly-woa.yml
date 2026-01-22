@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-windows:
-    runs-on: windows-latest-arm64
+    runs-on: windows-arm64
     env:
       ARTIFACT_DIR: ${{ github.workspace }}/nightly-toolchain
 
@@ -53,3 +53,4 @@ jobs:
             ${{ env.ARTIFACT_DIR }}/*.tgz
           if-no-files-found: ignore
           retention-days: 7
+
