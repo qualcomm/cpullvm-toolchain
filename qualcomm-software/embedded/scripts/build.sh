@@ -98,6 +98,10 @@ mkdir -p "${BUILD_DIR}" "${INSTALL_DIR}"
 if [[ ! -d "${WORKSPACE}/musl-embedded/.git" ]]; then
   log "Cloning musl-embedded into ${WORKSPACE}/musl-embedded"
   git clone "${MUSL_EMBEDDED_REPO_URL}" "${WORKSPACE}/musl-embedded" -b "${MUSL_EMBEDDED_BRANCH}"
+  MUSL_PINNED_COMMIT="${MUSL_PINNED_COMMIT:-a2bc89ab37e8691e300d7a7dd96bfac4917dc884}"
+  pushd "${WORKSPACE}/musl-embedded" >/dev/null
+  git checkout "${MUSL_PINNED_COMMIT}"
+  popd >/dev/null
 else
   log "musl-embedded already present, leaving as-is"
 fi
@@ -106,7 +110,7 @@ fi
 if [[ ! -d "${REPO_ROOT}/llvm/tools/eld/.git" ]]; then
   log "Cloning ELD to ${REPO_ROOT}/llvm/tools/eld"
   git clone "${ELD_REPO_URL}" "${SRC_DIR}/llvm/tools/eld" -b "${ELD_BRANCH}"
-  ELD_PINNED_COMMIT="${ELD_PINNED_COMMIT:-96a7dffdf65a68714c8311111d6a6d54a3a150db}"
+  ELD_PINNED_COMMIT="${ELD_PINNED_COMMIT:-c4fd9616c3a95577144b9ae3d9e3f383ccad5156}"
   pushd "${SRC_DIR}/llvm/tools/eld" >/dev/null
   git checkout "${ELD_PINNED_COMMIT}"
   popd >/dev/null

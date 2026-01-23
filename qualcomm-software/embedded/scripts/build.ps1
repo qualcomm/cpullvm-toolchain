@@ -10,6 +10,7 @@ $SRC_DIR     = $REPO_ROOT
 $BUILD_DIR   = "$WORKSPACE\build"
 $INSTALL_DIR = "$WORKSPACE\install"
 $ELD_DIR     = "$REPO_ROOT\llvm\tools\eld"
+$MUSL_EMBEDDED_DIR = "$WORKSPACE\musl-embedded"
 
 # === Config defaults ===
 if (-not $env:JOBS)           { $env:JOBS           = $env:NUMBER_OF_PROCESSORS }
@@ -18,11 +19,12 @@ if (-not $env:ASSERTION_MODE) { $env:ASSERTION_MODE = "OFF" }
 
 # === Constants ===
 $ELD_REPO_URL = "https://github.com/qualcomm/eld.git"
-$ELD_BRANCH   = "main"
-$ELD_COMMIT   = "96a7dffdf65a68714c8311111d6a6d54a3a150db"
+$ELD_BRANCH   = "release/22.x"
+$ELD_COMMIT   = "c4fd9616c3a95577144b9ae3d9e3f383ccad5156"
 
 $MUSL_EMBEDDED_REPO_URL = "https://github.com/qualcomm/musl-embedded.git"
 $MUSL_EMBEDDED_BRANCH   = "main"
+$MUSL_EMBEDDED_COMMIT   = "a2bc89ab37e8691e300d7a7dd96bfac4917dc884"
 
 Write-Host "[log] SCRIPT_DIR   = $SCRIPT_DIR"
 Write-Host "[log] REPO_ROOT    = $REPO_ROOT"
@@ -116,9 +118,12 @@ Write-Host "[log] Preparing workspace at: $WORKSPACE"
 New-Item -ItemType Directory -Force -Path $BUILD_DIR,$INSTALL_DIR | Out-Null
 
 # === Clone repos ===
-if (-not (Test-Path "$WORKSPACE\musl-embedded\.git")) {
+if (-not (Test-Path "$MUSL_EMBEDDED_DIR\.git")) {
     Write-Host "[log] Cloning musl-embedded..."
-    git clone $MUSL_EMBEDDED_REPO_URL "$WORKSPACE\musl-embedded" -b $MUSL_EMBEDDED_BRANCH
+    git clone $MUSL_EMBEDDED_REPO_URL $MUSL_EMBEDDED_DIR
+    Push-Location $MUSL_EMBEDDED_DIR
+    git checkout $MUSL_EMBEDDED_COMMIT
+    Pop-Location
 }
 
 if (-not (Test-Path "$ELD_DIR\.git")) {
