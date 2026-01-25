@@ -142,32 +142,54 @@ endif()
 
 set(BUG_REPORT_URL "https://github.com/qualcomm/cpullvm-toolchain/issues" CACHE STRING "")
 set(LLVM_DISTRIBUTION_COMPONENTS
-    clang-resource-headers
     clang
+    clang-format
+    clang-include-fixer
+    clang-refactor
+    clang-resource-headers
+    clang-scan-deps
+    clang-tidy
     dsymutil
     lld
     ld.eld
-    LW
-    PluginAPIHeaders
-    YAMLMapParser
     llvm-ar
     llvm-config
     llvm-cov
     llvm-cxxfilt
+    llvm-dis
+    llvm-dlltool
     llvm-dwarfdump
-    llvm-mc
+    llvm-dwarfutil
+    llvm-dwp
+    llvm-extract
+    llvm-lib
+    llvm-ml
+    # FIXME: We might want this? Our older releases had this, but for some
+    # reason my local builds (and I think our builders) can't locate libxml2,
+    # even though it should be present.
+    # llvm-mt
     llvm-nm
     llvm-objcopy
     llvm-objdump
     llvm-profdata
     llvm-ranlib
+    llvm-rc
     llvm-readelf
     llvm-readobj
     llvm-size
     llvm-strings
     llvm-strip
     llvm-symbolizer
+    llvm-undname
+    llvm-xray
+    opt-viewer
+    sancov
+    scan-build
+    scan-view
     LTO
+    LW
+    PluginAPIHeaders
+    YAMLMapParser
     CACHE STRING ""
 )
 set(LLVM_TOOLCHAIN_DISTRIBUTION_COMPONENTS
@@ -177,7 +199,7 @@ set(LLVM_TOOLCHAIN_DISTRIBUTION_COMPONENTS
     CACHE STRING "Components defined by this CMakeLists that should be
 installed by the install-llvm-toolchain target"
 )
-set(LLVM_ENABLE_PROJECTS clang;lld;polly CACHE STRING "")
+set(LLVM_ENABLE_PROJECTS clang;lld;polly;clang-tools-extra CACHE STRING "")
 set(LLVM_TARGETS_TO_BUILD AArch64;ARM;RISCV CACHE STRING "")
 set(LLVM_DEFAULT_TARGET_TRIPLE aarch64-unknown-linux-gnu CACHE STRING "")
 set(LLVM_BUILD_RUNTIME OFF CACHE BOOL "")
