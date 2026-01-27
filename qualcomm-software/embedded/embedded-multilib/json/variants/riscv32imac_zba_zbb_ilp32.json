@@ -8,7 +8,7 @@
             "ENABLE_RTTI": "ON",
             "TEST_EXECUTOR": "qemu",
             "QEMU_MACHINE": "virt",
-            "QEMU_CPU": "rv32",
+            "QEMU_CPU": "rv32,i=on,m=on,a=on,c=on,x-zba=on,x-zbb=on",
             "QEMU_PARAMS": "-bios none",
             "FLASH_ADDRESS": "0x80000000",
             "FLASH_SIZE": "0x00400000",

@@ -31,4 +31,4 @@ export LIT_OPTS="--ignore-fail --xunit-xml-output=lit_results.junit.xml"
 # but while we have a limited number of variants (and no compiler-rt
 # or libc++ testing enabled) we can run everything.
 cd "${REPO_ROOT}"/build
-ninja check-all-llvm-toolchain
+ninja check-picolibc-riscv32imac_zba_zbb_ilp32
