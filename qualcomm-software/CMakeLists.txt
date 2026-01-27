@@ -151,28 +151,65 @@ endif()
 
 set(BUG_REPORT_URL "https://github.com/qualcomm/cpullvm-toolchain/issues" CACHE STRING "")
 set(LLVM_DISTRIBUTION_COMPONENTS
-    clang-resource-headers
     clang
-    dsymutil
+    clang-format
+    clang-refactor
+    clang-resource-headers
+    clang-scan-deps
+    clang-tidy
+    clangd
     lld
     ld.eld
+    llvm-addr2line
     llvm-ar
-    llvm-config
+    llvm-as
+    llvm-cat
+    llvm-cfi-verify
     llvm-cov
+    llvm-cvtres
+    llvm-cxxdump
     llvm-cxxfilt
+    llvm-cxxmap
+    llvm-debuginfo-analyzer
+    llvm-debuginfod
+    llvm-debuginfod-find
+    llvm-diff
+    llvm-dis
+    llvm-dlltool
     llvm-dwarfdump
-    llvm-mc
+    llvm-dwarfutil
+    llvm-dwp
+    llvm-extract
+    llvm-ifs
+    llvm-lib
+    llvm-ml
+    llvm-ml64
+    llvm-modextract
     llvm-nm
     llvm-objcopy
     llvm-objdump
+    llvm-opt-report
+    llvm-pdbutil
     llvm-profdata
+    llvm-profgen
     llvm-ranlib
+    llvm-rc
     llvm-readelf
     llvm-readobj
+    llvm-reduce
+    llvm-remarkutil
     llvm-size
     llvm-strings
     llvm-strip
     llvm-symbolizer
+    llvm-undname
+    llvm-windres
+    opt-viewer
+    sancov
+    sanstats
+    scan-build
+    scan-build-py
+    scan-view
     LTO
     CACHE STRING ""
 )
@@ -183,7 +220,7 @@ set(LLVM_TOOLCHAIN_DISTRIBUTION_COMPONENTS
     CACHE STRING "Components defined by this CMakeLists that should be
 installed by the install-llvm-toolchain target"
 )
-set(LLVM_ENABLE_PROJECTS clang;lld;polly CACHE STRING "")
+set(LLVM_ENABLE_PROJECTS clang;lld;polly;clang-tools-extra CACHE STRING "")
 set(LLVM_TARGETS_TO_BUILD AArch64;ARM;RISCV;X86 CACHE STRING "")
 # There's test failures when enabling x86 support and testing on native
 # AArch64 Linux machines. Just disable x86 in eld until these are
