@@ -127,7 +127,7 @@ log "Configuring LLVM"
 mkdir -p "${BUILD_DIR}/llvm"
 pushd "${BUILD_DIR}/llvm" >/dev/null
 cmake -G Ninja -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
-  -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;RISCV" \
+  -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;RISCV;X86" \
   -DLLVM_EXTERNAL_PROJECTS="eld" \
   -DLLVM_EXTERNAL_ELD_SOURCE_DIR="llvm/tools/eld" \
   -DLLVM_DEFAULT_TARGET_TRIPLE="aarch64-unknown-linux-gnueabi" \
@@ -135,7 +135,6 @@ cmake -G Ninja -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
   -DLLVM_BUILD_RUNTIME="OFF" \
   -DLIBCLANG_BUILD_STATIC="ON" -DLLVM_POLLY_LINK_INTO_TOOLS="ON" \
   -DCMAKE_C_COMPILER="clang" -DCMAKE_CXX_COMPILER="clang++" \
-  -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
   -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
   -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}" \
   -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
@@ -156,7 +155,7 @@ if [[ "${AARCH64_BUILD}" == "true" ]]; then
     -S "${SRC_DIR}/llvm" \
     -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR_AARCH64}" \
     -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
-    -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;RISCV" \
+    -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;RISCV;X86" \
     -DLLVM_HOST_TRIPLE="aarch64-linux-gnu" \
     -DLLVM_EXTERNAL_PROJECTS="eld" \
     -DLLVM_EXTERNAL_ELD_SOURCE_DIR="${SRC_DIR}/llvm/tools/eld" \
