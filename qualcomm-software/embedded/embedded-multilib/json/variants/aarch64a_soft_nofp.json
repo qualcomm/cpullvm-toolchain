@@ -15,6 +15,12 @@
             "RAM_SIZE": "0x00200000",
             "LIBRARY_BUILD_TYPE": "minsizerelease"
         },
+        "picolibc": {
+            "ENABLE_CXX_LIBS": "OFF",
+            "ENABLE_LIBC_TESTS": "ON",
+            "ENABLE_COMPILER_RT_TESTS": "OFF",
+            "ENABLE_LIBCXX_TESTS": "OFF"
+        },
         "musl-embedded": {
             "ENABLE_CXX_LIBS": "OFF",
             "ENABLE_LIBC_TESTS": "OFF",
