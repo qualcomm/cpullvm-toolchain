@@ -173,12 +173,13 @@ set(LLVM_TOOLCHAIN_DISTRIBUTION_COMPONENTS
     CACHE STRING "Components defined by this CMakeLists that should be
 installed by the install-llvm-toolchain target"
 )
-set(LLVM_ENABLE_PROJECTS clang;lld CACHE STRING "")
+set(LLVM_ENABLE_PROJECTS clang;lld;polly CACHE STRING "")
 set(LLVM_TARGETS_TO_BUILD AArch64;ARM CACHE STRING "")
 set(LLVM_DEFAULT_TARGET_TRIPLE aarch64-unknown-linux-gnu CACHE STRING "")
 set(LLVM_BUILD_RUNTIME OFF CACHE BOOL "")
 set(LIBCLANG_BUILD_STATIC ON CACHE BOOL "")
 set(LLVM_ENABLE_LIBCXX ON CACHE BOOL "")
+set(LLVM_POLLY_LINK_INTO_TOOLS ON CACHE BOOL "")
 set(CLANG_DEFAULT_LINKER lld CACHE STRING "")
 
 # Default to a release build
