@@ -1,8 +1,8 @@
 [binaries]
 c = [@picolibc_meson_flags@, '-nostdlib']
 cpp = [@picolibcpp_meson_flags@, '-nostdlib']
-c_ld = 'lld'
-cpp_ld = 'lld'
+c_ld = 'eld'
+cpp_ld = 'eld'
 ar = '@LLVM_BINARY_DIR@/bin/llvm-ar@CMAKE_EXECUTABLE_SUFFIX@'
 strip = '@LLVM_BINARY_DIR@/bin/llvm-strip@CMAKE_EXECUTABLE_SUFFIX@'
 # only needed to run tests
