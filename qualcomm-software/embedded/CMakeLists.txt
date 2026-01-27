@@ -120,7 +120,7 @@ set(LLVM_TOOLCHAIN_C_LIBRARY
     "Which C library to use."
 )
 set_property(CACHE LLVM_TOOLCHAIN_C_LIBRARY
-    PROPERTY STRINGS picolibc)
+    PROPERTY STRINGS picolibc musl-embedded)
 
 option(
     SHORT_BUILD_PATHS
@@ -132,7 +132,7 @@ option(
 
 
 option(LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL
-    "Make cpack build an overlay package that can be unpacked over the main toolchain to install a secondary set of libraries."
+    "Make cpack build an overlay package that can be unpacked over the main toolchain to install a secondary set of libraries based on musl-embedded."
     ${overlay_install_default})
 if(LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL)
   if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL "picolibc")
@@ -221,10 +221,11 @@ include(ProcessorCount)
 # Check out and patch eld
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_eld.cmake)
 
-# Check out and patch picolibc if required.
+# Check out and patch picolibc or musl-embedded if required.
 #
 # If you'd rather check out and patch manually then run cmake with
 # -DFETCHCONTENT_SOURCE_DIR_PICOLIBC=/path/to/picolibc
+# -DFETCHCONTENT_SOURCE_DIR_MUSL=/path/to/musl
 #
 # By default check out will be silent but this can be changed by running
 # cmake with -DFETCHCONTENT_QUIET=OFF
@@ -233,6 +234,9 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_eld.cmake)
 # cmake . -DFETCHCONTENT_FULLY_DISCONNECTED=ON
 if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc)
     include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_picolibc.cmake)
+endif()
+if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_musl-embedded.cmake)
 endif()
 
 ##################################################################################################
@@ -253,6 +257,15 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     )
 endif()
 ##################################################################################################
+
+if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
+    install(
+        FILES
+        ${CMAKE_CURRENT_SOURCE_DIR}/${LLVM_TOOLCHAIN_C_LIBRARY}.cfg
+        DESTINATION bin
+        COMPONENT llvm-toolchain-${LLVM_TOOLCHAIN_C_LIBRARY}-configs
+    )
+endif()
 
 # Include eld
 set(LLVM_EXTERNAL_PROJECTS eld)
@@ -391,6 +404,8 @@ add_custom_target(
     # specify both definitions
     -Dpicolibc_SOURCE_DIR=${picolibc_SOURCE_DIR}
     -Dpicolibc_URL=${picolibc_URL}
+    -Dmusl_SOURCE_DIR=${musl_SOURCE_DIR}
+    -Dmusl_URL=${musl_URL}
     # but we do tell the script which library we're actually using
     -DLLVM_TOOLCHAIN_C_LIBRARY=${LLVM_TOOLCHAIN_C_LIBRARY}
     -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_version_txt.cmake
@@ -514,6 +529,7 @@ if(NOT PREBUILT_TARGET_LIBRARIES)
         -DPARALLEL_LIB_BUILD_LEVELS=${PARALLEL_LIB_BUILD_LEVELS}
         -DENABLE_QEMU_TESTING=${ENABLE_QEMU_TESTING}
         -DFETCHCONTENT_SOURCE_DIR_PICOLIBC=${FETCHCONTENT_SOURCE_DIR_PICOLIBC}
+        -DFETCHCONTENT_SOURCE_DIR_MUSL=${FETCHCONTENT_SOURCE_DIR_MUSL}
         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
         -DPROJECT_PREFIX=${multilib_prefix}
         -DNUMERICAL_BUILD_NAMES=${SHORT_BUILD_PATHS}
@@ -640,6 +656,10 @@ if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc)
     list(APPEND third_party_license_files
         ${picolibc_SOURCE_DIR}/COPYING.NEWLIB           COPYING.NEWLIB
         ${picolibc_SOURCE_DIR}/COPYING.picolibc         COPYING.picolibc
+    )
+elseif(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
+    list(APPEND third_party_license_files
+        ${musl_SOURCE_DIR}/COPYRIGHT musl-embedded-COPYRIGHT.txt
     )
 endif()
 
