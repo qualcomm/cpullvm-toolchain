@@ -1,0 +1,17 @@
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac -mabi=ilp32 -fno-pic -fno-exceptions | FileCheck %s --check-prefix=CHECK-IMAC-FNO-PIC
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imafc_zba -mabi=ilp32 -fno-pic -fno-exceptions | FileCheck %s --check-prefix=CHECK-IMAC-FNO-PIC
+# CHECK-IMAC-FNO-PIC: riscv32-unknown-elf/riscv32imac_ilp32_nopic{{$}}
+# CHECK-IMAC-FNO-PIC-EMPTY:
+
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac_zba_zbb -mabi=ilp32 -fpic -fno-exceptions | FileCheck %s --check-prefix=CHECK-IMAC-ZBA-ZBB
+# CHECK-IMAC-ZBA-ZBB: riscv32-unknown-elf/riscv32imac_zba_zbb_ilp32{{$}}
+# CHECK-IMAC-ZBA-ZBB-EMPTY:
+
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac_zba_zbb -mabi=ilp32 -fno-exceptions | FileCheck %s --check-prefix=CHECK-IMAC-ZBA-ZBB-NO-PIC
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac_zba_zbb -mabi=ilp32 -fno-pic -fno-exceptions | FileCheck %s --check-prefix=CHECK-IMAC-ZBA-ZBB-NO-PIC
+# CHECK-IMAC-ZBA-ZBB-NO-PIC: riscv32-unknown-elf/riscv32imac_zba_zbb_ilp32_nopic{{$}}
+# CHECK-IMAC-ZBA-ZBB-NO-PIC-EMPTY:
+
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac -mabi=ilp32 -fpic -fno-exceptions 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima -mabi=ilp32 -fno-pic -fno-exceptions 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
+# NOT-FOUND: warning: no multilib found matching flags

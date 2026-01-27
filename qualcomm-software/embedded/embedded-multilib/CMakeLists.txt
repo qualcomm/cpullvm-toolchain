@@ -145,6 +145,8 @@ string(JSON multilib_defs GET ${multilib_json_str} "libs")
 string(JSON lib_count LENGTH ${multilib_defs})
 math(EXPR lib_count_dec "${lib_count} - 1")
 
+include(${TOOLCHAIN_SOURCE_DIR}/cmake/get_canonical_riscv_march.cmake)
+
 foreach(lib_idx RANGE ${lib_count_dec})
     string(JSON lib_def GET ${multilib_defs} ${lib_idx})
     string(JSON variant GET ${lib_def} "variant")
@@ -172,6 +174,10 @@ foreach(lib_idx RANGE ${lib_count_dec})
             # Sort by target triple
             if(variant MATCHES "^aarch64")
                 set(parent_dir_name aarch64-none-elf)
+            elseif(variant MATCHES "^riscv32")
+                set(parent_dir_name riscv32-unknown-elf)
+            elseif(variant MATCHES "^riscv64")
+                set(parent_dir_name riscv64-unknown-elf)
             else()
                 set(parent_dir_name arm-none-eabi)
             endif()
@@ -328,6 +334,25 @@ foreach(lib_idx RANGE ${lib_count_dec})
             string(APPEND multilib_yaml_content "  Flags:\n")
             string(REPLACE " " ";" multilib_flags_list ${variant_multilib_flags})
             foreach(flag ${multilib_flags_list})
+                if(variant MATCHES "^riscv")
+                    if(flag MATCHES "-march=")
+                        get_canonical_riscv_march(
+                            "${LLVM_BINARY_DIR}/bin/clang${CMAKE_EXECUTABLE_SUFFIX}"
+                            "${multilib_flags_list}"
+                            canonical_riscv_march
+                        )
+                        set(flag "-march=${canonical_riscv_march}")
+
+                        # This forgoes any special handling of extension versions, but that seems
+                        # fine as we don't support multiple versions of the same extensions, and we
+                        # generally expect our compiler, libraries, and multilib file) to be coupled.
+                        string(REPLACE "_" "_.*" expanded_riscv_march_match ${flag})
+                        string(APPEND riscv_march_mappings "- Match: ${expanded_riscv_march_match}.*\n")
+                        string(APPEND riscv_march_mappings "  Flags:\n")
+                        string(APPEND riscv_march_mappings "  - ${flag}\n")
+                    endif()
+                endif()
+
                 string(APPEND multilib_yaml_content "  - ${flag}\n")
             endforeach()
             string(APPEND multilib_yaml_content "  Group: stdlibs\n")
