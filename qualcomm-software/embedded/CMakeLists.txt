@@ -146,6 +146,10 @@ set(LLVM_DISTRIBUTION_COMPONENTS
     clang
     dsymutil
     lld
+    ld.eld
+    LW
+    PluginAPIHeaders
+    YAMLMapParser
     llvm-ar
     llvm-config
     llvm-cov
@@ -214,6 +218,9 @@ include(ExternalProject)
 include(FetchContent)
 include(ProcessorCount)
 
+# Check out and patch eld
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_eld.cmake)
+
 # Check out and patch picolibc if required.
 #
 # If you'd rather check out and patch manually then run cmake with
@@ -247,6 +254,10 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 ##################################################################################################
 
+# Include eld
+set(LLVM_EXTERNAL_PROJECTS eld)
+set(LLVM_EXTERNAL_ELD_SOURCE_DIR "${eld_SOURCE_DIR}")
+
 set(clang_lit_xfails_path "${CMAKE_CURRENT_BINARY_DIR}/clang_lit_xfails.txt")
 set(CLANG_TEST_EXTRA_ARGS "@${clang_lit_xfails_path}")
 
@@ -254,6 +265,8 @@ set(llvmproject_src_dir ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 add_subdirectory(
     ${llvmproject_src_dir}/llvm llvm
 )
+
+add_dependencies(check-all check-eld)
 
 # Update the xfail/xfail-not list before running the tests.
 add_custom_target(
@@ -373,6 +386,9 @@ add_custom_target(
     -DCPULLVMToolchain_VERSION=${CPULLVMToolchain_VERSION}
     -DCPULLVMToolchain_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
     -Dllvmproject_src_dir=${llvmproject_src_dir}
+    -Deld_SOURCE_DIR=${eld_SOURCE_DIR}
+    # at most one of picolibc and musl options is needed, but easiest to
+    # specify both definitions
     -Dpicolibc_SOURCE_DIR=${picolibc_SOURCE_DIR}
     -Dpicolibc_URL=${picolibc_URL}
     # but we do tell the script which library we're actually using
@@ -430,6 +446,7 @@ if(NOT PREBUILT_TARGET_LIBRARIES)
         set(lib_tool_dependencies
             clang
             lld
+            ld.eld
             llvm-ar
             llvm-config
             llvm-nm
@@ -614,6 +631,7 @@ set(third_party_license_files
     ${llvmproject_src_dir}/libunwind/LICENSE.TXT     LIBUNWIND-LICENSE.txt
 )
 
+list(APPEND third_party_license_files ${eld_SOURCE_DIR}/LICENSE eld-LICENSE.txt)
 list(APPEND third_party_license_files
     ${CMAKE_CURRENT_LIST_DIR}/ATfE-LICENSE.txt ATfE-LICENSE.txt
 )

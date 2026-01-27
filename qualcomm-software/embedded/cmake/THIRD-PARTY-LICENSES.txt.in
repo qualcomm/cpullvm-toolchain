@@ -8,6 +8,7 @@ additional or alternate licenses:
  - libc++abi: third-party-licenses/LIBCXXABI-LICENSE.txt
  - libunwind: third-party-licenses/LIBUNWIND-LICENSE.txt
  - Picolibc: third-party-licenses/COPYING.NEWLIB, third-party-licenses/COPYING.picolibc
+ - eld: third-party-licenses/eld-LICENSE.txt
  - Arm Toolchain for Embedded: third-party-licenses/ATfE-LICENSE.txt
 
 Picolibc licenses refer to its source files. Sources are identified in VERSION.txt.

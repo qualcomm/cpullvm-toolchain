@@ -2,4 +2,5 @@ CPULLVM Toolchain ${cpullvm_VERSION}
 
 Sources:
 * cpullvm: https://github.com/qualcomm/cpullvm-toolchain (commit ${cpullvm_COMMIT})
+* eld: https://github.com/qualcomm/eld (commit ${eld_COMMIT})
 * ${LLVM_TOOLCHAIN_C_LIBRARY}: ${LLVM_TOOLCHAIN_C_LIBRARY_URL} (commit ${LLVM_TOOLCHAIN_C_LIBRARY_COMMIT})
