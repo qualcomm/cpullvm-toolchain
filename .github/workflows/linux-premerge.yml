@@ -54,5 +54,8 @@ jobs:
       - name: Build
         run: ./qualcomm-software/embedded/scripts/build.sh
 
+      - name: Build musl-embedded overlay
+        run: ./qualcomm-software/embedded/scripts/build_musl-embedded_overlay.sh
+
       - name: Test
         run: ./qualcomm-software/embedded/scripts/test.sh

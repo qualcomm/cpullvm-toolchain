@@ -27,7 +27,7 @@ set(llvmproject_src_dir ${TOOLCHAIN_SOURCE_DIR}/../..)
 set(MULTILIB_JSON "" CACHE STRING "JSON file to load library definitions from.")
 set(ENABLE_VARIANTS "all" CACHE STRING "Semicolon separated list of variants to build, or \"all\". Must match entries in the json.")
 set(C_LIBRARY "picolibc" CACHE STRING "Which C library to use.")
-set_property(CACHE C_LIBRARY PROPERTY STRINGS picolibc)
+set_property(CACHE C_LIBRARY PROPERTY STRINGS picolibc musl-embedded)
 set(PROJECT_PREFIX "${CMAKE_BINARY_DIR}/lib-builds" CACHE STRING "Directory to build subprojects in.")
 option(
     NUMERICAL_BUILD_NAMES
@@ -85,6 +85,9 @@ include(ExternalProject)
 if(C_LIBRARY STREQUAL picolibc)
     include(${TOOLCHAIN_SOURCE_DIR}/cmake/fetch_picolibc.cmake)
     list(APPEND passthrough_dirs "-DFETCHCONTENT_SOURCE_DIR_PICOLIBC=${FETCHCONTENT_SOURCE_DIR_PICOLIBC}")
+elseif(C_LIBRARY STREQUAL musl-embedded)
+    include(${TOOLCHAIN_SOURCE_DIR}/cmake/fetch_musl-embedded.cmake)
+    list(APPEND passthrough_dirs "-DFETCHCONTENT_SOURCE_DIR_MUSL=${FETCHCONTENT_SOURCE_DIR_MUSL}")
 endif()
 
 # Target for any dependencies to build the runtimes project.
