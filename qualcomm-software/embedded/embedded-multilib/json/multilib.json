@@ -1,0 +1,9 @@
+{
+    "libs": [
+        {
+            "variant": "aarch64a",
+            "json": "aarch64a.json",
+            "flags": "--target=aarch64-unknown-none-elf -fno-exceptions"
+        }
+    ]
+}
