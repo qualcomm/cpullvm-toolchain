@@ -9,6 +9,11 @@
       "url": "https://github.com/picolibc/picolibc.git",
       "tagType": "tag",
       "tag": "1.8.10"
+    },
+    "eld": {
+      "url": "https://github.com/qualcomm/eld",
+      "tagType": "branch",
+      "tag": "main"
     }
   }
 }

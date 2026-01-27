@@ -17,6 +17,13 @@ if(NOT ${cpullvm_COMMIT} MATCHES "^[a-f0-9]+$")
     )
 endif()
 
+execute_process(
+    COMMAND git -C ${eld_SOURCE_DIR} rev-parse HEAD
+    OUTPUT_VARIABLE eld_COMMIT
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND_ERROR_IS_FATAL ANY
+)
+
 # Supported libcs are all in a separate repo
 set(base_library ${LLVM_TOOLCHAIN_C_LIBRARY})
 
