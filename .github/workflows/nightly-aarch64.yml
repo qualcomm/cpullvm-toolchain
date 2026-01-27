@@ -1,0 +1,14 @@
+name: Nightly-Linux-AArch64
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [trigger-nightly-aarch64-linux]
+
+jobs:
+  base:
+    uses: ./.github/workflows/base-build.yml
+    with:
+      build-script: "src/qualcomm-software/embedded/scripts/build.sh --aarch64-build"
+      is-nightly: true
+      arch: AArch64
