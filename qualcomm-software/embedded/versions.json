@@ -10,6 +10,11 @@
       "tagType": "tag",
       "tag": "1.8.10"
     },
+    "musl-embedded": {
+      "url": "https://github.com/qualcomm/musl-embedded",
+      "tagType": "branch",
+      "tag": "main"
+    },
     "eld": {
       "url": "https://github.com/qualcomm/eld",
       "tagType": "branch",
