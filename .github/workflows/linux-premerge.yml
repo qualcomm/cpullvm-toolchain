@@ -1,0 +1,58 @@
+# Copyright (c) 2025, Arm Limited and affiliates.
+# Part of the Arm Toolchain project, under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. 
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Linux Premerge Build and Test
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    # FIXME: Our refactor is mainline-only for now, so exclude the release
+    # branches. This should be removed as we port it over to the release.
+    branches-ignore:
+      - 'release/qualcomm-software/**'
+    paths-ignore:
+      - '.github/workflows/qcom-preflight-checks.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-refactor:
+    # Don't run on forks
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    runs-on: self-hosted
+
+    steps:
+      - name: Cleanup workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Cleaning workspace: ${GITHUB_WORKSPACE}"
+          shopt -s dotglob nullglob
+          rm -rf "${GITHUB_WORKSPACE:?}/"*
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          clean: true
+
+      - name: Apply llvm-project patches
+        run: python3 qualcomm-software/embedded/cmake/patch_repo.py --method apply qualcomm-software/embedded/patches/llvm-project
+
+      - name: Build
+        run: ./qualcomm-software/embedded/scripts/build.sh
+
+      - name: Test
+        run: ./qualcomm-software/embedded/scripts/test.sh
