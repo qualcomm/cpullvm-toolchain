@@ -48,6 +48,12 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           clean: true
 
+      - name: Qemu checking
+        run: |
+          echo `which qemu-system-riscv32`
+          echo $PATH
+          ls /usr/local/bin | grep qemu
+
       - name: Apply llvm-project patches
         run: python3 qualcomm-software/embedded/cmake/patch_repo.py --method apply qualcomm-software/embedded/patches/llvm-project
 
