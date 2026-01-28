@@ -1,0 +1,14 @@
+name: Nightly-Linux-x86_64
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [trigger-nightly-x86-linux]
+
+jobs:
+  base:
+    uses: ./.github/workflows/base-build.yml
+    with:
+      build-script: "src/qualcomm-software/embedded/scripts/build.sh"
+      is-nightly: true
+      arch: x86_64
