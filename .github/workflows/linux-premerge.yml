@@ -7,7 +7,7 @@
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. 
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: Linux Premerge Build and Test
+name: Linux x86_64 Premerge Checks
 
 on:
   pull_request:
@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-refactor:
+  build-and-test:
     # Don't run on forks
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     runs-on: self-hosted
