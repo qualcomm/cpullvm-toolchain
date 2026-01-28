@@ -27,7 +27,7 @@
             "ENABLE_LIBC_TESTS": "OFF",
             "ENABLE_COMPILER_RT_TESTS": "OFF",
             "ENABLE_LIBCXX_TESTS": "OFF",
-            "EXTRA_MUSL_CFLAGS": "-mno-unaligned-access"
+            "EXTRA_MUSL-EMBEDDED_CFLAGS": "-mno-unaligned-access"
         }
     }
 }
