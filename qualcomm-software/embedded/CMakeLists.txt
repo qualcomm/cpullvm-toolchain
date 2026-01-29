@@ -178,11 +178,14 @@ set(LLVM_TOOLCHAIN_DISTRIBUTION_COMPONENTS
 installed by the install-llvm-toolchain target"
 )
 set(LLVM_ENABLE_PROJECTS clang;lld;polly CACHE STRING "")
-set(LLVM_TARGETS_TO_BUILD AArch64;ARM;RISCV CACHE STRING "")
+set(LLVM_TARGETS_TO_BUILD AArch64;ARM;RISCV;X86 CACHE STRING "")
+# There's test failures when enabling x86 support and testing on native
+# AArch64 Linux machines. Just disable x86 in eld until these are
+# resolved.
+set(ELD_TARGETS_TO_BUILD AArch64;ARM;RISCV CACHE STRING "")
 set(LLVM_DEFAULT_TARGET_TRIPLE aarch64-unknown-linux-gnu CACHE STRING "")
 set(LLVM_BUILD_RUNTIME OFF CACHE BOOL "")
 set(LIBCLANG_BUILD_STATIC ON CACHE BOOL "")
-set(LLVM_ENABLE_LIBCXX ON CACHE BOOL "")
 set(LLVM_POLLY_LINK_INTO_TOOLS ON CACHE BOOL "")
 set(CLANG_DEFAULT_LINKER lld CACHE STRING "")
 
