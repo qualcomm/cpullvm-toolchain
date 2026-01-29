@@ -17,16 +17,6 @@ set -ex
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 REPO_ROOT=$( git -C "${SCRIPT_DIR}" rev-parse --show-toplevel )
 
-# If a test fails, lit will ordinarily return a non-zero result,
-# which prevents further testing. Setting the --ignore-fail option
-# will cause testing to continue, so that CI systems can get a
-# full set of results.
-# The lit test suites do not generate xml results by default.
-# This can be enabled with the --xunit-xml-output option. The file
-# written will be relative to the individual suite's build directly,
-# so the same name can be used for all files for consistency.
-export LIT_OPTS="--ignore-fail --xunit-xml-output=lit_results.junit.xml"
-
 # Run all relevant test targets. This might be too broad eventually,
 # but while we have a limited number of variants (and no compiler-rt
 # or libc++ testing enabled) we can run everything.
