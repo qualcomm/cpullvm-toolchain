@@ -7,4 +7,4 @@ jobs:
   base:
     uses: ./.github/workflows/base-build.yml
     with:
-      build-script: "src/qualcomm-software/embedded/scripts/build.sh --aarch64-build"
+      build-script: "src/qualcomm-software/embedded/scripts/build.sh"
