@@ -21,7 +21,7 @@ project(embedded-multilib)
 # Root directory of the CMake scripts.
 set(TOOLCHAIN_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 # Root directory of the llvm-project source.
-set(llvmproject_src_dir ${TOOLCHAIN_SOURCE_DIR}/../..)
+set(llvmproject_src_dir ${TOOLCHAIN_SOURCE_DIR}/..)
 
 # Cache variables to be set by user
 set(MULTILIB_JSON "" CACHE STRING "JSON file to load library definitions from.")
