@@ -128,6 +128,7 @@ mkdir -p "${BUILD_DIR}/llvm"
 pushd "${BUILD_DIR}/llvm" >/dev/null
 cmake -G Ninja -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
   -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;RISCV;X86" \
+  -DELD_TARGETS_TO_BUILD="AArch64;ARM;RISCV" \
   -DLLVM_EXTERNAL_PROJECTS="eld" \
   -DLLVM_EXTERNAL_ELD_SOURCE_DIR="llvm/tools/eld" \
   -DLLVM_DEFAULT_TARGET_TRIPLE="aarch64-unknown-linux-gnueabi" \
@@ -156,6 +157,7 @@ if [[ "${AARCH64_BUILD}" == "true" ]]; then
     -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR_AARCH64}" \
     -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
     -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;RISCV;X86" \
+    -DELD_TARGETS_TO_BUILD="AArch64;ARM;RISCV" \
     -DLLVM_HOST_TRIPLE="aarch64-linux-gnu" \
     -DLLVM_EXTERNAL_PROJECTS="eld" \
     -DLLVM_EXTERNAL_ELD_SOURCE_DIR="${SRC_DIR}/llvm/tools/eld" \
