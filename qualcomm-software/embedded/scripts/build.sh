@@ -123,23 +123,13 @@ log "Configuring LLVM"
 mkdir -p "${BUILD_DIR}/llvm"
 pushd "${BUILD_DIR}/llvm" >/dev/null
 
-# Detect host arch and default triple for native builds on x86_64 or aarch64
-HOST_ARCH="$(uname -m)"
-DEFAULT_TRIPLE="$(clang -print-target-triple 2>/dev/null || true)"
-if [[ -z "${DEFAULT_TRIPLE}" ]]; then
-  case "${HOST_ARCH}" in
-    aarch64) DEFAULT_TRIPLE="aarch64-linux-gnu" ;;
-    x86_64)  DEFAULT_TRIPLE="x86_64-pc-linux-gnu" ;;
-    *)       DEFAULT_TRIPLE="${HOST_ARCH}-unknown-linux-gnu" ;;
-  esac
-fi
-
 cmake -G Ninja -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
   -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;RISCV;X86" \
   -DELD_TARGETS_TO_BUILD="AArch64;ARM;RISCV" \
   -DLLVM_EXTERNAL_PROJECTS="eld" \
   -DLLVM_EXTERNAL_ELD_SOURCE_DIR="llvm/tools/eld" \
-  -DLLVM_DEFAULT_TARGET_TRIPLE="${DEFAULT_TRIPLE}" \
+  -DLLVM_DEFAULT_TARGET_TRIPLE="aarch64-unknown-linux-gnueabi" \
+  -DLLVM_TARGET_ARCH="arm-linux-gnueabi" \
   -DLLVM_BUILD_RUNTIME="OFF" \
   -DLIBCLANG_BUILD_STATIC="ON" -DLLVM_POLLY_LINK_INTO_TOOLS="ON" \
   -DCMAKE_C_COMPILER="clang" -DCMAKE_CXX_COMPILER="clang++" \
