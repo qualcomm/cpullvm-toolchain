@@ -8,31 +8,37 @@
 # current revision. In the latter case the revision will be used as is.
 set(cpullvm_COMMIT "$Format:%H$")
 
-if(NOT ${cpullvm_COMMIT} MATCHES "^[a-f0-9]+$")
+function(get_commit_from_dir source_dir commit)
     execute_process(
-        COMMAND git -C ${CPULLVMToolchain_SOURCE_DIR} rev-parse HEAD
-        OUTPUT_VARIABLE cpullvm_COMMIT
+        COMMAND git -C ${source_dir} rev-parse HEAD
+        OUTPUT_VARIABLE temp_commit
         OUTPUT_STRIP_TRAILING_WHITESPACE
         COMMAND_ERROR_IS_FATAL ANY
     )
+    set(${commit} ${temp_commit} PARENT_SCOPE)
+endfunction()
+
+if(NOT ${cpullvm_COMMIT} MATCHES "^[a-f0-9]+$")
+    get_commit_from_dir("${CPULLVMToolchain_SOURCE_DIR}" cpullvm_COMMIT)
 endif()
 
-execute_process(
-    COMMAND git -C ${eld_SOURCE_DIR} rev-parse HEAD
-    OUTPUT_VARIABLE eld_COMMIT
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    COMMAND_ERROR_IS_FATAL ANY
-)
+get_commit_from_dir("${eld_SOURCE_DIR}" eld_COMMIT)
+
+if(ENABLE_LINUX_LIBRARIES)
+    get_commit_from_dir("${musl_SOURCE_DIR}" musl_COMMIT)
+    set(musl_version_string "* musl: ${musl_URL} (commit ${musl_COMMIT})\n")
+
+    if(NOT LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
+        get_commit_from_dir("${musl-embedded_SOURCE_DIR}" musl-embedded_COMMIT)
+        set(musl-embedded_version_string "* musl-embedded: ${musl-embedded_URL} (commit ${musl-embedded_COMMIT})\n")
+    endif()
+endif()
 
 # Supported libcs are all in a separate repo
 set(base_library ${LLVM_TOOLCHAIN_C_LIBRARY})
 
-execute_process(
-    COMMAND git -C ${${base_library}_SOURCE_DIR} rev-parse HEAD
-    OUTPUT_VARIABLE ${base_library}_COMMIT
-    OUTPUT_STRIP_TRAILING_WHITESPACE 
-    COMMAND_ERROR_IS_FATAL ANY
-)
+get_commit_from_dir("${${base_library}_SOURCE_DIR}" ${base_library}_COMMIT)
+
 set(LLVM_TOOLCHAIN_C_LIBRARY_URL ${${base_library}_URL})
 set(LLVM_TOOLCHAIN_C_LIBRARY_COMMIT ${${base_library}_COMMIT})
 
