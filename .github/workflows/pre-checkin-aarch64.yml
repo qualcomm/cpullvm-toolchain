@@ -7,4 +7,5 @@ jobs:
   base:
     uses: ./.github/workflows/base-build.yml
     with:
-      build-script: "src/qualcomm-software/embedded/scripts/build.sh --aarch64-build"
+      runner: ubuntu-22.04-arm
+      build-script: "src/qualcomm-software/embedded/scripts/build.sh"

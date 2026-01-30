@@ -36,9 +36,7 @@ ARTIFACT_DIR=""
 SKIP_TESTS="false"
 JOBS="${JOBS:-$(nproc)}"
 CLEAN="false"
-AARCH64_BUILD="false"
 NIGHTLY="false"
-
 
 usage() {
   cat <<'EOF'
@@ -50,7 +48,6 @@ Options:
   --skip-tests                Skip LLVM test steps
   --arm-sysroot <path>        Arm sysroot (default: /usr/arm-linux-gnueabi)
   --aarch64-sysroot <path>    AArch64 sysroot (default: /usr/aarch64-linux-gnu)
-  --aarch64-build             AArch64 build
   --nightly                   Nightly build
   --clean                     Delete and recreate build/install dirs
 
@@ -64,7 +61,6 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --artifact-dir) ARTIFACT_DIR="$2"; shift 2 ;;
     --skip-tests) SKIP_TESTS="true"; shift ;;
-    --aarch64-build) AARCH64_BUILD="true"; shift ;;
     --nightly) NIGHTLY="true"; shift ;;
     --clean) CLEAN="true"; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -126,6 +122,7 @@ python3 "${SRC_DIR}/qualcomm-software/embedded/tools/patchctl.py" apply -f "${SR
 log "Configuring LLVM"
 mkdir -p "${BUILD_DIR}/llvm"
 pushd "${BUILD_DIR}/llvm" >/dev/null
+
 cmake -G Ninja -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
   -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;RISCV;X86" \
   -DELD_TARGETS_TO_BUILD="AArch64;ARM;RISCV" \
@@ -147,43 +144,7 @@ log "Installing LLVM"
 ninja install
 popd >/dev/null
 
-if [[ "${AARCH64_BUILD}" == "true" ]]; then
-  log "[Stage 2] Configuring Cross-compiling LLVM for AArch64..."
-  mkdir -p "${BUILD_DIR_AARCH64}" "${INSTALL_DIR_AARCH64}"
-
-  pushd "${BUILD_DIR_AARCH64}" >/dev/null
-  cmake -G Ninja \
-    -S "${SRC_DIR}/llvm" \
-    -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR_AARCH64}" \
-    -DLLVM_ENABLE_PROJECTS="llvm;clang;polly;lld;mlir" \
-    -DLLVM_TARGETS_TO_BUILD="ARM;AArch64;RISCV;X86" \
-    -DELD_TARGETS_TO_BUILD="AArch64;ARM;RISCV" \
-    -DLLVM_HOST_TRIPLE="aarch64-linux-gnu" \
-    -DLLVM_EXTERNAL_PROJECTS="eld" \
-    -DLLVM_EXTERNAL_ELD_SOURCE_DIR="${SRC_DIR}/llvm/tools/eld" \
-    -DLLVM_DEFAULT_TARGET_TRIPLE="aarch64-linux-gnu" \
-    -DLLVM_BUILD_RUNTIME="OFF" \
-    -DLIBCLANG_BUILD_STATIC="ON" \
-    -DLLVM_POLLY_LINK_INTO_TOOLS="ON" \
-    -DCMAKE_SYSTEM_NAME="Linux" \
-    -DCMAKE_SYSTEM_PROCESSOR="aarch64" \
-    -DCMAKE_C_COMPILER="clang" \
-    -DCMAKE_CXX_COMPILER="clang++" \
-    -DCMAKE_C_FLAGS="--target=aarch64-linux-gnu \
-                     --gcc-toolchain=${GCC_ROOT_AARCH64}" \
-    -DCMAKE_CXX_FLAGS="--target=aarch64-linux-gnu \
-                       --gcc-toolchain=${GCC_ROOT_AARCH64}" \
-    -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
-    -DLLVM_TABLEGEN="${INSTALL_DIR}/bin/llvm-tblgen" \
-    -DCLANG_TABLEGEN="${INSTALL_DIR}/bin/clang-tblgen" \
-    -DLLVM_ENABLE_ASSERTIONS:BOOL="${ASSERTION_MODE}"
-
-  log "Building LLVM and Installing"
-  ninja install
-  popd >/dev/null
-fi
-
-if [[ "${SKIP_TESTS}" != "true" && "${AARCH64_BUILD}" != "true" ]]; then
+if [[ "${SKIP_TESTS}" != "true" ]]; then
   log "Running LLVM tests"
   (cd "${BUILD_DIR}/llvm" && ninja check-llvm check-lld check-polly check-eld check-clang)
 else
@@ -356,17 +317,16 @@ archive_root="${BUILD_DIR}"
 archive_dir="${INSTALL_DIR}"
 COMPRESS_EXT="tgz"
 COMPRESS_FLAG="-czvf"
-archive_name="cpullvm-toolchain-${ELD_BRANCH##*/}-Linux-x86_64-${short_sha}-${suffix}.${COMPRESS_EXT}"
 
-if [[ "${AARCH64_BUILD}" == "true" ]]; then
-    log "Preparing AARCH64 build"
-    mkdir -p "${INSTALL_DIR_AARCH64}"
-    cp -r "${INSTALL_DIR}"/aarch64-* "${INSTALL_DIR}"/armv7-* "${INSTALL_DIR_AARCH64}/"
-    cp -r "${INSTALL_DIR}"/lib/clang/[0-9]*/lib "${INSTALL_DIR_AARCH64}/lib/clang/[0-9]*/"
-    archive_root="${BUILD_DIR_AARCH64}"
-    archive_dir="${INSTALL_DIR_AARCH64}"
-    archive_name="cpullvm-toolchain-${ELD_BRANCH##*/}-Linux-AArch64-${short_sha}-${suffix}.${COMPRESS_EXT}"
-fi
+# Name the artifact according to host arch (native build)
+ARCH_TAG="$(uname -m)"
+case "${ARCH_TAG}" in
+  x86_64) ARCH_TAG="x86_64" ;;
+  aarch64|arm64) ARCH_TAG="AArch64" ;;
+  *) ARCH_TAG="${ARCH_TAG}" ;;
+esac
+
+archive_name="cpullvm-toolchain-${ELD_BRANCH##*/}-Linux-${ARCH_TAG}-${short_sha}-${suffix}.${COMPRESS_EXT}"
 
 if [[ "${NIGHTLY}" == "true" ]]; then
     log "Applying NIGHTLY compression settings"

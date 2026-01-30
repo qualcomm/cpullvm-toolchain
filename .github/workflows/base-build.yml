@@ -12,6 +12,9 @@ on:
       arch:
         required: false
         type: string
+      runner:
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -22,7 +25,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: self-hosted
+    runs-on: ${{ inputs.runner }}
     env:
       ARTIFACT_DIR: ${{ github.workspace }}/nightly-toolchain
 
@@ -42,9 +45,15 @@ jobs:
           ref:        ${{ github.event.pull_request.head.sha || github.sha }}
           path: src
           clean: true
+          fetch-depth: 0
 
       - name: Build
         shell: bash
+        env:
+            GIT_AUTHOR_NAME: "Qualcomm CI"
+            GIT_AUTHOR_EMAIL: "ci@qti.qualcomm.com"
+            GIT_COMMITTER_NAME: "Qualcomm CI"
+            GIT_COMMITTER_EMAIL: "ci@qti.qualcomm.com"
         run: |
           set -euo pipefail
           build_script="${{ inputs.build-script }}"
