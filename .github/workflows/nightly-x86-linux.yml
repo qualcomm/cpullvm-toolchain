@@ -12,6 +12,7 @@ jobs:
   base:
     uses: ./.github/workflows/base-build.yml
     with:
+      runner: self-hosted
       build-script: "src/qualcomm-software/embedded/scripts/build.sh"
       is-nightly: true
       arch: x86_64
