@@ -26,7 +26,7 @@ BUILD_DIR=${REPO_ROOT}/build_musl-embedded_overlay
 mkdir -p "${BUILD_DIR}"
 cd "${BUILD_DIR}"
 
-cmake ../qualcomm-software/embedded -GNinja -DFETCHCONTENT_QUIET=OFF -DLLVM_TOOLCHAIN_C_LIBRARY=musl-embedded -DLLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL=on
+cmake ../qualcomm-software -GNinja -DFETCHCONTENT_QUIET=OFF -DLLVM_TOOLCHAIN_C_LIBRARY=musl-embedded -DLLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL=on
 ninja package-llvm-toolchain
 
 # The package-llvm-toolchain target will produce a .tar.xz package, but we also

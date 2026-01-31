@@ -49,13 +49,13 @@ jobs:
           clean: true
 
       - name: Apply llvm-project patches
-        run: python3 qualcomm-software/embedded/cmake/patch_repo.py --method apply qualcomm-software/embedded/patches/llvm-project
+        run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
 
       - name: Build
-        run: ./qualcomm-software/embedded/scripts/build.sh
+        run: ./qualcomm-software/scripts/build.sh
 
       - name: Build musl-embedded overlay
-        run: ./qualcomm-software/embedded/scripts/build_musl-embedded_overlay.sh
+        run: ./qualcomm-software/scripts/build_musl-embedded_overlay.sh
 
       - name: Test
-        run: ./qualcomm-software/embedded/scripts/test.sh
+        run: ./qualcomm-software/scripts/test.sh
