@@ -20,7 +20,6 @@ if (-not $env:ASSERTION_MODE) { $env:ASSERTION_MODE = "OFF" }
 # === Constants ===
 $ELD_REPO_URL = "https://github.com/qualcomm/eld.git"
 $ELD_BRANCH   = "release/22.x"
-$ELD_COMMIT   = "58e68232ef5f85b3a53b594975a195445e3ec8da"
 
 $MUSL_EMBEDDED_REPO_URL = "https://github.com/qualcomm/musl-embedded.git"
 $MUSL_EMBEDDED_BRANCH   = "main"
@@ -129,9 +128,6 @@ if (-not (Test-Path "$MUSL_EMBEDDED_DIR\.git")) {
 if (-not (Test-Path "$ELD_DIR\.git")) {
     Write-Host "[log] Cloning ELD..."
     git clone $ELD_REPO_URL $ELD_DIR
-    Push-Location $ELD_DIR
-    git checkout $ELD_COMMIT
-    Pop-Location
 }
 
 # === Apply patches ===
