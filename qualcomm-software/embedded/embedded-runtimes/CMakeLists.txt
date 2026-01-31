@@ -86,12 +86,12 @@ set(ENABLE_COMPILER_RT_TESTS ${ENABLE_COMPILER_RT_TESTS_def} CACHE BOOL "Enable 
 set(ENABLE_LIBCXX_TESTS ${ENABLE_LIBCXX_TESTS_def} CACHE BOOL "Enable libcxx tests.")
 set(LLVM_BINARY_DIR "" CACHE PATH "Path to LLVM toolchain root to build libraries with")
 
-# Set up a few arbitrary pass-through flags for MUSL. This probably isn't the best idea,
-# but historically, our flag usage is such that it is a bit unclear how to do this in
-# a more princicpled way. This should be revisited and probably clean up, but for now
-# just mirror what we used to do.
-set(EXTRA_MUSL_CONFIG_FLAGS ${EXTRA_MUSL_CONFIG_FLAGS_def} CACHE BOOL "Extra configure options for musl-embedded.")
-set(EXTRA_MUSL_CFLAGS ${EXTRA_MUSL_CFLAGS_def} CACHE BOOL "Extra flags to be used when compiling musl-embedded.")
+# Set up a few arbitrary pass-through flags for musl-embedded. This probably
+# isn't the best idea, but historically, our flag usage is such that it is a
+# bit unclear how to do this in a more princicpled way. This should be
+# revisited and probably cleaned up, but for now just mirror what we used to do.
+set(EXTRA_MUSL-EMBEDDED_CONFIG_FLAGS ${EXTRA_MUSL-EMBEDDED_CONFIG_FLAGS_def} CACHE BOOL "Extra configure options for musl-embedded.")
+set(EXTRA_MUSL-EMBEDDED_CFLAGS ${EXTRA_MUSL-EMBEDDED_CFLAGS_def} CACHE BOOL "Extra flags to be used when compiling musl-embedded.")
 
 set(PROJECT_PREFIX "subproj" CACHE STRING "Directory to build subprojects in.")
 set(VARIANT_BUILD_ID "${VARIANT}" CACHE STRING "Name to use to identify build directories." )
@@ -539,7 +539,7 @@ if(C_LIBRARY STREQUAL musl-embedded)
     endif()
 
     if(WIN32)
-        message(FATAL_ERROR "Building MUSL is not supported on Windows hosts")
+        message(FATAL_ERROR "Building musl-embedded is not supported on Windows hosts")
     endif()
 
     if(TARGET_ARCH MATCHES "^riscv")
@@ -556,9 +556,9 @@ if(C_LIBRARY STREQUAL musl-embedded)
     endif()
 
     if(LIBRARY_BUILD_TYPE STREQUAL minsizerelease)
-        set(musl_opt_flags "-Os")
+        set(musl-embedded_opt_flags "-Os")
     elseif((LIBRARY_BUILD_TYPE STREQUAL release) OR (LIBRARY_BUILD_TYPE STREQUAL releasewithdebuginfo))
-        set(musl_opt_flags "-O3")
+        set(musl-embedded_opt_flags "-O3")
     endif()
 
     # FIXME: if we need the extra `uselocks`/`standalone` variants, we
@@ -567,10 +567,10 @@ if(C_LIBRARY STREQUAL musl-embedded)
         --disable-wrapper
         --quic-arm-baremetal
         --disable-visibility
-        ${EXTRA_MUSL_CONFIG_FLAGS}
+        ${EXTRA_MUSL-EMBEDDED_CONFIG_FLAGS}
         "CROSS_COMPILE=${LLVM_BINARY_DIR}/bin/llvm-"
         "CC=${LLVM_BINARY_DIR}/bin/clang --target=${target_triple} -fuse-ld=eld"
-        "CFLAGS=${lib_compile_flags} ${musl_opt_flags} -fPIC -fvisibility=hidden -DVISIBILITY_HIDDEN -fno-rounding-math ${EXTRA_MUSL_CFLAGS}"
+        "CFLAGS=${lib_compile_flags} ${musl-embedded_opt_flags} -fPIC -fvisibility=hidden -DVISIBILITY_HIDDEN -fno-rounding-math ${EXTRA_MUSL-EMBEDDED_CFLAGS}"
         "LIBCC=${TEMP_LIB_DIR}/libclang_rt.builtins.a")
 
     ExternalProject_Add(
@@ -579,7 +579,7 @@ if(C_LIBRARY STREQUAL musl-embedded)
         BINARY_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/build
         DOWNLOAD_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/dl
         TMP_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/tmp
-        SOURCE_DIR ${musl_SOURCE_DIR}
+        SOURCE_DIR ${musl-embedded_SOURCE_DIR}
         INSTALL_DIR ${TEMP_LIB_DIR}
         DEPENDS compiler_rt-install
         CONFIGURE_COMMAND

@@ -26,7 +26,7 @@
             "ENABLE_LIBC_TESTS": "OFF",
             "ENABLE_COMPILER_RT_TESTS": "OFF",
             "ENABLE_LIBCXX_TESTS": "OFF",
-            "EXTRA_MUSL_CFLAGS": "-mstrict-align -D__QUIC_ENABLE_FLT_FOR_PRINT"
+            "EXTRA_MUSL-EMBEDDED_CFLAGS": "-mstrict-align -D__QUIC_ENABLE_FLT_FOR_PRINT"
         }
     }
 }

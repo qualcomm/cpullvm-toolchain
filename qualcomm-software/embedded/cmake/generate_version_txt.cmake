@@ -25,11 +25,7 @@ execute_process(
 )
 
 # Supported libcs are all in a separate repo
-if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
-    set(base_library musl)
-else()
-    set(base_library ${LLVM_TOOLCHAIN_C_LIBRARY})
-endif()
+set(base_library ${LLVM_TOOLCHAIN_C_LIBRARY})
 
 execute_process(
     COMMAND git -C ${${base_library}_SOURCE_DIR} rev-parse HEAD
