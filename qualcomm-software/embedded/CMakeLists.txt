@@ -228,7 +228,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_eld.cmake)
 #
 # If you'd rather check out and patch manually then run cmake with
 # -DFETCHCONTENT_SOURCE_DIR_PICOLIBC=/path/to/picolibc
-# -DFETCHCONTENT_SOURCE_DIR_MUSL=/path/to/musl
+# -DFETCHCONTENT_SOURCE_DIR_MUSL-EMBEDDED=/path/to/musl-embedded
 #
 # By default check out will be silent but this can be changed by running
 # cmake with -DFETCHCONTENT_QUIET=OFF
@@ -407,8 +407,8 @@ add_custom_target(
     # specify both definitions
     -Dpicolibc_SOURCE_DIR=${picolibc_SOURCE_DIR}
     -Dpicolibc_URL=${picolibc_URL}
-    -Dmusl_SOURCE_DIR=${musl_SOURCE_DIR}
-    -Dmusl_URL=${musl_URL}
+    -Dmusl-embedded_SOURCE_DIR=${musl-embedded_SOURCE_DIR}
+    -Dmusl-embedded_URL=${musl-embedded_URL}
     # but we do tell the script which library we're actually using
     -DLLVM_TOOLCHAIN_C_LIBRARY=${LLVM_TOOLCHAIN_C_LIBRARY}
     -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_version_txt.cmake
@@ -532,7 +532,7 @@ if(NOT PREBUILT_TARGET_LIBRARIES)
         -DPARALLEL_LIB_BUILD_LEVELS=${PARALLEL_LIB_BUILD_LEVELS}
         -DENABLE_QEMU_TESTING=${ENABLE_QEMU_TESTING}
         -DFETCHCONTENT_SOURCE_DIR_PICOLIBC=${FETCHCONTENT_SOURCE_DIR_PICOLIBC}
-        -DFETCHCONTENT_SOURCE_DIR_MUSL=${FETCHCONTENT_SOURCE_DIR_MUSL}
+        -DFETCHCONTENT_SOURCE_DIR_MUSL-EMBEDDED=${FETCHCONTENT_SOURCE_DIR_MUSL-EMBEDDED}
         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
         -DPROJECT_PREFIX=${multilib_prefix}
         -DNUMERICAL_BUILD_NAMES=${SHORT_BUILD_PATHS}
@@ -662,7 +662,7 @@ if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc)
     )
 elseif(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
     list(APPEND third_party_license_files
-        ${musl_SOURCE_DIR}/COPYRIGHT musl-embedded-COPYRIGHT.txt
+        ${musl-embedded_SOURCE_DIR}/COPYRIGHT musl-embedded-COPYRIGHT.txt
     )
 endif()
 
