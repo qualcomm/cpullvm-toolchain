@@ -87,7 +87,7 @@ CPULLVM Toolchain for Embedded is built and tested on
       
    #### Navigate to the scripts directory
    
-    cd cpullvm-toolchain/qualcomm-software/embedded/scripts
+    cd cpullvm-toolchain/qualcomm-software/scripts
       
    #### Run the script 
    
