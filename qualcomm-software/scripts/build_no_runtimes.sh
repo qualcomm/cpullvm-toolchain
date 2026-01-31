@@ -10,7 +10,10 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # The script creates a build of the toolchain in the 'build' directory, inside
-# the repository tree.
+# the repository tree *excluding* all of the target runtime libraries.
+#
+# FIXME: This is intended as a convenience script while dependencies on various
+# builders are sorted out. This probably should be removed.
 
 set -ex
 
@@ -25,6 +28,11 @@ export CXX=clang++
 mkdir -p "${REPO_ROOT}"/build
 cd "${REPO_ROOT}"/build
 
-cmake ../qualcomm-software -GNinja -DFETCHCONTENT_QUIET=OFF -DENABLE_LINUX_LIBRARIES=ON ${EXTRA_CMAKE_ARGS}
+cmake ../qualcomm-software \
+ -GNinja \
+ -DFETCHCONTENT_QUIET=OFF \
+ -DLLVM_TOOLCHAIN_DISTRIBUTION_COMPONENTS="llvm-toolchain-docs;llvm-toolchain-third-party-licenses" \
+ -DPREBUILT_TARGET_LIBRARIES=ON \
+ ${EXTRA_CMAKE_ARGS}
 
 ninja package-llvm-toolchain

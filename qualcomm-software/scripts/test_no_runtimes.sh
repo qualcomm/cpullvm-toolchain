@@ -9,22 +9,14 @@
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. 
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# The script creates a build of the toolchain in the 'build' directory, inside
-# the repository tree.
+# The script assumes a successful build of the toolchain exists in the 'build'
+# directory inside the repository tree and will only run tests that do not
+# require the runtime libraries be present.
 
 set -ex
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 REPO_ROOT=$( git -C "${SCRIPT_DIR}" rev-parse --show-toplevel )
 
-clang --version
-
-export CC=clang
-export CXX=clang++
-
-mkdir -p "${REPO_ROOT}"/build
 cd "${REPO_ROOT}"/build
-
-cmake ../qualcomm-software -GNinja -DFETCHCONTENT_QUIET=OFF -DENABLE_LINUX_LIBRARIES=ON ${EXTRA_CMAKE_ARGS}
-
-ninja package-llvm-toolchain
+ninja check-all
