@@ -10,6 +10,7 @@ additional or alternate licenses:
  - Picolibc: third-party-licenses/COPYING.NEWLIB, third-party-licenses/COPYING.picolibc
  - eld: third-party-licenses/eld-LICENSE.txt
  - musl-embedded: third-party-licenses/musl-embedded-COPYRIGHT.txt
+ - musl: third-party-licenses/musl-COPYRIGHT.txt
  - Arm Toolchain for Embedded: third-party-licenses/ATfE-LICENSE.txt
 
 Picolibc licenses refer to its source files. Sources are identified in VERSION.txt.
