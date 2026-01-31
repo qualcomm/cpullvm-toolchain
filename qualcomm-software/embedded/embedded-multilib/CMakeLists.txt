@@ -87,7 +87,7 @@ if(C_LIBRARY STREQUAL picolibc)
     list(APPEND passthrough_dirs "-DFETCHCONTENT_SOURCE_DIR_PICOLIBC=${FETCHCONTENT_SOURCE_DIR_PICOLIBC}")
 elseif(C_LIBRARY STREQUAL musl-embedded)
     include(${TOOLCHAIN_SOURCE_DIR}/cmake/fetch_musl-embedded.cmake)
-    list(APPEND passthrough_dirs "-DFETCHCONTENT_SOURCE_DIR_MUSL=${FETCHCONTENT_SOURCE_DIR_MUSL}")
+    list(APPEND passthrough_dirs "-DFETCHCONTENT_SOURCE_DIR_MUSL-EMBEDDED=${FETCHCONTENT_SOURCE_DIR_MUSL-EMBEDDED}")
 endif()
 
 # Target for any dependencies to build the runtimes project.

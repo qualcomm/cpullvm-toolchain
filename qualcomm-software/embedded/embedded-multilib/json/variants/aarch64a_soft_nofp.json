@@ -26,8 +26,8 @@
             "ENABLE_LIBC_TESTS": "OFF",
             "ENABLE_COMPILER_RT_TESTS": "OFF",
             "ENABLE_LIBCXX_TESTS": "OFF",
-            "EXTRA_MUSL_CONFIG_FLAGS": "--quic-aarch64-nofp",
-            "EXTRA_MUSL_CFLAGS": "-mstrict-align"
+            "EXTRA_MUSL-EMBEDDED_CONFIG_FLAGS": "--quic-aarch64-nofp",
+            "EXTRA_MUSL-EMBEDDED_CFLAGS": "-mstrict-align"
         }
     }
 }
