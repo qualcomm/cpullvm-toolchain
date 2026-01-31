@@ -20,7 +20,7 @@ project(embedded-runtimes)
 # Root directory of the CMake scrpts.
 set(TOOLCHAIN_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 # Root directory of the llvm-project source.
-set(llvmproject_src_dir ${TOOLCHAIN_SOURCE_DIR}/../..)
+set(llvmproject_src_dir ${TOOLCHAIN_SOURCE_DIR}/..)
 
 # CMake arguments are loaded from the JSON file depending on which C
 # library is used, so this must be set before the JSON is processed.

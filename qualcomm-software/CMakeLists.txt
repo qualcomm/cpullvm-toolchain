@@ -277,7 +277,7 @@ set(LLVM_EXTERNAL_ELD_SOURCE_DIR "${eld_SOURCE_DIR}")
 set(clang_lit_xfails_path "${CMAKE_CURRENT_BINARY_DIR}/clang_lit_xfails.txt")
 set(CLANG_TEST_EXTRA_ARGS "@${clang_lit_xfails_path}")
 
-set(llvmproject_src_dir ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+set(llvmproject_src_dir ${CMAKE_CURRENT_SOURCE_DIR}/..)
 add_subdirectory(
     ${llvmproject_src_dir}/llvm llvm
 )
