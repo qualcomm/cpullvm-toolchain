@@ -12,6 +12,10 @@
 # The script creates a build of the toolchain in the 'build' directory, inside
 # the repository tree.
 
+# FIXME: Eventually this should be common between x86/AArch64. But, there's
+# dependencies that need to be sorted out on the AArch64 builders and it is more
+# convenient to have separate scripts until that happens.
+
 set -ex
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
@@ -25,6 +29,9 @@ export CXX=clang++
 mkdir -p "${REPO_ROOT}"/build
 cd "${REPO_ROOT}"/build
 
-cmake ../qualcomm-software -GNinja -DFETCHCONTENT_QUIET=OFF -DENABLE_LINUX_LIBRARIES=ON ${EXTRA_CMAKE_ARGS}
+AARCH64_CMAKE_ARGS="-DLLVM_TOOLCHAIN_DISTRIBUTION_COMPONENTS='llvm-toolchain-docs;llvm-toolchain-third-party-licenses' -DPREBUILT_TARGET_LIBRARIES=ON"
+EXTRA_CMAKE_ARGS="${AARCH64_CMAKE_ARGS} ${EXTRA_CMAKE_ARGS}"
+
+cmake ../qualcomm-software -GNinja -DFETCHCONTENT_QUIET=OFF ${EXTRA_CMAKE_ARGS}
 
 ninja package-llvm-toolchain

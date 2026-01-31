@@ -7,7 +7,7 @@
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. 
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: Linux x86_64 Premerge Checks
+name: Linux Premerge Checks
 
 on:
   pull_request:
@@ -30,7 +30,22 @@ jobs:
   build-and-test:
     # Don't run on forks
     if: github.repository == 'qualcomm/cpullvm-toolchain'
-    runs-on: self-hosted
+    name: ${{ matrix.target_os }}
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - build_script: build.sh
+            test_script: test.sh
+            target_os: Linux-x86_64
+            runner: self-hosted
+
+          - build_script: build_aarch64.sh
+            test_script: test.sh
+            target_os: Linux-AArch64
+            runner: ubuntu-22.04-arm
 
     steps:
       - name: Cleanup workspace
@@ -51,11 +66,12 @@ jobs:
       - name: Apply llvm-project patches
         run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
 
-      - name: Build
-        run: ./qualcomm-software/scripts/build.sh
+      - name: Build toolchain
+        run: ./qualcomm-software/scripts/${{ matrix.build_script }}
 
-      - name: Build musl-embedded overlay
+      - name: Build musl-embedded-overlay
         run: ./qualcomm-software/scripts/build_musl-embedded_overlay.sh
 
       - name: Test
-        run: ./qualcomm-software/scripts/test.sh
+        if: matrix.test_script != ''
+        run: ./qualcomm-software/scripts/${{ matrix.test_script }}
