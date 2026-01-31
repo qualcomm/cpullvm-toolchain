@@ -129,14 +129,23 @@ option(
     index numbers, which is shorter but less descriptive."
     OFF
 )
-
-
+option(
+    ENABLE_LINUX_LIBRARIES
+    "Include additional library variants for use on Linux targets"
+    OFF
+)
+if(ENABLE_LINUX_LIBRARIES AND WIN32)
+    message(FATAL_ERROR "ENABLE_LINUX_LIBRARIES is not permitted on Windows")
+endif()
 option(LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL
     "Make cpack build an overlay package that can be unpacked over the main toolchain to install a secondary set of libraries based on musl-embedded."
     ${overlay_install_default})
 if(LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL)
   if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL "picolibc")
     message(FATAL_ERROR "LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL is only permitted for C libraries other than the default picolibc")
+  endif()
+  if(ENABLE_LINUX_LIBRARIES)
+    message(FATAL_ERROR "ENABLE_LINUX_LIBRARIES is not permitted with LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL")
   endif()
 endif()
 
@@ -238,8 +247,11 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_eld.cmake)
 if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc)
     include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_picolibc.cmake)
 endif()
-if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
+if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded OR ENABLE_LINUX_LIBRARIES)
     include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_musl-embedded.cmake)
+endif()
+if(ENABLE_LINUX_LIBRARIES)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_musl.cmake)
 endif()
 
 ##################################################################################################
@@ -411,6 +423,9 @@ add_custom_target(
     -Dmusl-embedded_URL=${musl-embedded_URL}
     # but we do tell the script which library we're actually using
     -DLLVM_TOOLCHAIN_C_LIBRARY=${LLVM_TOOLCHAIN_C_LIBRARY}
+    -Dmusl_SOURCE_DIR=${musl_SOURCE_DIR}
+    -Dmusl_URL=${musl_URL}
+    -DENABLE_LINUX_LIBRARIES=${ENABLE_LINUX_LIBRARIES}
     -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_version_txt.cmake
     BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/VERSION.txt
 )
@@ -596,6 +611,41 @@ if(NOT PREBUILT_TARGET_LIBRARIES)
             add_dependencies(${check_target}-${variant} multilib-${LLVM_TOOLCHAIN_C_LIBRARY}-${check_target}-${variant})
         endforeach()
     endforeach()
+
+    # Linux
+    if(ENABLE_LINUX_LIBRARIES)
+        set(linux_library_prefix ${CMAKE_BINARY_DIR}/linux-library-builds)
+        ExternalProject_Add(
+            linux-libraries
+            STAMP_DIR ${linux_library_prefix}/stamp
+            BINARY_DIR ${linux_library_prefix}/build
+            DOWNLOAD_DIR ${linux_library_prefix}/dl
+            TMP_DIR ${linux_library_prefix}/tmp
+            SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/scripts
+            INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/llvm/linux-libraries
+            DEPENDS ${lib_tool_dependencies}
+            CONFIGURE_COMMAND ""
+            BUILD_COMMAND
+                <SOURCE_DIR>/build_linux_runtimes.sh
+                    --tools-path ${CMAKE_CURRENT_BINARY_DIR}/llvm/bin
+                    --base-build-dir <BINARY_DIR>
+                    --base-install-dir <INSTALL_DIR>
+                    --llvm-src-dir ${llvmproject_src_dir}
+                    --musl-src-dir ${musl_SOURCE_DIR}
+                    --musl-emb-src-dir ${musl-embedded_SOURCE_DIR}
+                    --download-dir <DOWNLOAD_DIR>
+            INSTALL_COMMAND ""
+            USES_TERMINAL_CONFIGURE TRUE
+            USES_TERMINAL_BUILD TRUE
+            USES_TERMINAL_INSTALL TRUE
+            STEP_TARGETS build install
+        )
+
+        add_dependencies(
+            llvm-toolchain-runtimes
+            linux-libraries-install
+        )
+    endif()
 endif()
 
 FILE(WRITE "${CMAKE_BINARY_DIR}/llvm/${TARGET_CFI_DIR}/cfi_ignorelist.txt" "")
@@ -611,6 +661,22 @@ install(
     DESTINATION ${TARGET_LIBRARIES_DIR}
     COMPONENT llvm-toolchain-libs
 )
+
+if(ENABLE_LINUX_LIBRARIES)
+    # libc, libc++/libc++abi/libunwind only
+    install(
+        DIRECTORY ${LLVM_BINARY_DIR}/linux-libraries/.
+        DESTINATION .
+        COMPONENT llvm-toolchain-libs
+        REGEX "resource-dir" EXCLUDE
+    )
+    # compiler-rt
+    install(
+        DIRECTORY ${LLVM_BINARY_DIR}/linux-libraries/resource-dir/.
+        DESTINATION lib/clang/${LLVM_VERSION_MAJOR}
+        COMPONENT llvm-toolchain-libs
+    )
+endif()
 
 install(
     FILES CHANGELOG.md LICENSE.txt README.md
@@ -664,6 +730,16 @@ elseif(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
     list(APPEND third_party_license_files
         ${musl-embedded_SOURCE_DIR}/COPYRIGHT musl-embedded-COPYRIGHT.txt
     )
+endif()
+if(ENABLE_LINUX_LIBRARIES)
+    list(APPEND third_party_license_files
+        ${musl_SOURCE_DIR}/COPYRIGHT musl-COPYRIGHT.txt)
+
+    # We added this above if musl-embedded was selected.
+    if(NOT LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
+        list(APPEND third_party_license_files
+             ${musl-embedded_SOURCE_DIR}/COPYRIGHT musl-embedded-COPYRIGHT.txt)
+    endif()
 endif()
 
 while(third_party_license_files)
