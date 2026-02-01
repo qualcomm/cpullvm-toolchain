@@ -12,10 +12,6 @@ name: Linux Premerge Checks
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    # FIXME: Our refactor is mainline-only for now, so exclude the release
-    # branches. This should be removed as we port it over to the release.
-    branches-ignore:
-      - 'release/qualcomm-software/**'
     paths-ignore:
       - '.github/workflows/qcom-preflight-checks.yml'
 
