@@ -23,7 +23,7 @@
     "eld": {
       "url": "https://github.com/qualcomm/eld",
       "tagType": "branch",
-      "tag": "main"
+      "tag": "release/22.x"
     }
   }
 }
