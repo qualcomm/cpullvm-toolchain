@@ -1,0 +1,75 @@
+name: base-build
+
+on:
+  workflow_call:
+    inputs:
+      build-script:
+        required: true
+        type: string
+      is-nightly:
+        required: false
+        type: boolean
+      arch:
+        required: false
+        type: string
+      runner:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runner }}
+    env:
+      ARTIFACT_DIR: ${{ github.workspace }}/nightly-toolchain
+
+    steps:
+      - name: Cleanup workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Cleaning workspace: ${GITHUB_WORKSPACE}"
+          shopt -s dotglob nullglob
+          rm -rf "${GITHUB_WORKSPACE:?}/"*
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref:        ${{ github.event.pull_request.head.sha || github.sha }}
+          path: src
+          clean: true
+          fetch-depth: 0
+
+      - name: Build
+        shell: bash
+        env:
+            GIT_AUTHOR_NAME: "Qualcomm CI"
+            GIT_AUTHOR_EMAIL: "ci@qti.qualcomm.com"
+            GIT_COMMITTER_NAME: "Qualcomm CI"
+            GIT_COMMITTER_EMAIL: "ci@qti.qualcomm.com"
+        run: |
+          set -euo pipefail
+          build_script="${{ inputs.build-script }}"
+          if [ "${{ inputs.is-nightly }}" = "true" ]; then
+            build_script="$build_script --artifact-dir $ARTIFACT_DIR --nightly"
+          fi
+          echo "Running: $build_script"
+          $build_script
+
+      - name: Upload Artifact
+        if: ${{ inputs.is-nightly && success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpullvm-toolchain-${{ github.run_id }}-Linux-${{ inputs.arch }}
+          path: |
+            ${{ env.ARTIFACT_DIR }}/*.txz
+            ${{ env.ARTIFACT_DIR }}/*.tgz
+          if-no-files-found: ignore
+          retention-days: 30
