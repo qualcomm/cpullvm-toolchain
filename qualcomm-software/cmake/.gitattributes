@@ -1,2 +1,0 @@
-# During git archive, replace $Format:%H$ with the commit hash.
-generate_version_txt.cmake export-subst

@@ -18,7 +18,6 @@ permissions:
 
 jobs:
   qcom-preflight-checks:
-    if: github.repository == 'qualcomm/cpullvm-toolchain'
     uses: qualcomm/qcom-reusable-workflows/.github/workflows/qcom-preflight-checks-reusable-workflow.yml@v1.1.4
     with:
         # ✅ Preflight Checkers
