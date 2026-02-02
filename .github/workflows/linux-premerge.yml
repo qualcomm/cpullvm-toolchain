@@ -1,0 +1,75 @@
+# Copyright (c) 2025, Arm Limited and affiliates.
+# Part of the Arm Toolchain project, under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. 
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Linux Premerge Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths-ignore:
+      - '.github/workflows/qcom-preflight-checks.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    # Don't run on forks
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    name: ${{ matrix.build_script }} on ${{ matrix.target_os }}
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - build_script: build.sh
+            test_script: test.sh
+            target_os: Linux-x86_64
+            runner: self-hosted
+
+          - build_script: build_no_runtimes.sh
+            test_script: test_no_runtimes.sh
+            target_os: Linux-AArch64
+            runner: ubuntu-22.04-arm
+
+          - build_script: build_musl-embedded_overlay.sh
+            test_script: ''
+            target_os: Linux-x86_64
+            runner: self-hosted
+
+    steps:
+      - name: Cleanup workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Cleaning workspace: ${GITHUB_WORKSPACE}"
+          shopt -s dotglob nullglob
+          rm -rf "${GITHUB_WORKSPACE:?}/"*
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          clean: true
+
+      - name: Apply llvm-project patches
+        run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
+
+      - name: Build toolchain
+        run: ./qualcomm-software/scripts/${{ matrix.build_script }}
+
+      - name: Test
+        if: matrix.test_script != ''
+        run: ./qualcomm-software/scripts/${{ matrix.test_script }}

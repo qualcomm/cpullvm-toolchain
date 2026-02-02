@@ -1,0 +1,29 @@
+{
+  "comment": [
+    "Release branches will use specific revisions of the repos it depends",
+    "on. This file provides a single source of truth for which revisions to",
+    "use that can be queried by CMake and other automation software."
+  ],
+  "repos": {
+    "picolibc": {
+      "url": "https://github.com/picolibc/picolibc.git",
+      "tagType": "tag",
+      "tag": "1.8.10"
+    },
+    "musl": {
+      "url": "https://git.musl-libc.org/git/musl",
+      "tagType": "tag",
+      "tag": "v1.2.5"
+    },
+    "musl-embedded": {
+      "url": "https://github.com/qualcomm/musl-embedded",
+      "tagType": "branch",
+      "tag": "main"
+    },
+    "eld": {
+      "url": "https://github.com/qualcomm/eld",
+      "tagType": "branch",
+      "tag": "release/22.x"
+    }
+  }
+}
