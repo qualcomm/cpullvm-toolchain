@@ -156,9 +156,6 @@ set(LLVM_DISTRIBUTION_COMPONENTS
     dsymutil
     lld
     ld.eld
-    LW
-    PluginAPIHeaders
-    YAMLMapParser
     llvm-ar
     llvm-config
     llvm-cov
@@ -192,6 +189,7 @@ set(LLVM_TARGETS_TO_BUILD AArch64;ARM;RISCV;X86 CACHE STRING "")
 # AArch64 Linux machines. Just disable x86 in eld until these are
 # resolved.
 set(ELD_TARGETS_TO_BUILD AArch64;ARM;RISCV CACHE STRING "")
+set(ELD_INSTALL_LINKER_SCRIPT_TEMPLATES OFF CACHE BOOL "")
 set(LLVM_DEFAULT_TARGET_TRIPLE aarch64-unknown-linux-gnu CACHE STRING "")
 set(LLVM_BUILD_RUNTIME OFF CACHE BOOL "")
 set(LIBCLANG_BUILD_STATIC ON CACHE BOOL "")
