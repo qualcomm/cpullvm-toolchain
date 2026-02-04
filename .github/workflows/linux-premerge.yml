@@ -53,19 +53,13 @@ jobs:
             runner: self-hosted
 
     steps:
-      - name: Cleanup workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Cleaning workspace: ${GITHUB_WORKSPACE}"
-          shopt -s dotglob nullglob
-          rm -rf "${GITHUB_WORKSPACE:?}/"*
-
       - name: Checkout source
         uses: actions/checkout@v4
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
+          # We build in the repository and rely on clean to cleanup possible
+          # old build products if the runner doesn't do it itself.
           clean: true
 
       - name: Apply llvm-project patches

@@ -59,18 +59,12 @@ jobs:
             runner: windows-11-arm
 
     steps:
-      # FIXME: Need to discuss if this is actually needed.
-      - name: Cleanup workspace
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Cleaning workspace: ${GITHUB_WORKSPACE}"
-          shopt -s dotglob nullglob
-          rm -rf "${GITHUB_WORKSPACE:?}/"*
-
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          # We build in the repository and rely on clean to cleanup possible
+          # old build products if the runner doesn't do it itself.
+          clean: true
 
       - name: Apply llvm-project patches
         run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
