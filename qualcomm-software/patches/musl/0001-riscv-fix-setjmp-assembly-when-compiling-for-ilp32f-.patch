@@ -1,0 +1,184 @@
+From 0b86d60badad6a69b37fc06d18b5763fbbf47b58 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Alex=20R=C3=B8nne=20Petersen?= <alex@alexrp.com>
+Date: Sat, 29 Jun 2024 04:04:34 +0200
+Subject: [PATCH] riscv: fix setjmp assembly when compiling for ilp32f/lp64f.
+
+per the psABI, floating point register contents beyond the register
+size of the targeted ABI variant are never call-saved, so no
+hwcap-conditional logic is needed here and the assembly-time
+conditions are based purely on ABI variant macros, not the targeted
+ISA level.
+---
+ src/setjmp/riscv32/longjmp.S | 30 ++++++++++++++++++------------
+ src/setjmp/riscv32/setjmp.S  | 30 ++++++++++++++++++------------
+ src/setjmp/riscv64/longjmp.S | 30 ++++++++++++++++++------------
+ src/setjmp/riscv64/setjmp.S  | 30 ++++++++++++++++++------------
+ 4 files changed, 72 insertions(+), 48 deletions(-)
+
+diff --git a/src/setjmp/riscv32/longjmp.S b/src/setjmp/riscv32/longjmp.S
+index f9cb3318..b4e5458d 100644
+--- a/src/setjmp/riscv32/longjmp.S
++++ b/src/setjmp/riscv32/longjmp.S
+@@ -23,18 +23,24 @@ longjmp:
+ 	lw ra,    52(a0)
+ 
+ #ifndef __riscv_float_abi_soft
+-	fld fs0,  56(a0)
+-	fld fs1,  64(a0)
+-	fld fs2,  72(a0)
+-	fld fs3,  80(a0)
+-	fld fs4,  88(a0)
+-	fld fs5,  96(a0)
+-	fld fs6,  104(a0)
+-	fld fs7,  112(a0)
+-	fld fs8,  120(a0)
+-	fld fs9,  128(a0)
+-	fld fs10, 136(a0)
+-	fld fs11, 144(a0)
++#ifdef __riscv_float_abi_double
++#define FLX fld
++#else
++#define FLX flw
++#endif
++
++	FLX fs0,  56(a0)
++	FLX fs1,  64(a0)
++	FLX fs2,  72(a0)
++	FLX fs3,  80(a0)
++	FLX fs4,  88(a0)
++	FLX fs5,  96(a0)
++	FLX fs6,  104(a0)
++	FLX fs7,  112(a0)
++	FLX fs8,  120(a0)
++	FLX fs9,  128(a0)
++	FLX fs10, 136(a0)
++	FLX fs11, 144(a0)
+ #endif
+ 
+ 	seqz a0, a1
+diff --git a/src/setjmp/riscv32/setjmp.S b/src/setjmp/riscv32/setjmp.S
+index 8a75cf55..5a1a41ef 100644
+--- a/src/setjmp/riscv32/setjmp.S
++++ b/src/setjmp/riscv32/setjmp.S
+@@ -23,18 +23,24 @@ setjmp:
+ 	sw ra,    52(a0)
+ 
+ #ifndef __riscv_float_abi_soft
+-	fsd fs0,  56(a0)
+-	fsd fs1,  64(a0)
+-	fsd fs2,  72(a0)
+-	fsd fs3,  80(a0)
+-	fsd fs4,  88(a0)
+-	fsd fs5,  96(a0)
+-	fsd fs6,  104(a0)
+-	fsd fs7,  112(a0)
+-	fsd fs8,  120(a0)
+-	fsd fs9,  128(a0)
+-	fsd fs10, 136(a0)
+-	fsd fs11, 144(a0)
++#ifdef __riscv_float_abi_double
++#define FSX fsd
++#else
++#define FSX fsw
++#endif
++
++	FSX fs0,  56(a0)
++	FSX fs1,  64(a0)
++	FSX fs2,  72(a0)
++	FSX fs3,  80(a0)
++	FSX fs4,  88(a0)
++	FSX fs5,  96(a0)
++	FSX fs6,  104(a0)
++	FSX fs7,  112(a0)
++	FSX fs8,  120(a0)
++	FSX fs9,  128(a0)
++	FSX fs10, 136(a0)
++	FSX fs11, 144(a0)
+ #endif
+ 
+ 	li a0, 0
+diff --git a/src/setjmp/riscv64/longjmp.S b/src/setjmp/riscv64/longjmp.S
+index 41e2d210..982475c7 100644
+--- a/src/setjmp/riscv64/longjmp.S
++++ b/src/setjmp/riscv64/longjmp.S
+@@ -23,18 +23,24 @@ longjmp:
+ 	ld ra,    104(a0)
+ 
+ #ifndef __riscv_float_abi_soft
+-	fld fs0,  112(a0)
+-	fld fs1,  120(a0)
+-	fld fs2,  128(a0)
+-	fld fs3,  136(a0)
+-	fld fs4,  144(a0)
+-	fld fs5,  152(a0)
+-	fld fs6,  160(a0)
+-	fld fs7,  168(a0)
+-	fld fs8,  176(a0)
+-	fld fs9,  184(a0)
+-	fld fs10, 192(a0)
+-	fld fs11, 200(a0)
++#ifdef __riscv_float_abi_double
++#define FLX fld
++#else
++#define FLX flw
++#endif
++
++	FLX fs0,  112(a0)
++	FLX fs1,  120(a0)
++	FLX fs2,  128(a0)
++	FLX fs3,  136(a0)
++	FLX fs4,  144(a0)
++	FLX fs5,  152(a0)
++	FLX fs6,  160(a0)
++	FLX fs7,  168(a0)
++	FLX fs8,  176(a0)
++	FLX fs9,  184(a0)
++	FLX fs10, 192(a0)
++	FLX fs11, 200(a0)
+ #endif
+ 
+ 	seqz a0, a1
+diff --git a/src/setjmp/riscv64/setjmp.S b/src/setjmp/riscv64/setjmp.S
+index 51249672..0795bf7d 100644
+--- a/src/setjmp/riscv64/setjmp.S
++++ b/src/setjmp/riscv64/setjmp.S
+@@ -23,18 +23,24 @@ setjmp:
+ 	sd ra,    104(a0)
+ 
+ #ifndef __riscv_float_abi_soft
+-	fsd fs0,  112(a0)
+-	fsd fs1,  120(a0)
+-	fsd fs2,  128(a0)
+-	fsd fs3,  136(a0)
+-	fsd fs4,  144(a0)
+-	fsd fs5,  152(a0)
+-	fsd fs6,  160(a0)
+-	fsd fs7,  168(a0)
+-	fsd fs8,  176(a0)
+-	fsd fs9,  184(a0)
+-	fsd fs10, 192(a0)
+-	fsd fs11, 200(a0)
++#ifdef __riscv_float_abi_double
++#define FSX fsd
++#else
++#define FSX fsw
++#endif
++
++	FSX fs0,  112(a0)
++	FSX fs1,  120(a0)
++	FSX fs2,  128(a0)
++	FSX fs3,  136(a0)
++	FSX fs4,  144(a0)
++	FSX fs5,  152(a0)
++	FSX fs6,  160(a0)
++	FSX fs7,  168(a0)
++	FSX fs8,  176(a0)
++	FSX fs9,  184(a0)
++	FSX fs10, 192(a0)
++	FSX fs11, 200(a0)
+ #endif
+ 
+ 	li a0, 0
+-- 
+2.34.1
+
