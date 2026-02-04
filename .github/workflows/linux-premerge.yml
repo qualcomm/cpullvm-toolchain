@@ -53,20 +53,12 @@ jobs:
             runner: self-hosted
 
     steps:
-      - name: Cleanup workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Cleaning workspace: ${GITHUB_WORKSPACE}"
-          shopt -s dotglob nullglob
-          rm -rf "${GITHUB_WORKSPACE:?}/"*
-
       - name: Checkout source
         uses: actions/checkout@v4
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
-          clean: true
+          clean: false
 
       - name: Apply llvm-project patches
         run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
