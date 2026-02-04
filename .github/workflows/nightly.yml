@@ -15,7 +15,7 @@
 name: Nightly Build and Test
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -46,19 +46,26 @@ jobs:
             target_os: Linux-x86_64
             runner: self-hosted
 
-          # FIXME: there's lit failures in Windows, probably from missing some
-          # dependency. Just disable testing for now for both x64/AArch64
           - build_script: build.ps1
-            test_script: ''
+            test_script: test.ps1
             target_os: Windows-x86_64
             runner: windows-latest
 
           - build_script: build.ps1
-            test_script: ''
+            test_script: test.ps1
             target_os: Windows-AArch64
             runner: windows-11-arm
 
     steps:
+      # Not setting these can cause lit test failures on Windows machines when
+      # files with ex: different line endings are compared.
+      - name: Preconfigure git
+        shell: bash
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+          git config --global core.longpaths true
+
       - name: Checkout source
         uses: actions/checkout@v4
         with:
