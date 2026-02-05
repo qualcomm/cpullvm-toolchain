@@ -13,7 +13,7 @@
         {
             "variant": "aarch64a_soft_nofp_pacret_bti",
             "json": "aarch64a_soft_nofp_pacret_bti.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.3-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fno-exceptions"
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fno-exceptions"
         },
         {
             "variant": "aarch64a_pacret_bkey_bti",

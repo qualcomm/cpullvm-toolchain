@@ -14,9 +14,9 @@
 # CHECK-NOFP: aarch64-none-elf/aarch64a_soft_nofp{{$}}
 # CHECK-NOFP-EMPTY:
 
-# RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.3a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fno-exceptions | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
-# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.3a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fno-exceptions | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
-# RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.3a -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fno-exceptions | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fno-exceptions | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fno-exceptions | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fno-exceptions | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
 # CHECK-NOFP-PACRET-BTI: aarch64-none-elf/aarch64a_soft_nofp_pacret_bti{{$}}
 # CHECK-NOFP-PACRET-BTI-EMPTY:
 
