@@ -112,6 +112,7 @@ CLANG_RESOURCE_DIR="$(clang --print-resource-dir)"
 # dependencies and is intended as temporary code.
 VARIANTS=(
   "rv32imac_ilp32"
+  "rv32imafc_ilp32f"
   "rv64imac_lp64"
   "rv64gc_lp64d"
   "aarch64a"
@@ -125,6 +126,7 @@ VARIANTS=(
 # builtins, default libs, etc.
 declare -A VARIANT_BUILD_FLAGS
 VARIANT_BUILD_FLAGS["rv32imac_ilp32"]="--target=riscv32-unknown-linux-gnu -march=rv32imac -mabi=ilp32"
+VARIANT_BUILD_FLAGS["rv32imafc_ilp32f"]="--target=riscv32-unknown-linux-gnu -march=rv32imafc -mabi=ilp32f"
 VARIANT_BUILD_FLAGS["rv64imac_lp64"]="--target=riscv64-unknown-linux-gnu -march=rv64imac -mabi=lp64"
 VARIANT_BUILD_FLAGS["rv64gc_lp64d"]="--target=riscv64-unknown-linux-gnu -march=rv64gc -mabi=lp64d"
 # Note that there's minor devations in the flags here--in the past, only musl
@@ -152,6 +154,7 @@ ARCH_MUSL_CFLAGS["arm"]="-mno-unaligned-access -fPIC -fno-rounding-math -O3"
 # as well. Just list all variants--it'll be cleaned up later.
 declare -A VARIANT_MUSL_CONFIGS
 VARIANT_MUSL_CONFIGS["rv32imac_ilp32"]=""
+VARIANT_MUSL_CONFIGS["rv32imafc_ilp32f"]=""
 VARIANT_MUSL_CONFIGS["rv64imac_lp64"]=""
 VARIANT_MUSL_CONFIGS["rv64gc_lp64d"]=""
 VARIANT_MUSL_CONFIGS["aarch64a"]="--quic-aarch64-optmem"
