@@ -289,8 +289,6 @@ for VARIANT in "${VARIANTS[@]}"; do
   echo "Installing musl libraries for ${VARIANT}"
   pushd "${VARIANT_MUSL_BUILD_DIR}" >/dev/null
   make distclean
-  # TODO: we should probably standardize which linker we're using (lld vs eld)
-  # but that can wait--this matches what we've done in the past.
   "${MUSL_DIR}"/configure \
       ${EXTRA_MUSL_CONFIGS} \
       --disable-wrapper \
@@ -371,18 +369,12 @@ for VARIANT in "${VARIANTS[@]}"; do
   # `partially_link_libcxx` in fuzzer/CMakeLists.txt has a custom command that
   # invokes the linker, but it just uses the toolchain default. So, we get
   # errors as it picks up the host ld.bfd when linking for riscv64 rather than
-  # our just-built lld with no way to override this. Note that re-enabling
+  # our just-built eld/lld with no way to override this. Note that re-enabling
   # this also requires messing with some libc++ configuration similar to
   # above.
   # FIXME: Investigate if we can merge this with the libc++ build above as
   # it'd simplify things a bit. Not sure how that works with install dirs
   echo "Installing compiler-rt for ${VARIANT}"
-
-  LINKER_NAME="lld"
-  # Support for Xqci relocations is currently only available in eld.
-  if [[ "${VARIANT}" == "rv32ima_xqci_ilp32" ]]; then
-    LINKER_NAME="eld"
-  fi
 
   COMPILER_RT_BUILD_DIR="${VARIANT_BASE_BUILD_DIR}/compiler-rt"
   cmake -G Ninja \
@@ -408,9 +400,9 @@ for VARIANT in "${VARIANTS[@]}"; do
       -DCOMPILER_RT_BUILD_ORC=OFF \
       -DCOMPILER_RT_BUILD_XRAY=OFF \
       -DLLVM_ENABLE_RUNTIMES=compiler-rt \
-      -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=${LINKER_NAME} --rtlib=compiler-rt -stdlib=libc++" \
-      -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=${LINKER_NAME} --rtlib=compiler-rt -stdlib=libc++" \
-      -DCMAKE_MODULE_LINKER_FLAGS="-fuse-ld=${LINKER_NAME} --rtlib=compiler-rt -stdlib=libc++" \
+      -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=eld --rtlib=compiler-rt -stdlib=libc++" \
+      -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=eld --rtlib=compiler-rt -stdlib=libc++" \
+      -DCMAKE_MODULE_LINKER_FLAGS="-fuse-ld=eld --rtlib=compiler-rt -stdlib=libc++" \
       ${EXTRA_CRT_CONFIGS} \
       -B "${COMPILER_RT_BUILD_DIR}" \
       -S "${LLVM_BASE_DIR}/runtimes"
