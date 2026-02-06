@@ -119,6 +119,7 @@ VARIANTS=(
   "aarch64a"
   "aarch64a_pacret"
   "aarch64a_pacret_bti"
+  "aarch64a_pacret_bkey_bti"
   "armv7_softfp_neon"
 )
 
@@ -139,6 +140,7 @@ VARIANT_BUILD_FLAGS["rv64gc_lp64d"]="--target=riscv64-unknown-linux-gnu -march=r
 VARIANT_BUILD_FLAGS["aarch64a"]="--target=aarch64-unknown-linux-gnu -mcpu=cortex-a53"
 VARIANT_BUILD_FLAGS["aarch64a_pacret"]="--target=aarch64-unknown-linux-gnu -mcpu=cortex-a53 -march=armv8.3a -mbranch-protection=pac-ret+leaf"
 VARIANT_BUILD_FLAGS["aarch64a_pacret_bti"]="--target=aarch64-unknown-linux-gnu -mcpu=cortex-a53 -march=armv8.3a -mbranch-protection=pac-ret+leaf+bti"
+VARIANT_BUILD_FLAGS["aarch64a_pacret_bkey_bti"]="--target=aarch64-unknown-linux-gnu -mcpu=cortex-a53 -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti"
 # The full normalized form here seems to be "thumbv7-unknown-linux-gnueabi" but
 # that doesn't seem to be what clang searches--use "arm-unknown-linux-gnueabi"
 # instead.
@@ -164,6 +166,8 @@ VARIANT_MUSL_CONFIGS["aarch64a"]="--quic-aarch64-optmem"
 VARIANT_MUSL_CONFIGS["aarch64a_pacret"]="--quic-aarch64-optmem"
 VARIANT_MUSL_CONFIGS["aarch64a_pacret_bti"]="--quic-aarch64-optmem \
                                              --quic-aarch64-mark-bti"
+VARIANT_MUSL_CONFIGS["aarch64a_pacret_bkey_bti"]="--quic-aarch64-optmem \
+                                                  --quic-aarch64-mark-bti"
 VARIANT_MUSL_CONFIGS["armv7_softfp_neon"]=""
 
 for VARIANT in "${VARIANTS[@]}"; do
