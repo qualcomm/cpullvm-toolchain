@@ -36,6 +36,11 @@
             "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft"
         },
         {
+            "variant": "armv8_soft_neon",
+            "json": "armv8_soft_neon.json",
+            "flags": "--target=thumbv8-unknown-none-eabi -mfpu=neon-fp-armv8"
+        },
+        {
             "variant": "armv7a_soft_neon",
             "json": "armv7a_soft_neon.json",
             "flags": "--target=thumbv7-unknown-none-eabi -mfpu=neon"
