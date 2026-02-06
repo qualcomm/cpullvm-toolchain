@@ -1,14 +1,14 @@
 {
     "args": {
         "common": {
-            "TARGET_ARCH": "aarch64a",
-            "VARIANT": "aarch64a",
-            "COMPILE_FLAGS": "-march=armv8-a -fPIC",
+            "TARGET_ARCH": "armv8",
+            "VARIANT": "arvm8_soft_neon",
+            "COMPILE_FLAGS": "-mfloat-abi=softfp -march=armv8 -mthumb -mfpu=neon-fp-armv8 -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",
             "QEMU_MACHINE": "virt",
-            "QEMU_CPU": "cortex-a57",
+            "QEMU_CPU": "max",
             "FLASH_ADDRESS": "0x40000000",
             "FLASH_SIZE": "0x00400000",
             "RAM_ADDRESS": "0x40400000",
@@ -26,7 +26,7 @@
             "ENABLE_LIBC_TESTS": "OFF",
             "ENABLE_COMPILER_RT_TESTS": "OFF",
             "ENABLE_LIBCXX_TESTS": "OFF",
-            "EXTRA_MUSL-EMBEDDED_CFLAGS": "-mstrict-align"
+            "EXTRA_MUSL-EMBEDDED_CFLAGS": "-mno-unaligned-access"
         }
     }
 }
