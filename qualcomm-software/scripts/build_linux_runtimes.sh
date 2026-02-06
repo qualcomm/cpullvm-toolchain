@@ -113,6 +113,7 @@ CLANG_RESOURCE_DIR="$(clang --print-resource-dir)"
 VARIANTS=(
   "rv32imac_ilp32"
   "rv32imafc_ilp32f"
+  "rv32ima_xqci_ilp32"
   "rv64imac_lp64"
   "rv64gc_lp64d"
   "aarch64a"
@@ -127,6 +128,7 @@ VARIANTS=(
 declare -A VARIANT_BUILD_FLAGS
 VARIANT_BUILD_FLAGS["rv32imac_ilp32"]="--target=riscv32-unknown-linux-gnu -march=rv32imac -mabi=ilp32"
 VARIANT_BUILD_FLAGS["rv32imafc_ilp32f"]="--target=riscv32-unknown-linux-gnu -march=rv32imafc -mabi=ilp32f"
+VARIANT_BUILD_FLAGS["rv32ima_xqci_ilp32"]="--target=riscv32-unknown-linux-gnu -march=rv32ima_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp -mabi=ilp32"
 VARIANT_BUILD_FLAGS["rv64imac_lp64"]="--target=riscv64-unknown-linux-gnu -march=rv64imac -mabi=lp64"
 VARIANT_BUILD_FLAGS["rv64gc_lp64d"]="--target=riscv64-unknown-linux-gnu -march=rv64gc -mabi=lp64d"
 # Note that there's minor devations in the flags here--in the past, only musl
@@ -155,6 +157,7 @@ ARCH_MUSL_CFLAGS["arm"]="-mno-unaligned-access -fPIC -fno-rounding-math -O3"
 declare -A VARIANT_MUSL_CONFIGS
 VARIANT_MUSL_CONFIGS["rv32imac_ilp32"]=""
 VARIANT_MUSL_CONFIGS["rv32imafc_ilp32f"]=""
+VARIANT_MUSL_CONFIGS["rv32ima_xqci_ilp32"]=""
 VARIANT_MUSL_CONFIGS["rv64imac_lp64"]=""
 VARIANT_MUSL_CONFIGS["rv64gc_lp64d"]=""
 VARIANT_MUSL_CONFIGS["aarch64a"]="--quic-aarch64-optmem"
@@ -370,6 +373,13 @@ for VARIANT in "${VARIANTS[@]}"; do
   # FIXME: Investigate if we can merge this with the libc++ build above as
   # it'd simplify things a bit. Not sure how that works with install dirs
   echo "Installing compiler-rt for ${VARIANT}"
+
+  LINKER_NAME="lld"
+  # Support for Xqci relocations is currently only available in eld.
+  if [[ "${VARIANT}" == "rv32ima_xqci_ilp32" ]]; then
+    LINKER_NAME="eld"
+  fi
+
   COMPILER_RT_BUILD_DIR="${VARIANT_BASE_BUILD_DIR}/compiler-rt"
   cmake -G Ninja \
       -DCMAKE_INSTALL_PREFIX="${VARIANT_TMP_RESOURCE_DIR}" \
@@ -394,9 +404,9 @@ for VARIANT in "${VARIANTS[@]}"; do
       -DCOMPILER_RT_BUILD_ORC=OFF \
       -DCOMPILER_RT_BUILD_XRAY=OFF \
       -DLLVM_ENABLE_RUNTIMES=compiler-rt \
-      -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld --rtlib=compiler-rt -stdlib=libc++" \
-      -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld --rtlib=compiler-rt -stdlib=libc++" \
-      -DCMAKE_MODULE_LINKER_FLAGS="-fuse-ld=lld --rtlib=compiler-rt -stdlib=libc++" \
+      -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=${LINKER_NAME} --rtlib=compiler-rt -stdlib=libc++" \
+      -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=${LINKER_NAME} --rtlib=compiler-rt -stdlib=libc++" \
+      -DCMAKE_MODULE_LINKER_FLAGS="-fuse-ld=${LINKER_NAME} --rtlib=compiler-rt -stdlib=libc++" \
       ${EXTRA_CRT_CONFIGS} \
       -B "${COMPILER_RT_BUILD_DIR}" \
       -S "${LLVM_BASE_DIR}/runtimes"
