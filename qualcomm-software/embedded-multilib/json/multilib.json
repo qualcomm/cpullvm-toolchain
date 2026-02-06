@@ -26,6 +26,12 @@
             "flags": "--target=thumbv7-unknown-none-eabi -mfpu=neon -fno-exceptions"
         },
         {
+            "variant": "riscv32imac_ilp32",
+            "json": "riscv32imac_ilp32.json",
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32 -fno-exceptions",
+            "libraries_supported": "picolibc"
+        },
+        {
             "variant": "riscv32imac_ilp32_nopic",
             "json": "riscv32imac_ilp32_nopic.json",
             "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32 -fno-pic -fno-exceptions",
