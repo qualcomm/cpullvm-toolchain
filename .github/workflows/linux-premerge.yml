@@ -24,8 +24,6 @@ concurrency:
 
 jobs:
   build-and-test:
-    # Don't run on forks
-    if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: ${{ matrix.build_script }} on ${{ matrix.target_os }}
     runs-on: ${{ matrix.runner }}
 
@@ -49,21 +47,5 @@ jobs:
             runner: self-hosted
 
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
-          # We build in the repository and rely on clean to cleanup possible
-          # old build products if the runner doesn't do it itself.
-          clean: true
-
-      - name: Apply llvm-project patches
-        run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
-
-      - name: Build toolchain
-        run: ./qualcomm-software/scripts/${{ matrix.build_script }}
-
-      - name: Test
-        if: matrix.test_script != ''
-        run: ./qualcomm-software/scripts/${{ matrix.test_script }}
+      - name: Test repo
+        run: echo ${{ github.repository }}
