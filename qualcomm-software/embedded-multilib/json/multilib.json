@@ -46,6 +46,11 @@
             "flags": "--target=thumbv7-unknown-none-eabi -mfpu=none"
         },
         {
+            "variant": "armv7m_soft_nofp",
+            "json": "armv7m_soft_nofp.json",
+            "flags": "--target=thumbv7m-unknown-none-eabi -mfpu=none"
+        },
+        {
             "variant": "riscv32imac_ilp32",
             "json": "riscv32imac_ilp32.json",
             "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32",

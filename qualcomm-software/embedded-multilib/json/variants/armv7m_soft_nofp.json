@@ -1,0 +1,32 @@
+{
+    "args": {
+        "common": {
+            "TARGET_ARCH": "armv7m",
+            "VARIANT": "armv7m_soft_nofp",
+            "COMPILE_FLAGS": "-mfloat-abi=soft -march=armv7m -mfpu=none -mno-unaligned-access -fPIC",
+            "ENABLE_EXCEPTIONS": "OFF",
+            "ENABLE_RTTI": "OFF",
+            "TEST_EXECUTOR": "qemu",
+            "QEMU_MACHINE": "mps2-an385",
+            "QEMU_CPU": "cortex-m3",
+            "FLASH_ADDRESS": "0x00000000",
+            "FLASH_SIZE": "0x00400000",
+            "RAM_ADDRESS": "0x20000000",
+            "RAM_SIZE": "0x00200000",
+            "LIBRARY_BUILD_TYPE": "minsizerelease"
+        },
+        "picolibc": {
+            "ENABLE_CXX_LIBS": "ON",
+            "ENABLE_LIBC_TESTS": "ON",
+            "ENABLE_COMPILER_RT_TESTS": "OFF",
+            "ENABLE_LIBCXX_TESTS": "OFF"
+        },
+        "musl-embedded": {
+            "ENABLE_CXX_LIBS": "ON",
+            "ENABLE_LIBC_TESTS": "OFF",
+            "ENABLE_COMPILER_RT_TESTS": "OFF",
+            "ENABLE_LIBCXX_TESTS": "OFF",
+            "EXTRA_MUSL-EMBEDDED_CONFIG_FLAGS": "--quic-arm-nofp"
+        }
+    }
+}
