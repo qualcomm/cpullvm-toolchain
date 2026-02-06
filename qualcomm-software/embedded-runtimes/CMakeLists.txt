@@ -173,7 +173,7 @@ if(ENABLE_LIBC_TESTS OR ENABLE_COMPILER_RT_TESTS OR ENABLE_LIBCXX_TESTS)
     set(LLVM_LIT_ARGS "${default_lit_args}" CACHE STRING "Default options for lit")
 
     if(TEST_EXECUTOR STREQUAL qemu)
-        if(TARGET_ARCH MATCHES "^aarch64")
+        if(TARGET_ARCH MATCHES "^aarch64|^armv8")
             find_program(QEMU_EXECUTABLE qemu-system-aarch64 REQUIRED)
         elseif(TARGET_ARCH MATCHES "^riscv32")
             find_program(QEMU_EXECUTABLE qemu-system-riscv32 REQUIRED)
