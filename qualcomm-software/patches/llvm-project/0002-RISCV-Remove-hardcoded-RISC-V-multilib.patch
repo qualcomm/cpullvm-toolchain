@@ -1,0 +1,123 @@
+From 3dcb99366af084d1df9d0460f7817ec991698a91 Mon Sep 17 00:00:00 2001
+From: Jonathon Penix <jpenix@qti.qualcomm.com>
+Date: Fri, 6 Feb 2026 18:39:34 -0800
+Subject: [PATCH] [RISCV] Remove hardcoded RISC-V multilib
+
+When we build our embedded runtimes, we start with an empty directory as our
+sysroot and pass `--sysroot <dir>` to each step as we build it out. Notably,
+we don't have a multilib.yaml at this stage or rely on multilib at all during
+this process. Also note that the sysroot contains only a 'include' and 'lib'
+dir that we build out and expect the usual clang driver logic to handle. This
+scheme works nicely for Arm and AArch64.
+
+For RISC-V, we can run into issues with the hardcoded multilibs. For certain
+configs (-march=rv64gc -mabi=lp64d, for example) we match the hardcoded
+multilib (and again we don't have a multilib.yaml to disable this). As such,
+when we pass in `--sysroot <dir>`, instead of finding files in `<dir>/include`
+and `<dir>/lib` as normal, we look in paths like
+`<dir>/rv64imafdc/lp64d/include' which don't exist, causing build failures
+(failed to find #include'd headers, etc.)
+
+We could maybe install a dummy multilib.yaml to disable this behavior, but
+that seems like more hassle than it is worth. And, these hardcoded multilib
+paths are not valid in our toolchain and we have no intention of adopting
+that scheme (directory layout or hardcoded multilib more generally). We
+might want to find a more upstream-able solution at some point, but to
+unblock ourselves in the short term, just remove this support to prevent
+these build failures.
+
+Signed-off-by: Jonathon Penix <jpenix@qti.qualcomm.com>
+---
+ clang/lib/Driver/ToolChains/BareMetal.cpp | 69 -----------------------
+ 1 file changed, 69 deletions(-)
+
+diff --git a/clang/lib/Driver/ToolChains/BareMetal.cpp b/clang/lib/Driver/ToolChains/BareMetal.cpp
+index 6574651b72a3..70864832ff6a 100644
+--- a/clang/lib/Driver/ToolChains/BareMetal.cpp
++++ b/clang/lib/Driver/ToolChains/BareMetal.cpp
+@@ -51,70 +51,6 @@ static bool isPPCBareMetal(const llvm::Triple &Triple) {
+          Triple.getEnvironment() == llvm::Triple::EABI;
+ }
+ 
+-static bool findRISCVMultilibs(const Driver &D,
+-                               const llvm::Triple &TargetTriple,
+-                               const ArgList &Args, DetectedMultilibs &Result) {
+-  Multilib::flags_list Flags;
+-  std::string Arch = riscv::getRISCVArch(Args, TargetTriple);
+-  StringRef Abi = tools::riscv::getRISCVABI(Args, TargetTriple);
+-
+-  if (TargetTriple.isRISCV64()) {
+-    MultilibBuilder Imac =
+-        MultilibBuilder().flag("-march=rv64imac").flag("-mabi=lp64");
+-    MultilibBuilder Imafdc = MultilibBuilder("/rv64imafdc/lp64d")
+-                                 .flag("-march=rv64imafdc")
+-                                 .flag("-mabi=lp64d");
+-
+-    // Multilib reuse
+-    bool UseImafdc =
+-        (Arch == "rv64imafdc") || (Arch == "rv64gc"); // gc => imafdc
+-
+-    addMultilibFlag((Arch == "rv64imac"), "-march=rv64imac", Flags);
+-    addMultilibFlag(UseImafdc, "-march=rv64imafdc", Flags);
+-    addMultilibFlag(Abi == "lp64", "-mabi=lp64", Flags);
+-    addMultilibFlag(Abi == "lp64d", "-mabi=lp64d", Flags);
+-
+-    Result.Multilibs =
+-        MultilibSetBuilder().Either(Imac, Imafdc).makeMultilibSet();
+-    return Result.Multilibs.select(D, Flags, Result.SelectedMultilibs);
+-  }
+-  if (TargetTriple.isRISCV32()) {
+-    MultilibBuilder Imac =
+-        MultilibBuilder().flag("-march=rv32imac").flag("-mabi=ilp32");
+-    MultilibBuilder I = MultilibBuilder("/rv32i/ilp32")
+-                            .flag("-march=rv32i")
+-                            .flag("-mabi=ilp32");
+-    MultilibBuilder Im = MultilibBuilder("/rv32im/ilp32")
+-                             .flag("-march=rv32im")
+-                             .flag("-mabi=ilp32");
+-    MultilibBuilder Iac = MultilibBuilder("/rv32iac/ilp32")
+-                              .flag("-march=rv32iac")
+-                              .flag("-mabi=ilp32");
+-    MultilibBuilder Imafc = MultilibBuilder("/rv32imafc/ilp32f")
+-                                .flag("-march=rv32imafc")
+-                                .flag("-mabi=ilp32f");
+-
+-    // Multilib reuse
+-    bool UseI = (Arch == "rv32i") || (Arch == "rv32ic");    // ic => i
+-    bool UseIm = (Arch == "rv32im") || (Arch == "rv32imc"); // imc => im
+-    bool UseImafc = (Arch == "rv32imafc") || (Arch == "rv32imafdc") ||
+-                    (Arch == "rv32gc"); // imafdc,gc => imafc
+-
+-    addMultilibFlag(UseI, "-march=rv32i", Flags);
+-    addMultilibFlag(UseIm, "-march=rv32im", Flags);
+-    addMultilibFlag((Arch == "rv32iac"), "-march=rv32iac", Flags);
+-    addMultilibFlag((Arch == "rv32imac"), "-march=rv32imac", Flags);
+-    addMultilibFlag(UseImafc, "-march=rv32imafc", Flags);
+-    addMultilibFlag(Abi == "ilp32", "-mabi=ilp32", Flags);
+-    addMultilibFlag(Abi == "ilp32f", "-mabi=ilp32f", Flags);
+-
+-    Result.Multilibs =
+-        MultilibSetBuilder().Either(I, Im, Iac, Imac, Imafc).makeMultilibSet();
+-    return Result.Multilibs.select(D, Flags, Result.SelectedMultilibs);
+-  }
+-  return false;
+-}
+-
+ static std::string computeClangRuntimesSysRoot(const Driver &D,
+                                                bool IncludeTriple) {
+   if (!D.SysRoot.empty())
+@@ -340,11 +276,6 @@ void BareMetal::findMultilibs(const Driver &D, const llvm::Triple &Triple,
+     Multilibs = Result.Multilibs;
+     MultilibMacroDefines.append(CustomFlagMacroDefines.begin(),
+                                 CustomFlagMacroDefines.end());
+-  } else if (isRISCVBareMetal(Triple) && !detectGCCToolchainAdjacent(D)) {
+-    if (findRISCVMultilibs(D, Triple, Args, Result)) {
+-      SelectedMultilibs = Result.SelectedMultilibs;
+-      Multilibs = Result.Multilibs;
+-    }
+   }
+ }
+ 
+-- 
+2.43.0
+
