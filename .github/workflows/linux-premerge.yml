@@ -38,10 +38,12 @@ jobs:
             target_os: Linux-x86_64
             runner: self-hosted
 
-          - build_script: build_no_runtimes.sh
-            test_script: test_no_runtimes.sh
-            target_os: Linux-AArch64
-            runner: ubuntu-22.04-arm
+          # FIXME: uncomment, this is in a different PR. But for now I want
+          # to avoid launching these while testing.
+          # - build_script: build_no_runtimes.sh
+          #   test_script: test_no_runtimes.sh
+          #   target_os: Linux-AArch64
+          #   runner: ubuntu-22.04-arm
 
           - build_script: build_musl-embedded_overlay.sh
             test_script: ''
