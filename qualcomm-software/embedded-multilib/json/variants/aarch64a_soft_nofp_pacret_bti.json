@@ -3,7 +3,7 @@
         "common": {
             "TARGET_ARCH": "aarch64a",
             "VARIANT": "aarch64a_soft_nofp_pacret_bti",
-            "COMPILE_FLAGS": "-march=armv8.3a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fPIC",
+            "COMPILE_FLAGS": "-march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "ON",
             "TEST_EXECUTOR": "qemu",
