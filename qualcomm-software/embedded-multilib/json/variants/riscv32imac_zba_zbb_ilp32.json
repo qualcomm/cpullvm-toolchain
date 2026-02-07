@@ -2,7 +2,7 @@
     "args": {
         "common": {
             "TARGET_ARCH": "riscv32",
-            "VARIANT": "riscv32imac_zba_zbb_ilp32_fpic",
+            "VARIANT": "riscv32imac_zba_zbb_ilp32",
             "COMPILE_FLAGS": "-march=rv32imac_zba_zbb -mabi=ilp32 -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "ON",
