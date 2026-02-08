@@ -48,6 +48,18 @@ jobs:
             target_os: Linux-AArch64
             runner: ubuntu-22.04-arm
 
+          - build_script: build.ps1
+            test_script: test.ps1
+            install_script: install_dependencies.ps1
+            target_os: Windows-x86_64
+            runner: windows-latest
+
+          - build_script: build.ps1
+            test_script: test.ps1
+            install_script: install_dependencies.ps1
+            target_os: Windows-AArch64
+            runner: windows-11-arm
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v4

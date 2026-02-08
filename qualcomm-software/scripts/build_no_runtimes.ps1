@@ -23,11 +23,12 @@ $buildDir = (Join-Path $repoRoot build)
 mkdir $buildDir
 cd $buildDir
 
-# Omit Linux runtimes, QEMU testing on Windows builds.
+# Omit target runtimes on Windows builds.
 cmake ..\qualcomm-software `
   -GNinja `
   -DFETCHCONTENT_QUIET=OFF `
-  -DENABLE_QEMU_TESTING=OFF `
+  -DLLVM_TOOLCHAIN_DISTRIBUTION_COMPONENTS="llvm-toolchain-docs;llvm-toolchain-third-party-licenses" `
+  -DPREBUILT_TARGET_LIBRARIES=ON `
   -DCMAKE_C_COMPILER=clang-cl `
   -DCMAKE_CXX_COMPILER=clang-cl
 

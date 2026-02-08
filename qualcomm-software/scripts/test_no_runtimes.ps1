@@ -7,10 +7,10 @@
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. 
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# A Powershell script to build the toolchain
 
-# The script creates a build of the toolchain in the 'build' directory, inside
-# the repository tree.
+# A Powershell script to run the tests for the toolchain. The script assumes a
+# successful build of the toolchain exists in the 'build' directory inside the
+# repository tree.
 
 $ErrorActionPreference = 'Stop'
 
@@ -20,15 +20,6 @@ Set-VS-Env
 $repoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
 $buildDir = (Join-Path $repoRoot build)
 
-mkdir $buildDir
 cd $buildDir
 
-# Omit Linux runtimes, QEMU testing on Windows builds.
-cmake ..\qualcomm-software `
-  -GNinja `
-  -DFETCHCONTENT_QUIET=OFF `
-  -DENABLE_QEMU_TESTING=OFF `
-  -DCMAKE_C_COMPILER=clang-cl `
-  -DCMAKE_CXX_COMPILER=clang-cl
-
-ninja package-llvm-toolchain
+ninja check-all
