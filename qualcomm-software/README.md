@@ -1,42 +1,49 @@
 
-# CPULLVM Toolchain for Embedded
+# CPULLVM Toolchain
 
-This repository contains build scripts and auxiliary material for building Linux and bare-metal LLVM-based toolchains, including:
+This repository contains build scripts and auxiliary material for building LLVM-based toolchains for embedded,
+including:
 
 - clang + llvm
-- eld linker
+- eld
 - lld
-- libc++abi
-- libc++
-- compiler-rt for Linux Arm/AArch64
-- compiler-rt for bare-metal Arm/AArch64
+- compiler-rt
+- picolibc
+- musl
 - musl-embedded
+- libc++/libunwind/libc++abi
+
+For Arm and AArch64 embedded environments, picolibc or musl-embedded may be used as the libc.
+For RISC-V, only picolibc may be used.
+
+Libraries intended for use in Linux environments may also be built as part of CPULLVM, though these
+are primarily intended for testing and validation. For Arm and AArch64, musl-embedded is used
+as the libc for Linux. For RISC-V, musl is used.
 
 ## Targets Built
-- Arm
-- AArch64
+CPULLVM supports generating code for Arm, AArch64, RISC-V, and x86 targets only. It does **not** generate code for other targets supported by the upstream LLVM compiler.
 
 ## Enabled Projects
 - llvm
 - clang
 - polly
 - lld
-- mlir
 - eld
 
-## Goal
-The CPULLVM Compiler generates code for Arm and AArch64 targets only. It does **not** generate code for other targets supported by the upstream LLVM compiler.
-
 ## Components
-The CPULLVM toolchain for Embedded relies on the following upstream components:
+CPULLVM relies on the following upstream components:
 
-- [CPULLVM](https://github.com/qualcomm/cpullvm-toolchain)
+- [LLVM](https://github.com/llvm/llvm-project)
+- [picolibc](https://github.com/picolibc/picolibc)
+- [musl](https://musl.libc.org/)
 - [musl-embedded](https://github.com/qualcomm/musl-embedded)
-- [eld linker](https://github.com/qualcomm/eld)
+- [eld](https://github.com/qualcomm/eld)
 
 ## Host Platforms
-CPULLVM Toolchain for Embedded is built and tested on
-- Linux Ubuntu 22.04 LTS
+CPULLVM is built and tested on
+- Linux Ubuntu 22.04 LTS on x86_64 and AArch64
+- Windows Server 2025 on x86_64
+- Windows 11 Desktop on Arm64
 
 ## Getting started
 
@@ -67,17 +74,6 @@ CPULLVM Toolchain for Embedded is built and tested on
    
     sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100
     sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
-
-   #### Install libc++ and libc++abi
-   These provide C++ standard library support for Clang.
-      
-    sudo apt-get install libc++-19-dev libc++abi-19-dev
-
-   #### Install cross-compilers for Arm/AArch64
-   Required for building Arm and AArch64 targets.
-      
-    sudo apt-get install gcc-arm-linux-gnueabi
-    sudo apt-get install gcc-aarch64-linux-gnu
 
 ### Steps to build the CPULLVM compiler toolchain
 
