@@ -36,11 +36,6 @@
             "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft -fno-exceptions"
         },
         {
-            "variant": "armv8_soft_neon",
-            "json": "armv8_soft_neon.json",
-            "flags": "--target=thumbv8-unknown-none-eabi -mfpu=neon-fp-armv8 -fno-exceptions"
-        },
-        {
             "variant": "armv7a_soft_neon",
             "json": "armv7a_soft_neon.json",
             "flags": "--target=thumbv7-unknown-none-eabi -mfpu=neon -fno-exceptions"
@@ -49,11 +44,6 @@
             "variant": "armv7a_soft_nofp",
             "json": "armv7a_soft_nofp.json",
             "flags": "--target=thumbv7-unknown-none-eabi -march=armvX+nofp -march=armvX+nosimd -fno-exceptions"
-        },
-        {
-            "variant": "armv7m_soft_nofp",
-            "json": "armv7m_soft_nofp.json",
-            "flags": "--target=thumbv7m-unknown-none-eabi -mfpu=none -fno-exceptions"
         },
         {
             "variant": "riscv32imac_ilp32",
