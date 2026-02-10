@@ -463,7 +463,11 @@ add_dependencies(
 # Set LLVM_DEFAULT_EXTERNAL_LIT to the directory of clang
 # which was build in previous step. This path is not exported
 # by add_subdirectory of llvm project
-set(LLVM_DEFAULT_EXTERNAL_LIT "${LLVM_BINARY_DIR}/bin/llvm-lit")
+set(lit_file_name "llvm-lit")
+if (CMAKE_HOST_WIN32)
+  set(lit_file_name "${lit_file_name}.py")
+endif ()
+set(LLVM_DEFAULT_EXTERNAL_LIT "${LLVM_BINARY_DIR}/bin/${lit_file_name}")
 
 add_custom_target(check-llvm-toolchain-runtimes)
 add_custom_target(check-${LLVM_TOOLCHAIN_C_LIBRARY})
