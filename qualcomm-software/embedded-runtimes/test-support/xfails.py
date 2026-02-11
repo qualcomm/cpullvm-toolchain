@@ -118,6 +118,19 @@ def main():
             project="clang",
             description="If the installed default multilib does not have a library available for -mcpu=cortex-r52, this test will fail.",
         ),
+        XFail(
+            name="picolibc_rv64gc",
+            testnames=[
+                "math_errhandling.test",
+                "test-fma.test",
+            ],
+            result=NewResult.XFAILED,
+            project="picolibc",
+            variants=[
+                "riscv64gc_lp64d_nopic",
+            ],
+            description="Disable the tests for now while the issue is being fixed upstream (https://github.com/picolibc/picolibc/pull/1072).",
+        ),
     ]
 
     tests_to_xfail = []

@@ -54,6 +54,12 @@
             "json": "riscv64imac_lp64_nopic.json",
             "flags": "--target=riscv64-unknown-unknown-elf -march=rv64imac -mabi=lp64 -fno-pic -fno-exceptions",
             "libraries_supported": "picolibc"
+        },
+        {
+            "variant": "riscv64gc_lp64d_nopic",
+            "json": "riscv64gc_lp64d_nopic.json",
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc -mabi=lp64d -fno-pic -fno-exceptions",
+            "libraries_supported": "picolibc"
         }
     ]
 }
