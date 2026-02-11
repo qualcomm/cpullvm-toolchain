@@ -43,7 +43,7 @@
         {
             "variant": "armv7a_soft_nofp",
             "json": "armv7a_soft_nofp.json",
-            "flags": "--target=thumbv7-unknown-none-eabi -march=armvX+nofp -march=armvX+nosimd -fno-exceptions"
+            "flags": "--target=thumbv7-unknown-none-eabi -mfpu=none -fno-exceptions"
         },
         {
             "variant": "riscv32imac_ilp32",

@@ -3,7 +3,7 @@
         "common": {
             "TARGET_ARCH": "armv7a",
             "VARIANT": "armv7a_soft_nofp",
-            "COMPILE_FLAGS": "-mfloat-abi=softfp -march=armv7a -mthumb -mhwdiv=none -fPIC",
+            "COMPILE_FLAGS": "-mfloat-abi=softfp -march=armv7a -mthumb -mfpu=none -mhwdiv=none -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "ON",
             "TEST_EXECUTOR": "qemu",
