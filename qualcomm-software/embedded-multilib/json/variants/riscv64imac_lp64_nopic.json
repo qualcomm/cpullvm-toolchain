@@ -2,7 +2,7 @@
     "args": {
         "common": {
             "TARGET_ARCH": "riscv64",
-            "VARIANT": "riscv64imac_lp64",
+            "VARIANT": "riscv64imac_lp64_nopic",
             "COMPILE_FLAGS": "-march=rv64imac -mabi=lp64 -mcmodel=medany",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "ON",
