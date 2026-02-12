@@ -3,7 +3,7 @@
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set -euo pipefail
+set -euxo pipefail
 
 usage() {
   cat <<'EOF'
@@ -358,6 +358,12 @@ for VARIANT in "${VARIANTS[@]}"; do
     EXTRA_CRT_CONFIGS="-DCOMPILER_RT_BUILD_SANITIZERS=OFF \
                        -DCOMPILER_RT_BUILD_CTX_PROFILE=OFF \
                        -DCOMPILER_RT_BUILD_MEMPROF=OFF"
+  fi
+
+  # For AArch64, make sure asan/hwasan are compatible with VA smaller than
+  # 48 bits.
+  if [[ "${VARIANT_ARCH}" =~ aarch64 ]]; then
+    EXTRA_CRT_CONFIGS="-DSANITIZER_AARCH64_39BIT_VA=ON"
   fi
 
   # FIXME: Disable fuzzers as well to work around (seemingly) an upstream bug.
