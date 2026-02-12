@@ -6,6 +6,21 @@
             "flags": "--target=aarch64-unknown-none-elf -fno-exceptions"
         },
         {
+            "variant": "aarch64a_pacret",
+            "json": "aarch64a_pacret.json",
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.3-a -mbranch-protection=pac-ret+leaf -fno-exceptions"
+        },
+        {
+            "variant": "aarch64a_pacret_bti",
+            "json": "aarch64a_pacret_bti.json",
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+bti -fno-exceptions"
+        },
+        {
+            "variant": "aarch64a_pacret_bkey_bti",
+            "json": "aarch64a_pacret_bkey_bti.json",
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti -fno-exceptions"
+        },
+        {
             "variant": "aarch64a_soft_nofp",
             "json": "aarch64a_soft_nofp.json",
             "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft -fno-exceptions"
@@ -16,14 +31,19 @@
             "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fno-exceptions"
         },
         {
-            "variant": "aarch64a_pacret_bkey_bti",
-            "json": "aarch64a_pacret_bkey_bti.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti -fno-exceptions"
+            "variant": "aarch64a_soft_nofp_pacret_bkey_bti",
+            "json": "aarch64a_soft_nofp_pacret_bkey_bti.json",
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft -fno-exceptions"
         },
         {
             "variant": "armv7a_soft_neon",
             "json": "armv7a_soft_neon.json",
             "flags": "--target=thumbv7-unknown-none-eabi -mfpu=neon -fno-exceptions"
+        },
+        {
+            "variant": "armv7a_soft_nofp",
+            "json": "armv7a_soft_nofp.json",
+            "flags": "--target=thumbv7-unknown-none-eabi -mfpu=none -fno-exceptions"
         },
         {
             "variant": "riscv32imac_ilp32",

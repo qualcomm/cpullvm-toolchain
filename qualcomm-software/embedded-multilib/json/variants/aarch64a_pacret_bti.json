@@ -2,8 +2,8 @@
     "args": {
         "common": {
             "TARGET_ARCH": "aarch64a",
-            "VARIANT": "aarch64a_pacret_bkey_bti",
-            "COMPILE_FLAGS": "-march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -fPIC",
+            "VARIANT": "aarch64a_pacret_bti",
+            "COMPILE_FLAGS": "-march=armv8.5a -mbranch-protection=pac-ret+leaf+bti -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "ON",
             "TEST_EXECUTOR": "qemu",
@@ -16,13 +16,13 @@
             "LIBRARY_BUILD_TYPE": "minsizerelease"
         },
         "picolibc": {
-            "ENABLE_CXX_LIBS": "ON",
+            "ENABLE_CXX_LIBS": "OFF",
             "ENABLE_LIBC_TESTS": "OFF",
             "ENABLE_COMPILER_RT_TESTS": "OFF",
             "ENABLE_LIBCXX_TESTS": "OFF"
         },
         "musl-embedded": {
-            "ENABLE_CXX_LIBS": "ON",
+            "ENABLE_CXX_LIBS": "OFF",
             "ENABLE_LIBC_TESTS": "OFF",
             "ENABLE_COMPILER_RT_TESTS": "OFF",
             "ENABLE_LIBCXX_TESTS": "OFF",
