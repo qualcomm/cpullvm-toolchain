@@ -126,6 +126,10 @@ VARIANTS=(
 # We place things into folders based on the target here (which maybe isn't
 # ideal) so prefer the mostly-normalized form that clang seems to search for
 # builtins, default libs, etc.
+#
+# Note also that we're using `*-linux-gnu` triples intentionally, despite
+# building musl-based sysroots. This should be revisited, but this is left
+# as-is in keeping with how we used to build.
 declare -A VARIANT_BUILD_FLAGS
 VARIANT_BUILD_FLAGS["rv32imac_ilp32"]="--target=riscv32-unknown-linux-gnu -march=rv32imac -mabi=ilp32"
 VARIANT_BUILD_FLAGS["rv32imafc_ilp32f"]="--target=riscv32-unknown-linux-gnu -march=rv32imafc -mabi=ilp32f"
@@ -424,19 +428,23 @@ done
 # This layout isn't ideal, but it is close to what we had in the
 # past. When we know what to do with the installed libc++ module files
 # and sanitizer binaries we can revisit this.
+#
+# Also, while we use `*-linux-gnu` triples to build, we want to install these
+# in `*-linux-musl` directories.
 echo "Copying libraries to their final locations"
 for VARIANT in "${VARIANTS[@]}"; do
   VARIANT_TMP_SYSROOT="${BASE_BUILD_DIR}/${VARIANT}/sysroot"
   VARIANT_TARGET="$(get_target_from_flags ${VARIANT_BUILD_FLAGS[$VARIANT]})"
-  mkdir -p "${BASE_INSTALL_DIR}/${VARIANT_TARGET}/${VARIANT}"
+  VARIANT_TARGET_MUSL=$(echo ${VARIANT_TARGET} | sed "s/gnu/musl/")
+  mkdir -p "${BASE_INSTALL_DIR}/${VARIANT_TARGET_MUSL}/${VARIANT}"
   cp -r "${VARIANT_TMP_SYSROOT}"/include \
         "${VARIANT_TMP_SYSROOT}"/lib \
-        -t "${BASE_INSTALL_DIR}/${VARIANT_TARGET}/${VARIANT}"
+        -t "${BASE_INSTALL_DIR}/${VARIANT_TARGET_MUSL}/${VARIANT}"
 
   mv "${VARIANT_TMP_SYSROOT}/resource-dir/lib/${VARIANT_TARGET}" \
      "${VARIANT_TMP_SYSROOT}/resource-dir/lib/temp"
-  mkdir -p "${VARIANT_TMP_SYSROOT}/resource-dir/lib/${VARIANT_TARGET}"
+  mkdir -p "${VARIANT_TMP_SYSROOT}/resource-dir/lib/${VARIANT_TARGET_MUSL}"
   mv "${VARIANT_TMP_SYSROOT}/resource-dir/lib/temp" \
-     "${VARIANT_TMP_SYSROOT}/resource-dir/lib/${VARIANT_TARGET}/${VARIANT}"
+     "${VARIANT_TMP_SYSROOT}/resource-dir/lib/${VARIANT_TARGET_MUSL}/${VARIANT}"
   cp -r "${VARIANT_TMP_SYSROOT}/resource-dir" "${BASE_INSTALL_DIR}"
 done
