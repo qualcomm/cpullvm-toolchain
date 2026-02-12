@@ -128,6 +128,9 @@ def main():
             project="picolibc",
             variants=[
                 "riscv64gc_lp64d_nopic",
+                "riscv64gc_zba_zbb_lp64d_nopic",
+                "riscv64gc_lp64_nopic",
+                "riscv64gc_zba_zbb_lp64_nopic"
             ],
             description="Disable the tests for now while the issue is being fixed upstream (https://github.com/picolibc/picolibc/pull/1072).",
         ),
