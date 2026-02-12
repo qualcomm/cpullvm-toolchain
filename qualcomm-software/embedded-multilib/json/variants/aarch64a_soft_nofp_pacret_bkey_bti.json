@@ -2,8 +2,8 @@
     "args": {
         "common": {
             "TARGET_ARCH": "aarch64a",
-            "VARIANT": "aarch64a_pacret_bkey_bti",
-            "COMPILE_FLAGS": "-march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -fPIC",
+            "VARIANT": "aarch64a_soft_nofp_pacret_bkey_bti",
+            "COMPILE_FLAGS": "-march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "ON",
             "TEST_EXECUTOR": "qemu",
@@ -16,16 +16,17 @@
             "LIBRARY_BUILD_TYPE": "minsizerelease"
         },
         "picolibc": {
-            "ENABLE_CXX_LIBS": "ON",
+            "ENABLE_CXX_LIBS": "OFF",
             "ENABLE_LIBC_TESTS": "OFF",
             "ENABLE_COMPILER_RT_TESTS": "OFF",
             "ENABLE_LIBCXX_TESTS": "OFF"
         },
         "musl-embedded": {
-            "ENABLE_CXX_LIBS": "ON",
+            "ENABLE_CXX_LIBS": "OFF",
             "ENABLE_LIBC_TESTS": "OFF",
             "ENABLE_COMPILER_RT_TESTS": "OFF",
             "ENABLE_LIBCXX_TESTS": "OFF",
+            "EXTRA_MUSL-EMBEDDED_CONFIG_FLAGS": "--quic-aarch64-nofp",
             "EXTRA_MUSL-EMBEDDED_CFLAGS": "-mstrict-align"
         }
     }
