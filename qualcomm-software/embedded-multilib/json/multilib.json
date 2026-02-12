@@ -91,6 +91,24 @@
             "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zcb_zcmp_zba_zbb -mabi=ilp32 -fno-pic",
             "libraries_supported": "picolibc"
         },
+	{
+            "variant": "riscv32imafc_ilp32f",
+            "json": "riscv32imafc_ilp32f.json",
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imafc -mabi=ilp32f",
+            "libraries_supported": "picolibc"
+        },
+        {
+            "variant": "riscv32imafc_zba_zbb_ilp32f",
+            "json": "riscv32imafc_zba_zbb_ilp32f.json",
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imafc_zba_zbb -mabi=ilp32f",
+            "libraries_supported": "picolibc"
+        },
+        {
+            "variant": "riscv32imafc_zcb_zcmp_zba_zbb_ilp32f",
+            "json": "riscv32imafc_zcb_zcmp_zba_zbb_ilp32f.json",
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imafc_zcb_zcmp_zba_zbb -mabi=ilp32f",
+            "libraries_supported": "picolibc"
+        },
         {
             "variant": "riscv64imac_lp64_nopic",
             "json": "riscv64imac_lp64_nopic.json",

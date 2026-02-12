@@ -134,6 +134,22 @@ def main():
             ],
             description="Disable the tests for now while the issue is being fixed upstream (https://github.com/picolibc/picolibc/pull/1072).",
         ),
+        XFail(
+            name="picolibc_rv32imafc",
+            testnames=[
+                "math_errhandling.test",
+                "rounding-mode.test",
+                "test-fma.test",
+            ],
+            result=NewResult.XFAILED,
+            project="picolibc",
+            variants=[
+                "riscv32imafc_ilp32f",
+                "riscv32imafc_zba_zbb_ilp32f",
+                "riscv32imafc_zcb_zcmp_zba_zbb_ilp32f"
+            ],
+            description="Disable the tests for now while the issue is being fixed upstream (https://github.com/picolibc/picolibc/pull/1072).",
+        ),
     ]
 
     tests_to_xfail = []
