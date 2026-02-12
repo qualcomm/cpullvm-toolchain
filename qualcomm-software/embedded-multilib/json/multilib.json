@@ -3,100 +3,100 @@
         {
             "variant": "aarch64a",
             "json": "aarch64a.json",
-            "flags": "--target=aarch64-unknown-none-elf -fno-exceptions"
+            "flags": "--target=aarch64-unknown-none-elf"
         },
         {
             "variant": "aarch64a_pacret",
             "json": "aarch64a_pacret.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.3-a -mbranch-protection=pac-ret+leaf -fno-exceptions"
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.3-a -mbranch-protection=pac-ret+leaf"
         },
         {
             "variant": "aarch64a_pacret_bti",
             "json": "aarch64a_pacret_bti.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+bti -fno-exceptions"
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+bti"
         },
         {
             "variant": "aarch64a_pacret_bkey_bti",
             "json": "aarch64a_pacret_bkey_bti.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti -fno-exceptions"
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti"
         },
         {
             "variant": "aarch64a_soft_nofp",
             "json": "aarch64a_soft_nofp.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft -fno-exceptions"
+            "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft"
         },
         {
             "variant": "aarch64a_soft_nofp_pacret_bti",
             "json": "aarch64a_soft_nofp_pacret_bti.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fno-exceptions"
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft"
         },
         {
             "variant": "aarch64a_soft_nofp_pacret_bkey_bti",
             "json": "aarch64a_soft_nofp_pacret_bkey_bti.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft -fno-exceptions"
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft"
         },
         {
             "variant": "armv7a_soft_neon",
             "json": "armv7a_soft_neon.json",
-            "flags": "--target=thumbv7-unknown-none-eabi -mfpu=neon -fno-exceptions"
+            "flags": "--target=thumbv7-unknown-none-eabi -mfpu=neon"
         },
         {
             "variant": "armv7a_soft_nofp",
             "json": "armv7a_soft_nofp.json",
-            "flags": "--target=thumbv7-unknown-none-eabi -mfpu=none -fno-exceptions"
+            "flags": "--target=thumbv7-unknown-none-eabi -mfpu=none"
         },
         {
             "variant": "riscv32imac_ilp32",
             "json": "riscv32imac_ilp32.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32 -fno-exceptions",
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32",
             "libraries_supported": "picolibc"
         },
         {
             "variant": "riscv32imac_ilp32_nopic",
             "json": "riscv32imac_ilp32_nopic.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32 -fno-pic -fno-exceptions",
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32 -fno-pic",
             "libraries_supported": "picolibc"
         },
         {
             "variant": "riscv32imac_zba_zbb_ilp32",
             "json": "riscv32imac_zba_zbb_ilp32.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zba_zbb -mabi=ilp32 -fno-exceptions",
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zba_zbb -mabi=ilp32",
             "libraries_supported": "picolibc"
         },
         {
             "variant": "riscv32imac_zba_zbb_ilp32_nopic",
             "json": "riscv32imac_zba_zbb_ilp32_nopic.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zba_zbb -mabi=ilp32 -fno-pic -fno-exceptions",
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zba_zbb -mabi=ilp32 -fno-pic",
             "libraries_supported": "picolibc"
         },
         {
             "variant": "riscv64imac_lp64_nopic",
             "json": "riscv64imac_lp64_nopic.json",
-            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64imac -mabi=lp64 -fno-pic -fno-exceptions",
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64imac -mabi=lp64 -fno-pic",
             "libraries_supported": "picolibc"
         },
         {
             "variant": "riscv64gc_lp64_nopic",
             "json": "riscv64gc_lp64_nopic.json",
-            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc -mabi=lp64 -fno-pic -fno-exceptions",
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc -mabi=lp64 -fno-pic",
             "libraries_supported": "picolibc"
         },
         {
             "variant": "riscv64gc_zba_zbb_lp64_nopic",
             "json": "riscv64gc_zba_zbb_lp64_nopic.json",
-            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc_zba_zbb -mabi=lp64 -fno-pic -fno-exceptions",
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc_zba_zbb -mabi=lp64 -fno-pic",
             "libraries_supported": "picolibc"
         },
         {
             "variant": "riscv64gc_lp64d_nopic",
             "json": "riscv64gc_lp64d_nopic.json",
-            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc -mabi=lp64d -fno-pic -fno-exceptions",
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc -mabi=lp64d -fno-pic",
             "libraries_supported": "picolibc"
         },
         {
             "variant": "riscv64gc_zba_zbb_lp64d_nopic",
             "json": "riscv64gc_zba_zbb_lp64d_nopic.json",
-            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc_zba_zbb -mabi=lp64d -fno-pic -fno-exceptions",
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc_zba_zbb -mabi=lp64d -fno-pic",
             "libraries_supported": "picolibc"
         }
     ]
