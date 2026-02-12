@@ -5,7 +5,7 @@
             "VARIANT": "armv7a_soft_nofp",
             "COMPILE_FLAGS": "-mfloat-abi=softfp -march=armv7a -mthumb -mfpu=none -mhwdiv=none -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
-            "ENABLE_RTTI": "ON",
+            "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",
             "QEMU_MACHINE": "none",
             "QEMU_CPU": "cortex-a7",
