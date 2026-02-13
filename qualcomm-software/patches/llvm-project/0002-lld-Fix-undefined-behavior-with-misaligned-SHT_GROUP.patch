@@ -1,0 +1,64 @@
+From b7e1922ca15935342f9570ddbb7b61c8164115d5 Mon Sep 17 00:00:00 2001
+From: Eli Friedman <efriedma@qti.qualcomm.com>
+Date: Thu, 12 Feb 2026 14:07:57 -0800
+Subject: [PATCH] [lld] Fix undefined behavior with misaligned SHT_GROUP
+ section. (#180848)
+
+read32() allows misaligned values, but a `uint32_t &` must be properly
+aligned even if it isn't directly read. ubsan detects this. To fix the
+issue, replace the `uint32_t &` with a value that doesn't require
+alignment.
+
+Also added an assertion to catch similar misuse of getDataAs().
+
+(Alternatively, we could make the input validation more strict, and
+reject files with a misaligned SHT_GROUP, but I don't see any obvious
+reason to require that.)
+---
+ lld/ELF/InputSection.h            | 1 +
+ lld/ELF/OutputSections.cpp        | 2 +-
+ lld/test/ELF/linkorder-group.test | 3 ++-
+ 3 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/lld/ELF/InputSection.h b/lld/ELF/InputSection.h
+index dc29fedbc5c5..30df85d7aa10 100644
+--- a/lld/ELF/InputSection.h
++++ b/lld/ELF/InputSection.h
+@@ -299,6 +299,7 @@ public:
+   template <typename T> llvm::ArrayRef<T> getDataAs() const {
+     size_t s = content().size();
+     assert(s % sizeof(T) == 0);
++    assert(reinterpret_cast<uintptr_t>(content().data()) % alignof(T) == 0);
+     return llvm::ArrayRef<T>((const T *)content().data(), s / sizeof(T));
+   }
+ 
+diff --git a/lld/ELF/OutputSections.cpp b/lld/ELF/OutputSections.cpp
+index 1522e608563a..278e9f56b1d1 100644
+--- a/lld/ELF/OutputSections.cpp
++++ b/lld/ELF/OutputSections.cpp
+@@ -625,7 +625,7 @@ static void finalizeShtGroup(Ctx &ctx, OutputSection *os,
+   // new size. The content will be rewritten in InputSection::copyShtGroup.
+   DenseSet<uint32_t> seen;
+   ArrayRef<InputSectionBase *> sections = section->file->getSections();
+-  for (const uint32_t &idx : section->getDataAs<uint32_t>().slice(1))
++  for (auto &idx : section->getDataAs<std::array<char, 4>>().slice(1))
+     if (OutputSection *osec = sections[read32(ctx, &idx)]->getOutputSection())
+       seen.insert(osec->sectionIndex);
+   os->size = (1 + seen.size()) * sizeof(uint32_t);
+diff --git a/lld/test/ELF/linkorder-group.test b/lld/test/ELF/linkorder-group.test
+index 0d25413868b3..536fe53fac73 100644
+--- a/lld/test/ELF/linkorder-group.test
++++ b/lld/test/ELF/linkorder-group.test
+@@ -31,7 +31,8 @@ Sections:
+     Type:            SHT_GROUP
+     Link:            .symtab
+     Info:            foo
+-    AddressAlign:    4
++## Intentionally misaligned to check that lld works with unaligned SHT_GROUP
++    AddressAlign:    1
+     Members:
+       - SectionOrType:   GRP_COMDAT
+       - SectionOrType:   .bss
+-- 
+2.34.1
+
