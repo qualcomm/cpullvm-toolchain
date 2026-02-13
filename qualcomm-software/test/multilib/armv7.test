@@ -1,7 +1,7 @@
-# RUN: %clang -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=softfp -mthumb -mfpu=neon -fno-exceptions | FileCheck %s --check-prefix=CHECK-ARMV7
+# RUN: %clang -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=softfp -mthumb -mfpu=neon | FileCheck %s --check-prefix=CHECK-ARMV7
 # CHECK-ARMV7: arm-none-eabi/armv7a_soft_neon{{$}}
 # CHECK-ARMV7-EMPTY:
 
-# RUN: %clang -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=softfp -mthumb -mfpu=none -mhwdiv=none -fno-exceptions | FileCheck %s --check-prefix=CHECK-ARMV7-NOFP
+# RUN: %clang -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=softfp -mthumb -mfpu=none -mhwdiv=none | FileCheck %s --check-prefix=CHECK-ARMV7-NOFP
 # CHECK-ARMV7-NOFP: arm-none-eabi/armv7a_soft_nofp{{$}}
 # CHECK-ARMV7-NOFP-EMPTY:
