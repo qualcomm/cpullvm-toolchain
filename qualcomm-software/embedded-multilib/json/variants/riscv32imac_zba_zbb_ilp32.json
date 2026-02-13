@@ -5,7 +5,7 @@
             "VARIANT": "riscv32imac_zba_zbb_ilp32",
             "COMPILE_FLAGS": "-march=rv32imac_zba_zbb -mabi=ilp32 -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
-            "ENABLE_RTTI": "ON",
+            "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",
             "QEMU_MACHINE": "virt",
             "QEMU_CPU": "rv32",
