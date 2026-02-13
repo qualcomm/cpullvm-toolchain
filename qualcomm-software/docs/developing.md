@@ -57,7 +57,10 @@ There's a few important things to note about the multilib selection flags (those
 #### Enabling additional extensions for RISC-V in QEMU
 Some of our variants enable extensions that are not enabled by default in QEMU. For now, these can be
 enabled by passing the appropriate extensions through the `QEMU_CPU` variable in the variant-specific
-JSON file (ex: `"QEMU_CPU": "rv32,i=true,m=true<extra extensions>"`).
+JSON file (ex: `"QEMU_CPU": "rv32,i=true,m=false<extra extensions>"`).
+
+Note that may also have to explicitly disable extensions which QEMU enables by default if it conflicts with
+what you're enabling.
 
 ### Adding new Linux variants
 
