@@ -41,10 +41,26 @@ To build additional embedded library variants, add the variant-specific JSON fil
 
 Corresponding multilib tests should be added in [test/multilib](../test/multilib/) as well.
 
+#### Specifying multilib and compile flags for variants
 Note that the flags listed the multilib.json entry are used differently than those in the variant-specific JSON
-file. Those in the multilib.json entry are used for multilib selection *only* (and may not be valid compiler flags,
-as in the case of the `armvX` flags). The flags listed in the variant-specific JSON file are used when actually
-building the runtimes.
+file. Those in the multilib.json entry are used for multilib selection *only*--the flags listed in the
+variant-specific JSON file are used when actually building the runtimes.
+
+There's a few important things to note about the multilib selection flags (those in multilib.json):
+* The flags don't necessarily need to be valid compiler flags. One notable example of this is the `armvX`
+  feature flags used in some AArch64 variants. These should be the exception though.
+* Multilib flag matching generally happens on the normalized user input. So, normalized forms of triples
+  (`aarch64-unknown-none-elf` instead of `aarch64-none-elf`) and arch strings (`armv8.5-a` instead of
+  `armv8.5a`) should be used. The notable exception here is RISC-V arch strings--our CMake normalizes
+  the input `-march` strings automatically so non-normalized forms may be used.
+
+#### Enabling additional extensions for RISC-V in QEMU
+Some of our variants enable extensions that are not enabled by default in QEMU. For now, these can be
+enabled by passing the appropriate extensions through the `QEMU_CPU` variable in the variant-specific
+JSON file (ex: `"QEMU_CPU": "rv32,i=true,m=false<extra extensions>"`).
+
+Note that you may also have to disable extensions which QEMU enables by default if it conflicts with
+what you're enabling.
 
 ### Adding new Linux variants
 
