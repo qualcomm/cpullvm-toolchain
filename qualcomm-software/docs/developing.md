@@ -59,7 +59,7 @@ Some of our variants enable extensions that are not enabled by default in QEMU. 
 enabled by passing the appropriate extensions through the `QEMU_CPU` variable in the variant-specific
 JSON file (ex: `"QEMU_CPU": "rv32,i=true,m=false<extra extensions>"`).
 
-Note that may also have to explicitly disable extensions which QEMU enables by default if it conflicts with
+Note that you may also have to disable extensions which QEMU enables by default if it conflicts with
 what you're enabling.
 
 ### Adding new Linux variants
