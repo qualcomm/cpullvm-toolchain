@@ -3,7 +3,7 @@
         "common": {
             "TARGET_ARCH": "riscv32",
             "VARIANT": "riscv32imac_ilp32",
-            "COMPILE_FLAGS": "-march=rv32imac -mabi=ilp32",
+            "COMPILE_FLAGS": "-march=rv32imac -mabi=ilp32 -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",
