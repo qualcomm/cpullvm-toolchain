@@ -110,6 +110,12 @@
             "libraries_supported": "picolibc"
         },
         {
+            "variant": "rv32ima_xqci_ilp32_nopic",
+            "json": "rv32ima_xqci_ilp32_nopic.json",
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32ima_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp -mabi=ilp32 -fno-pic",
+            "libraries_supported": "picolibc"
+        },
+        {
             "variant": "riscv64imac_lp64_nopic",
             "json": "riscv64imac_lp64_nopic.json",
             "flags": "--target=riscv64-unknown-unknown-elf -march=rv64imac -mabi=lp64 -fno-pic",
