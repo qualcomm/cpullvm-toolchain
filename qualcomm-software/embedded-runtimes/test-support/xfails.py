@@ -155,7 +155,7 @@ def main():
             testnames=[
                 "test-except.test",
             ],
-            result=NewResult.EXCLUDE,
+            result=NewResult.XFAILED,
             project="picolibc",
             variants=[
                 "riscv32ima_xqci_ilp32_nopic"
