@@ -43,6 +43,10 @@
 # CHECK-IMA-XQCI-ILP32-NO-PIC: riscv32-unknown-elf/riscv32ima_xqci_ilp32{{$}}
 # CHECK-IMA-XQCI-ILP32-NO-PIC-EMPTY:
 
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqci_xqccmp -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=CHECK-IMA-XQCI-ILP32-NO-PIC
+# CHECK-IMA-XQCI-ILP32-NO-PIC: riscv32-unknown-elf/riscv32ima_xqci_ilp32{{$}}
+# CHECK-IMA-XQCI-ILP32-NO-PIC-EMPTY:
+
 # RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imafdzca_zcf -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # NOT-FOUND: warning: no multilib found matching flags
