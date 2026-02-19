@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #
 # Changes from Qualcomm Technologies, Inc. are provided under the following license:
-# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. 
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # A Powershell script to build the toolchain
@@ -23,11 +23,12 @@ $buildDir = (Join-Path $repoRoot build)
 mkdir $buildDir
 cd $buildDir
 
-# Omit Linux runtimes, QEMU testing on Windows builds.
+# Omit target runtimes on Windows builds.
 cmake ..\qualcomm-software `
   -GNinja `
   -DFETCHCONTENT_QUIET=OFF `
-  -DENABLE_QEMU_TESTING=OFF `
+  -DLLVM_TOOLCHAIN_DISTRIBUTION_COMPONENTS="llvm-toolchain-docs;llvm-toolchain-third-party-licenses" `
+  -DPREBUILT_TARGET_LIBRARIES=ON `
   -DCMAKE_C_COMPILER=clang-cl `
   -DCMAKE_CXX_COMPILER=clang-cl
 

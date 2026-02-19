@@ -22,4 +22,4 @@ $buildDir = (Join-Path $repoRoot build)
 
 cd $buildDir
 
-ninja check-all
+ninja check-all-llvm-toolchain
