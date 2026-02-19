@@ -100,8 +100,8 @@ def main():
         XFail(
             name="no frwpi",
             testnames=[
-                "Driver/ropi-rwpi.c",
-                "Preprocessor/arm-pic-predefines.c",
+                "Clang :: Driver/ropi-rwpi.c",
+                "Clang :: Preprocessor/arm-pic-predefines.c",
             ],
             result=NewResult.XFAILED,
             conditional=check_frwpi_error,
@@ -111,7 +111,7 @@ def main():
         XFail(
             name="no r52",
             testnames=[
-                "Driver/arm-fpu-selection.s",
+                "Clang :: Driver/arm-fpu-selection.s",
             ],
             result=NewResult.XFAILED,
             conditional=check_r52_warning,
