@@ -21,6 +21,7 @@ name: Nightly Build and Test
 
 on:
   workflow_dispatch:
+  pull_request: # FIXME: testing only
 
 permissions:
   contents: read
@@ -135,4 +136,5 @@ jobs:
           path: |
             build*/cpullvm-*.tar.xz
             build*/cpullvm-*.zip
+            !build/cpullvm-*-Linux-x86_64.tar.gz
           retention-days: 7
