@@ -4,7 +4,7 @@
 # /cherry-pick <commit> <...>
 #
 # This comment will attempt to cherry-pick the given commits to the latest
-# release branch (release/Y.x) and if successful, push the result to a branch
+# release branch (release/qualcomm-software/Y.x) and if successful, push the result to a branch
 # on github.
 #
 # /branch <owner>/<repo>/<branch>
@@ -33,19 +33,18 @@ jobs:
   backport-commits:
     name: Backport Commits
     runs-on: ubuntu-24.04
-    environment: main-branch-only
     permissions:
       issues: write
       pull-requests: write
     if: >-
-      (github.repository == 'llvm/llvm-project') &&
+      (github.repository == 'qualcomm/cpullvm-toolchain') &&
       !startswith(github.event.comment.body, '<!--IGNORE-->') &&
       contains(github.event.action == 'opened' && github.event.issue.body || github.event.comment.body, '/cherry-pick')
     steps:
-      - name: Fetch LLVM sources
+      - name: Fetch cpullvm sources
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
-          repository: llvm/llvm-project
+          repository: qualcomm/cpullvm-toolchain
           # GitHub stores the token used for checkout and uses it for pushes
           # too, but we want to use a different token for pushing, so we need
           # to disable persist-credentials here.
