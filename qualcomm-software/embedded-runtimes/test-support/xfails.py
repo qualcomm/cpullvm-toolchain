@@ -153,7 +153,7 @@ def main():
         XFail(
             name="picolibc_rv32ima_xqci",
             testnames=[
-                "test-except"
+                "test-except.test"
             ],
             result=NewResult.EXCLUDE,
             project="picolibc",
