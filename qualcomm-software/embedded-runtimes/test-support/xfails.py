@@ -150,6 +150,18 @@ def main():
             ],
             description="Disable the tests for now while the issue is being fixed upstream (https://github.com/picolibc/picolibc/pull/1072).",
         ),
+        XFail(
+            name="picolibc_rv32ima_xqci",
+            testnames=[
+                "test-except.test"
+            ],
+            result=NewResult.EXCLUDE,
+            project="picolibc",
+            variants=[
+                "riscv32ima_xqci_ilp32_nopic"
+            ],
+            description="This test times out for some reason and we will most probably need a fix in QEMU. Disable until we have one.",
+        ),
     ]
 
     tests_to_xfail = []
