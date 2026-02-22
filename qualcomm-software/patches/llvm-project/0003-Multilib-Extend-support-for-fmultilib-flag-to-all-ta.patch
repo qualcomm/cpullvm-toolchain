@@ -1,0 +1,61 @@
+From 6c18d648ac2f578998f8dda664ffde9cc1667c0c Mon Sep 17 00:00:00 2001
+From: Pengxuan Zheng <pzheng@qti.qualcomm.com>
+Date: Wed, 18 Feb 2026 21:11:43 -0800
+Subject: [PATCH] [Multilib] Extend support for -fmultilib-flag to all targets
+
+Support for the `-fmultilib-flag` option has been added to AArch64/ARM. This
+patch extends the support of the flag to all targets.
+---
+ clang/lib/Driver/ToolChain.cpp                  | 6 ++----
+ clang/test/Driver/print-multi-selection-flags.c | 2 ++
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/clang/lib/Driver/ToolChain.cpp b/clang/lib/Driver/ToolChain.cpp
+index 0eee7f917d2b..71b1ece1880b 100644
+--- a/clang/lib/Driver/ToolChain.cpp
++++ b/clang/lib/Driver/ToolChain.cpp
+@@ -229,8 +229,6 @@ static void getAArch64MultilibFlags(const Driver &D,
+       break;
+     }
+   }
+-
+-  processMultilibCustomFlags(Result, Args);
+ }
+ 
+ static void getARMMultilibFlags(const Driver &D, const llvm::Triple &Triple,
+@@ -319,8 +317,6 @@ static void getARMMultilibFlags(const Driver &D, const llvm::Triple &Triple,
+       break;
+     }
+   }
+-
+-  processMultilibCustomFlags(Result, Args);
+ }
+ 
+ static void getRISCVMultilibFlags(const Driver &D, const llvm::Triple &Triple,
+@@ -378,6 +374,8 @@ ToolChain::getMultilibFlags(const llvm::opt::ArgList &Args) const {
+     break;
+   }
+ 
++  processMultilibCustomFlags(Result, Args);
++
+   // Include fno-exceptions and fno-rtti
+   // to improve multilib selection
+   if (getRTTIMode() == ToolChain::RTTIMode::RM_Disabled)
+diff --git a/clang/test/Driver/print-multi-selection-flags.c b/clang/test/Driver/print-multi-selection-flags.c
+index b1a0a29ec418..4a98e7c5e990 100644
+--- a/clang/test/Driver/print-multi-selection-flags.c
++++ b/clang/test/Driver/print-multi-selection-flags.c
+@@ -103,8 +103,10 @@
+ 
+ // RUN: %clang -multi-lib-config=%S/Inputs/multilib/multilib-custom-flags.yaml -print-multi-flags-experimental --target=armv8m.main-none-eabi -fmultilib-flag=foo -fmultilib-flag=bar | FileCheck --check-prefixes=CHECK-MULTILIB-CUSTOM-FLAG,CHECK-ARM-MULTILIB-CUSTOM-FLAG %s
+ // RUN: %clang -multi-lib-config=%S/Inputs/multilib/multilib-custom-flags.yaml -print-multi-flags-experimental --target=aarch64-none-eabi     -fmultilib-flag=foo -fmultilib-flag=bar | FileCheck --check-prefixes=CHECK-MULTILIB-CUSTOM-FLAG,CHECK-AARCH64-MULTILIB-CUSTOM-FLAG %s
++// RUN: %clang -multi-lib-config=%S/Inputs/multilib/multilib-custom-flags.yaml -print-multi-flags-experimental --target=riscv64-none-elf -fmultilib-flag=foo -fmultilib-flag=bar | FileCheck --check-prefixes=CHECK-MULTILIB-CUSTOM-FLAG,CHECK-RISCV-MULTILIB-CUSTOM-FLAG %s
+ // CHECK-ARM-MULTILIB-CUSTOM-FLAG:     --target=thumbv8m.main-unknown-none-eabi
+ // CHECK-AARCH64-MULTILIB-CUSTOM-FLAG: --target=aarch64-unknown-none-eabi
++// CHECK-RISCV-MULTILIB-CUSTOM-FLAG:   --target=riscv64-unknown-none-elf
+ // CHECK-MULTILIB-CUSTOM-FLAG-DAG:     -fmultilib-flag=foo
+ // CHECK-MULTILIB-CUSTOM-FLAG-DAG:     -fmultilib-flag=bar
+ 
+-- 
+2.34.1
+
