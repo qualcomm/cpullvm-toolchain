@@ -1,0 +1,68 @@
+From f973e4dd9b67f5d38a8b0a314d68d2e49da94039 Mon Sep 17 00:00:00 2001
+From: Pengxuan Zheng <pzheng@qti.qualcomm.com>
+Date: Fri, 20 Feb 2026 15:57:21 -0800
+Subject: [PATCH] [Multilib] Expose shadow call stack as multilib flags for
+ RISC-V
+
+This allows multilib selection based on shadow call stack for RISC-V.
+---
+ clang/lib/Driver/ToolChain.cpp                  | 11 +++++++++--
+ clang/test/Driver/print-multi-selection-flags.c |  6 ++++++
+ 2 files changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/clang/lib/Driver/ToolChain.cpp b/clang/lib/Driver/ToolChain.cpp
+index 77a2c73f0d44..a71bf906d3d2 100644
+--- a/clang/lib/Driver/ToolChain.cpp
++++ b/clang/lib/Driver/ToolChain.cpp
+@@ -325,7 +325,8 @@ static void getARMMultilibFlags(const Driver &D, const llvm::Triple &Triple,
+ 
+ static void getRISCVMultilibFlags(const Driver &D, const llvm::Triple &Triple,
+                                   const llvm::opt::ArgList &Args,
+-                                  Multilib::flags_list &Result) {
++                                  Multilib::flags_list &Result,
++                                  bool hasShadowCallStack) {
+   std::string Arch = riscv::getRISCVArch(Args, Triple);
+   // Canonicalize arch for easier matching
+   auto ISAInfo = llvm::RISCVISAInfo::parseArchString(
+@@ -334,6 +335,11 @@ static void getRISCVMultilibFlags(const Driver &D, const llvm::Triple &Triple,
+     Result.push_back("-march=" + (*ISAInfo)->toString());
+ 
+   Result.push_back(("-mabi=" + riscv::getRISCVABI(Args, Triple)).str());
++
++  if (hasShadowCallStack)
++    Result.push_back("-fsanitize=shadow-call-stack");
++  else
++    Result.push_back("-fno-sanitize=shadow-call-stack");
+ }
+ 
+ Multilib::flags_list
+@@ -370,7 +376,8 @@ ToolChain::getMultilibFlags(const llvm::opt::ArgList &Args) const {
+     break;
+   case llvm::Triple::riscv32:
+   case llvm::Triple::riscv64:
+-    getRISCVMultilibFlags(D, Triple, Args, Result);
++    getRISCVMultilibFlags(D, Triple, Args, Result,
++                          getSanitizerArgs(Args).hasShadowCallStack());
+     break;
+   default:
+     break;
+diff --git a/clang/test/Driver/print-multi-selection-flags.c b/clang/test/Driver/print-multi-selection-flags.c
+index b1a0a29ec418..eba00e3278f1 100644
+--- a/clang/test/Driver/print-multi-selection-flags.c
++++ b/clang/test/Driver/print-multi-selection-flags.c
+@@ -86,6 +86,12 @@
+ // RUN: %clang -multi-lib-config=%S/Inputs/multilib/empty.yaml -print-multi-flags-experimental --target=aarch64-none-elf -mbig-endian | FileCheck --check-prefix=CHECK-BIG-ENDIAN %s
+ // CHECK-BIG-ENDIAN: -mbig-endian
+ 
++// RUN: %clang -multi-lib-config=%S/Inputs/multilib/empty.yaml -print-multi-flags-experimental --target=riscv64-none-elf -fsanitize=shadow-call-stack | FileCheck --check-prefix=CHECK-SHADOW-CALL-STACK %s
++// RUN: %clang -multi-lib-config=%S/Inputs/multilib/empty.yaml -print-multi-flags-experimental --target=riscv64-none-elf -fno-sanitize=shadow-call-stack | FileCheck --check-prefix=CHECK-NO-SHADOW-CALL-STACK %s
++// RUN: %clang -multi-lib-config=%S/Inputs/multilib/empty.yaml -print-multi-flags-experimental --target=riscv64-none-elf | FileCheck --check-prefix=CHECK-NO-SHADOW-CALL-STACK %s
++// CHECK-SHADOW-CALL-STACK: -fsanitize=shadow-call-stack
++// CHECK-NO-SHADOW-CALL-STACK: -fno-sanitize=shadow-call-stack
++
+ // RUN: %clang -multi-lib-config=%S/Inputs/multilib/empty.yaml -print-multi-flags-experimental --target=riscv32-none-elf -march=rv32g | FileCheck --check-prefix=CHECK-RV32 %s
+ // CHECK-RV32: --target=riscv32-unknown-none-elf
+ // CHECK-RV32: -mabi=ilp32d
+-- 
+2.34.1
+
