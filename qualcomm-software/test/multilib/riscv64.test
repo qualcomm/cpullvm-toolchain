@@ -21,6 +21,14 @@
 # CHECK-GC-ZBA-ZBB-LP64-FNO-PIC: riscv64-unknown-elf/riscv64gc_zba_zbb_lp64_nopic{{$}}
 # CHECK-GC-ZBA-ZBB-LP64-FNO-PIC-EMPTY:
 
+# RUN: %clang -print-multi-directory --target=riscv64-unknown-elf -march=rv64imac -mabi=lp64 -fsanitize=shadow-call-stack -fno-pic | FileCheck %s --check-prefix=CHECK-IMAC-LP64-SCS-FNO-PIC
+# CHECK-IMAC-LP64-SCS-FNO-PIC: riscv64-unknown-elf/riscv64imac_lp64_scs_nopic{{$}}
+# CHECK-IMAC-LP64-SCS-FNO-PIC-EMPTY:
+
+# RUN: %clang -print-multi-directory --target=riscv64-unknown-elf -march=rv64gc -mabi=lp64 -fsanitize=shadow-call-stack -fno-pic | FileCheck %s --check-prefix=CHECK-GC-LP64-SCS-FNO-PIC
+# CHECK-GC-LP64-SCS-FNO-PIC: riscv64-unknown-elf/riscv64gc_lp64_scs_nopic{{$}}
+# CHECK-GC-LP64-SCS-FNO-PIC-EMPTY:
+
 # RUN: %clang -print-multi-directory --target=riscv64-unknown-elf -march=rv64imac -mabi=lp64 -fpic 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # RUN: %clang -print-multi-directory --target=riscv64-unknown-elf -march=rv64imc -mabi=lp64 -fno-pic 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # RUN: %clang -print-multi-directory --target=riscv64-unknown-elf -march=rv64imafdzca -mabi=lp64 -fno-pic  2>&1| FileCheck %s --check-prefix=NOT-FOUND
