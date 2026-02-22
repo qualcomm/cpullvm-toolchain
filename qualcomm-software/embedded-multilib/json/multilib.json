@@ -122,6 +122,12 @@
             "libraries_supported": "picolibc"
         },
         {
+            "variant": "riscv64imac_lp64_scs_nopic",
+            "json": "riscv64imac_lp64_scs_nopic.json",
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64imac -mabi=lp64 -fsanitize=shadow-call-stack -fno-pic",
+            "libraries_supported": "picolibc"
+        },
+        {
             "variant": "riscv64gc_lp64_nopic",
             "json": "riscv64gc_lp64_nopic.json",
             "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc -mabi=lp64 -fno-pic",
@@ -144,6 +150,12 @@
             "json": "riscv64gc_zba_zbb_lp64d_nopic.json",
             "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc_zba_zbb -mabi=lp64d -fno-pic",
             "libraries_supported": "picolibc"
-        }
+        },
+        {
+            "variant": "riscv64gc_lp64_scs_nopic",
+            "json": "riscv64gc_lp64_scs_nopic.json",
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc -mabi=lp64 -fsanitize=shadow-call-stack -fno-pic",
+            "libraries_supported": "picolibc"
+         }
     ]
 }
