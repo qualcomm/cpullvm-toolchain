@@ -41,3 +41,35 @@ Documentation
 If the issue is specific to the Qualcomm Toolchain build scripts, packaging, or documentation—or if you are unsure where the issue originates—please create an issue in our repository:
 [Qualcomm Toolchain Issue Tracker](github.com/qualcomm/cpullvm-toolchain/issues)
 
+# Branching Strategy
+In general, contributors should develop on branches based off of main and pull requests should be made against main.
+
+# Submitting a pull request
+
+1. Please read our code of conduct and license.
+
+2. Fork and clone the repository.
+git clone https://github.com/<username>/<REPLACE-ME>.git
+
+3. Create a new branch based on main:
+git checkout -b <my-branch-name> main
+
+4. Create an upstream remote to make it easier to keep your branches up-to-date:
+git remote add upstream https://github.com/qualcomm/<REPLACE-ME>.git
+
+5. Make your changes, add tests, and make sure the tests still pass.
+
+6. Commit your changes using the DCO. You can attest to the DCO by commiting with the -s or --signoff options or manually adding the "Signed-off-by":
+git commit -s -m "Really useful commit message"`
+
+7. After committing your changes on the topic branch, sync it with the upstream branch:
+git pull --rebase upstream main
+
+8. Push to your fork.
+git push -u origin <my-branch-name>
+
+The -u is shorthand for --set-upstream. This will set up the tracking reference so subsequent runs of git push or git pull can omit the remote and branch.
+
+9. Submit a pull request from your branch to main.
+
+10. Pat yourself on the back and wait for your pull request to be reviewed.
