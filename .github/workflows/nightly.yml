@@ -8,9 +8,12 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # This workflow runs our common build scripts in parallel for multiple operating
-# systems and architectures.
+# systems and architectures. All runtimes are built on Linux x86_64 and copied to
+# other build hosts.
+#
 # It is intended to be triggered as part of a **nightly build** to
 # validate our typical build configurations and test them automatically.
+#
 # Other build configurations such as building the runtimes on non-Linux
 # x86_64 platforms are built and tested separately.
 
@@ -23,24 +26,49 @@ permissions:
   contents: read
 
 jobs:
-  build-and-test:
+  build-and-test-Linux-x86:
     # Don't run on forks
     if: github.repository == 'qualcomm/cpullvm-toolchain'
+    name: build.sh on Linux-x86_64
+    runs-on: self-hosted
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          # We build in the repository and rely on clean to cleanup possible
+          # old build products if the runner doesn't do it itself.
+          clean: true
+
+      - name: Apply llvm-project patches
+        run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
+
+      - name: Build
+        run: ./qualcomm-software/scripts/build.sh
+
+      - name: Test
+        run: ./qualcomm-software/scripts/test.sh
+
+      - name: Upload built packages
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: cpullvm-packages-build.sh-Linux-x86
+          path: build*/cpullvm-*.tar.xz
+          if-no-files-found: error
+          retention-days: 7
+
+  build-and-test:
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: ${{ matrix.build_script }} on ${{ matrix.target_os }}
+    needs: build-and-test-Linux-x86
     runs-on: ${{ matrix.runner }}
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          - build_script: build.sh
+          - build_script: build_copy_runtimes.sh
             test_script: test.sh
-            install_script: ''
-            target_os: Linux-x86_64
-            runner: self-hosted
-
-          - build_script: build_no_runtimes.sh
-            test_script: test_no_runtimes.sh
             install_script: ''
             target_os: Linux-AArch64
             runner: ubuntu-22.04-arm
@@ -51,14 +79,14 @@ jobs:
             target_os: Linux-x86_64
             runner: self-hosted
 
-          - build_script: build_no_runtimes.ps1
-            test_script: test_no_runtimes.ps1
+          - build_script: build_copy_runtimes.ps1
+            test_script: test.ps1
             install_script: install_dependencies.ps1
             target_os: Windows-x86_64
             runner: windows-latest
 
-          - build_script: build_no_runtimes.ps1
-            test_script: test_no_runtimes.ps1
+          - build_script: build_copy_runtimes.ps1
+            test_script: test.ps1
             install_script: install_dependencies.ps1
             target_os: Windows-AArch64
             runner: windows-11-arm
@@ -79,6 +107,11 @@ jobs:
           # We build in the repository and rely on clean to cleanup possible
           # old build products if the runner doesn't do it itself.
           clean: true
+
+      - name: Download Linux-x86 package
+        uses: actions/download-artifact@v4
+        with:
+          name: cpullvm-packages-build.sh-Linux-x86
 
       - name: Install dependencies
         if: matrix.install_script != ''
@@ -102,4 +135,5 @@ jobs:
           path: |
             build*/cpullvm-*.tar.xz
             build*/cpullvm-*.zip
+            !build/cpullvm-*-Linux-x86_64.tar.xz
           retention-days: 7
