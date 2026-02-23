@@ -38,6 +38,14 @@ Groups:
 - Name: stdlibs
   Type: Exclusive
 
+# Custom flag declarations.
+Flags:
+- Name: threads
+  Values:
+  - Name: no-threads
+  - Name: threads
+  Default: threads
+
 # The list of library variants is substituted in by CMakeLists.txt, so
 # that it can respect the LLVM_TOOLCHAIN_LIBRARY_VARIANTS setting and
 # only include the set of libraries actually included in this build.

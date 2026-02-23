@@ -5,6 +5,14 @@
 # CHECK-IMAC-FNO-PIC: riscv64-unknown-elf/riscv64imac_lp64_nopic{{$}}
 # CHECK-IMAC-FNO-PIC-EMPTY:
 
+# RUN: %clang -print-multi-directory --target=riscv64-unknown-elf -march=rv64imc -mabi=lp64 -fmultilib-flag=no-threads -fno-pic | FileCheck %s --check-prefix=CHECK-IMC-LP64-NO-THREADS-FNO-PIC
+# CHECK-IMC-LP64-NO-THREADS-FNO-PIC: riscv64-unknown-elf/riscv64imc_lp64_nothreads_nopic{{$}}
+# CHECK-IMC-LP64-NO-THREADS-FNO-PIC-EMPTY:
+
+# RUN: %clang -print-multi-directory --target=riscv64-unknown-elf -march=rv64imc -mabi=lp64 -fsanitize=shadow-call-stack -fmultilib-flag=no-threads -fno-pic | FileCheck %s --check-prefix=CHECK-IMC-LP64-SCS-NO-THREADS-FNO-PIC
+# CHECK-IMC-LP64-SCS-NO-THREADS-FNO-PIC: riscv64-unknown-elf/riscv64imc_lp64_scs_nothreads_nopic{{$}}
+# CHECK-IMC-LP64-SCS-NO-THREADS-FNO-PIC-EMPTY:
+
 # RUN: %clang -print-multi-directory --target=riscv64-unknown-elf -march=rv64gc -mabi=lp64d -fno-pic | FileCheck %s --check-prefix=CHECK-GC-LP64D-FNO-PIC
 # CHECK-GC-LP64D-FNO-PIC: riscv64-unknown-elf/riscv64gc_lp64d_nopic{{$}}
 # CHECK-GC-LP64D-FNO-PIC-EMPTY:
