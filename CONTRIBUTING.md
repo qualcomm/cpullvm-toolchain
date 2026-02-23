@@ -89,3 +89,21 @@ In general, contributors should develop on branches based off of `qualcomm-softw
 
 9. [Submit a pull request](https://github.com/qualcomm/cpullvm-toolchain/pulls) from your branch to `qualcomm-software`.
 10. Pat yourself on the back and wait for your pull request to be reviewed.
+    
+## Security Analysis of Pull Requests
+
+To maintain the security and integrity of this project, all pull requests from external contributors are automatically scanned using [Semgrep](https://github.com/semgrep/semgrep) to detect insecure coding patterns and potential security flaws.
+
+**Static Analysis with Semgrep:**  We use Semgrep to perform lightweight, fast static analysis on every PR. This helps identify risky code patterns and logic flaws early in the development process.
+
+**Contributor Responsibility:** If any issues are flagged, contributors are expected to resolve them before the PR can be merged.
+
+**Continuous Improvement:** Our Semgrep ruleset evolves over time to reflect best practices and emerging security concerns.
+
+By submitting a PR, you agree to participate in this process and help us keep the project secure for everyone.
+
+Here are a few things you can do that will increase the likelihood of your pull request to be accepted:
+
+- Keep your change as focused as possible.
+  If you want to make multiple independent changes, please consider submitting them as separate pull requests.
+- Write a [good commit message](https://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
