@@ -44,32 +44,51 @@ If the issue is specific to the Qualcomm Toolchain build scripts, packaging, or 
 # Branching Strategy
 In general, contributors should develop on branches based off of main and pull requests should be made against main.
 
-# Submitting a pull request
+## Branching Strategy
 
-1. Please read our code of conduct and license.
+In general, contributors should develop on branches based off of `main` and pull requests should be made against `main`.
 
-2. Fork and clone the repository.
-git clone https://github.com/<username>/<REPLACE-ME>.git
+## Submitting a pull request
 
-3. Create a new branch based on main:
-git checkout -b <my-branch-name> main
+1. Please read our [code of conduct](CODE-OF-CONDUCT.md) and [license](LICENSE.txt).
+1. [Fork](https://github.com/qualcomm/<REPLACE-ME>/fork) and clone the repository.
 
-4. Create an upstream remote to make it easier to keep your branches up-to-date:
-git remote add upstream https://github.com/qualcomm/<REPLACE-ME>.git
+    ```bash
+    git clone https://github.com/<username>/<REPLACE-ME>.git
+    ```
 
-5. Make your changes, add tests, and make sure the tests still pass.
+1. Create a new branch based on `main`:
 
-6. Commit your changes using the DCO. You can attest to the DCO by commiting with the -s or --signoff options or manually adding the "Signed-off-by":
-git commit -s -m "Really useful commit message"`
+    ```bash
+    git checkout -b <my-branch-name> main
+    ```
 
-7. After committing your changes on the topic branch, sync it with the upstream branch:
-git pull --rebase upstream main
+1. Create an upstream `remote` to make it easier to keep your branches up-to-date:
 
-8. Push to your fork.
-git push -u origin <my-branch-name>
+    ```bash
+    git remote add upstream https://github.com/qualcomm/<REPLACE-ME>.git
+    ```
 
-The -u is shorthand for --set-upstream. This will set up the tracking reference so subsequent runs of git push or git pull can omit the remote and branch.
+1. Make your changes, add tests, and make sure the tests still pass.
+1. Commit your changes using the [DCO](https://developercertificate.org/). You can attest to the DCO by commiting with the **-s** or **--signoff** options or manually adding the "Signed-off-by":
 
-9. Submit a pull request from your branch to main.
+    ```bash
+    git commit -s -m "Really useful commit message"`
+    ```
 
-10. Pat yourself on the back and wait for your pull request to be reviewed.
+1. After committing your changes on the topic branch, sync it with the upstream branch:
+
+    ```bash
+    git pull --rebase upstream main
+    ```
+
+1. Push to your fork.
+
+    ```bash
+    git push -u origin <my-branch-name>
+    ```
+
+    The `-u` is shorthand for `--set-upstream`. This will set up the tracking reference so subsequent runs of `git push` or `git pull` can omit the remote and branch.
+
+1. [Submit a pull request](https://github.com/qualcomm/<REPLACE-ME>/pulls) from your branch to `main`.
+1. Pat yourself on the back and wait for your pull request to be reviewed.
