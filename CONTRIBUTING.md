@@ -2,11 +2,14 @@
 
 Thank you for your interest in the CPULLVM Toolchain.
 
-The CPULLVM Toolchain repository is a fork of the llvm-project. It includes an additional Qualcomm-software directory containing build scripts
-used to produce the CPULLVM Toolchain for Embedded and CPULLVM Toolchain for Linux, as well as documentation and samples. Additionally,
-the CPULLVM Toolchain for Embedded allows for integration with external projects such as the Picolibc C-library and MUSL via an overlay package.
+The CPULLVM Toolchain repository is a fork of the [llvm-project](https://github.com/llvm/llvm-project/). It includes an additional qualcomm-software directory containing build scripts
+used to produce the CPULLVM Toolchain, as well as documentation and CI workflow scripts. Additionally,the CPULLVM Toolchain allows for integration with external projects such as the Picolibc C-library and MUSL.
 
-For guidance on how to contribute to the upstream projects see:
+# Contribution Policy
+The CPULLVM Toolchain repository is synchronized with the upstream llvm-project (including main and release branches). As such, we do not accept external code contributions or pull requests for core components.
+Any changes that can be made in the upstream project must be made in the upstream project.
+
+**For guidance on how to contribute to the upstream projects see:**
 
 [Contributing to LLVM](https://llvm.org/docs/Contributing.html)
 
@@ -14,15 +17,22 @@ For guidance on how to contribute to the upstream projects see:
 
 [Contribution to ELD](https://github.com/qualcomm/eld/blob/main/CONTRIBUTING.md)
 
+# Accepted Contributions
+While core code changes must go upstream, we welcome contributions to this repository that improve:
 
-# Contribution Policy
-The CPULLVM Toolchain repository is synchronized with the upstream llvm-project (including main and release branches). As such, we do not accept external code contributions or pull requests for core components at this time.
+- Build and Test infrastructure
+- Configurations to build
+- Packaging
+- Documentation
 
-# Upstream First
-Any changes that can be made in the upstream project must be made in the upstream project. Please refer to the specific project guidelines for contributing:
+# Reporting Issues
+The CPULLVM Toolchain is heavily dependent on the LLVM, Picolibc, and ELD projects. If you identify an issue that is generic to one of these upstream projects, please submit it directly to the respective upstream repository. 
 
-# Reporting Upstream Issues
-The CPULLVM Toolchain is heavily dependent on the LLVM, Picolibc, and ELD projects. If you identify an issue that is generic to one of these upstream projects, please submit it directly to the respective community. This ensures you can interact directly with the broader community, including Qualcomm's development team who monitor these trackers.
+**For CPULLVM Toolchain specific issues :**
+
+[CPULLVM-Toolchain](https://github.com/qualcomm/cpullvm-toolchain/issues)
+
+**Other upstream projects :**
 
 [LLVM Issue Tracker](github.com/llvm/llvm-project/issues)
 
@@ -30,19 +40,6 @@ The CPULLVM Toolchain is heavily dependent on the LLVM, Picolibc, and ELD projec
 
 [ELD Issue Tracker](github.com/qualcomm/eld/issues)
 
-# Accepted Contributions
-While core code changes must go upstream, we welcome contributions to this repository that improve.
-
-Build and Test infrastructure
-Packaging
-Documentation
-
-# CPULLVM Toolchain Issues
-If the issue is specific to the Qualcomm Toolchain build scripts, packaging, or documentation—or if you are unsure where the issue originates—please create an issue in our repository:
-[Qualcomm Toolchain Issue Tracker](github.com/qualcomm/cpullvm-toolchain/issues)
-
-# Branching Strategy
-In general, contributors should develop on branches based off of main and pull requests should be made against main.
 
 ## Branching Strategy
 
