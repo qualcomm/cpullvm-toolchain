@@ -43,7 +43,7 @@ The CPULLVM Toolchain is heavily dependent on the LLVM, Picolibc, and ELD projec
 
 ## Branching Strategy
 
-In general, contributors should develop on branches based off of `main` and pull requests should be made against `main`.
+In general, contributors should develop on branches based off of `qualcomm-software` and pull requests should be made against `qualcomm-software`.
 
 ## Submitting a pull request
 
@@ -54,10 +54,10 @@ In general, contributors should develop on branches based off of `main` and pull
     git clone https://github.com/<username>/<REPLACE-ME>.git
     ```
 
-3. Create a new branch based on `main`:
+3. Create a new branch based on `qualcomm-software`:
 
     ```bash
-    git checkout -b <my-branch-name> main
+    git checkout -b <my-branch-name> qualcomm-software
     ```
 
 4. Create an upstream `remote` to make it easier to keep your branches up-to-date:
@@ -76,7 +76,7 @@ In general, contributors should develop on branches based off of `main` and pull
 7. After committing your changes on the topic branch, sync it with the upstream branch:
 
     ```bash
-    git pull --rebase upstream main
+    git pull --rebase upstream qualcomm-software
     ```
 
 8. Push to your fork.
@@ -87,5 +87,5 @@ In general, contributors should develop on branches based off of `main` and pull
 
     The `-u` is shorthand for `--set-upstream`. This will set up the tracking reference so subsequent runs of `git push` or `git pull` can omit the remote and branch.
 
-9. [Submit a pull request](https://github.com/qualcomm/cpullvm-toolchain/pulls) from your branch to `main`.
+9. [Submit a pull request](https://github.com/qualcomm/cpullvm-toolchain/pulls) from your branch to `qualcomm-software`.
 10. Pat yourself on the back and wait for your pull request to be reviewed.
