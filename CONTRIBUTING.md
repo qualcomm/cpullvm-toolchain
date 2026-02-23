@@ -47,7 +47,7 @@ In general, contributors should develop on branches based off of `main` and pull
 
 ## Submitting a pull request
 
-1. Please read our [code of conduct](CODE-OF-CONDUCT.md) and [license](LICENSE.txt).  
+1. Please read our [code of conduct](CODE_OF_CONDUCT.md) and [license](LICENSE.TXT).  
 2. [Fork](https://github.com/qualcomm/cpullvm-toolchain/fork) and clone the repository.
 
     ```bash
