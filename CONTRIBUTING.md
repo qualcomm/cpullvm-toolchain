@@ -10,36 +10,34 @@ CPULLVM is composed of a number of [upstream projects](README.md). As a general 
 
 For guidance on how to contribute to the upstream projects see:
 
-[Contributing to LLVM](https://llvm.org/docs/Contributing.html)
-
-[Contributing to Picolibc](https://github.com/picolibc/picolibc/blob/main/CONTRIBUTING.md)
-
-[Contributing to ELD](https://github.com/qualcomm/eld/blob/main/CONTRIBUTING.md)
+* llvm-project [Contributing to LLVM](https://llvm.org/docs/Contributing.html)
+* picolibc     [Contributing to Picolibc](https://github.com/picolibc/picolibc/blob/main/CONTRIBUTING.md)
+* ELD          [Contributing to ELD](https://github.com/qualcomm/eld/blob/main/CONTRIBUTING.md)
 
 Accepted Contributions:
 
 While core code changes must go upstream, we welcome contributions to this repository that improve:
 
-- Build and Test infrastructure
-- Configurations to build
-- Packaging
-- Documentation
+* Build and Test infrastructure
+* Configurations to build
+* Packaging
+* Documentation
 
 # Reporting Issues
 
 The CPULLVM Toolchain is heavily dependent on the LLVM, Picolibc, and ELD projects. If you identify an issue that is generic to one of these upstream projects, please submit it directly to the respective upstream repository.
 
-1. For CPULLVM Toolchain specific issues:
+For CPULLVM Toolchain specific issues:
 
-[CPULLVM Toolchain Issue Tracker](https://github.com/qualcomm/cpullvm-toolchain/issues)
+* [CPULLVM Toolchain Issue Tracker](https://github.com/qualcomm/cpullvm-toolchain/issues)
 
-2. Other upstream projects:
+Other upstream projects:
 
-[LLVM Issue Tracker](https://github.com/llvm/llvm-project/issues)
+* [LLVM Issue Tracker](https://github.com/llvm/llvm-project/issues)
 
-[Picolibc Issue Tracker](https://github.com/picolibc/picolibc/issues)
+* [Picolibc Issue Tracker](https://github.com/picolibc/picolibc/issues)
 
-[ELD Issue Tracker](https://github.com/qualcomm/eld/issues)
+* [ELD Issue Tracker](https://github.com/qualcomm/eld/issues)
 
 # Branching Strategy
 
