@@ -10,8 +10,7 @@
 # A Powershell script to build the toolchain
 
 # The script creates a build of the toolchain in the 'build' directory, inside
-# the repository tree. It assumes a prebuilt CPULLVM package is already present
-# and uses the runtimes from that build, rather than rebuilding them.
+# the repository tree.
 
 $ErrorActionPreference = 'Stop'
 
@@ -21,14 +20,14 @@ Set-VS-Env
 $repoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
 $buildDir = (Join-Path $repoRoot build)
 
-mkdir $buildDir -Force
+mkdir $buildDir
 cd $buildDir
 
-python3 ..\qualcomm-software\cmake\copy_target_libraries.py --distribution-file=cpullvm-*.tar.xz --build-dir=$buildDir
-
+# Omit target runtimes on Windows builds.
 cmake ..\qualcomm-software `
   -GNinja `
   -DFETCHCONTENT_QUIET=OFF `
+  -DLLVM_TOOLCHAIN_DISTRIBUTION_COMPONENTS="llvm-toolchain-docs;llvm-toolchain-third-party-licenses" `
   -DPREBUILT_TARGET_LIBRARIES=ON `
   -DCMAKE_C_COMPILER=clang-cl `
   -DCMAKE_CXX_COMPILER=clang-cl
