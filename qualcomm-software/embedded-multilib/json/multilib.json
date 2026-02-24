@@ -68,6 +68,18 @@
             "libraries_supported": "picolibc"
         },
         {
+            "variant": "riscv32imac_ilp32_scs_nopic",
+            "json": "riscv32imac_ilp32_scs_nopic.json",
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32 -fsanitize=shadow-call-stack -fno-pic",
+            "libraries_supported": "picolibc"
+        },
+        {
+            "variant": "riscv32imac_ilp32_scs_nothreads_nopic",
+            "json": "riscv32imac_ilp32_scs_nothreads_nopic.json",
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32 -fsanitize=shadow-call-stack -fmultilib-flag=no-threads -fno-pic",
+            "libraries_supported": "picolibc"
+        },
+        {
             "variant": "riscv32imac_zba_zbb_ilp32",
             "json": "riscv32imac_zba_zbb_ilp32.json",
             "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zba_zbb -mabi=ilp32",
