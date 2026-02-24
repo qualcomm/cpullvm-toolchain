@@ -22,6 +22,14 @@
 # CHECK-IMAC-PIC: riscv32-unknown-elf/riscv32imac_ilp32{{$}}
 # CHECK-IMAC-PIC-EMPTY:
 
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac -mabi=ilp32 -fsanitize=shadow-call-stack -fno-pic | FileCheck %s --check-prefix=CHECK-IMAC-SCS-FNO-PIC
+# CHECK-IMAC-SCS-FNO-PIC: riscv32-unknown-elf/riscv32imac_ilp32_scs_nopic{{$}}
+# CHECK-IMAC-SCS-FNO-PIC-EMPTY:
+
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac -mabi=ilp32 -fsanitize=shadow-call-stack -fmultilib-flag=no-threads -fno-pic | FileCheck %s --check-prefix=CHECK-IMAC-SCS-NO-THREADS-FNO-PIC
+# CHECK-IMAC-SCS-NO-THREADS-FNO-PIC: riscv32-unknown-elf/riscv32imac_ilp32_scs_nothreads_nopic{{$}}
+# CHECK-IMAC-SCS-NO-THREADS-FNO-PIC-EMPTY:
+
 # RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac_zba_zbb -mabi=ilp32 -fpic | FileCheck %s --check-prefix=CHECK-IMAC-ZBA-ZBB
 # CHECK-IMAC-ZBA-ZBB: riscv32-unknown-elf/riscv32imac_zba_zbb_ilp32{{$}}
 # CHECK-IMAC-ZBA-ZBB-EMPTY:

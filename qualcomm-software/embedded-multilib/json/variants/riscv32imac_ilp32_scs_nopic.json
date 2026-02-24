@@ -1,0 +1,26 @@
+{
+    "args": {
+        "common": {
+            "TARGET_ARCH": "riscv32",
+            "VARIANT": "riscv32imac_ilp32_scs_nopic",
+            "COMPILE_FLAGS": "-march=rv32imac -mabi=ilp32 -fsanitize=shadow-call-stack -fstack-protector-strong",
+            "ENABLE_EXCEPTIONS": "OFF",
+            "ENABLE_RTTI": "OFF",
+            "TEST_EXECUTOR": "qemu",
+            "QEMU_MACHINE": "virt",
+            "QEMU_CPU": "rv32",
+            "QEMU_PARAMS": "-bios none",
+            "FLASH_ADDRESS": "0x80000000",
+            "FLASH_SIZE": "0x00400000",
+            "RAM_ADDRESS": "0x80400000",
+            "RAM_SIZE": "0x00200000",
+            "LIBRARY_BUILD_TYPE": "minsizerelease"
+        },
+        "picolibc": {
+            "ENABLE_CXX_LIBS": "ON",
+            "ENABLE_LIBC_TESTS": "OFF",
+            "ENABLE_COMPILER_RT_TESTS": "OFF",
+            "ENABLE_LIBCXX_TESTS": "OFF"
+        }
+    }
+}
