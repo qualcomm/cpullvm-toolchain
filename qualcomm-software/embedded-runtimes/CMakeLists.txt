@@ -84,6 +84,7 @@ set(ENABLE_CXX_LIBS ${ENABLE_CXX_LIBS_def} CACHE BOOL "Build CXX libs")
 set(ENABLE_LIBC_TESTS ${ENABLE_LIBC_TESTS_def} CACHE BOOL "Enable libc tests (picolibc only).")
 set(ENABLE_COMPILER_RT_TESTS ${ENABLE_COMPILER_RT_TESTS_def} CACHE BOOL "Enable compiler-rt tests.")
 set(ENABLE_LIBCXX_TESTS ${ENABLE_LIBCXX_TESTS_def} CACHE BOOL "Enable libcxx tests.")
+set(DISABLE_THREADS ${DISABLE_THREADS_def} CACHE BOOL "Disable threads/atomic/TLS (picolibc only).")
 set(LLVM_BINARY_DIR "" CACHE PATH "Path to LLVM toolchain root to build libraries with")
 
 # Set up a few arbitrary pass-through flags for musl-embedded. This probably
@@ -447,6 +448,15 @@ if(C_LIBRARY STREQUAL picolibc)
 
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/meson-cross-build.txt.in ${CMAKE_CURRENT_BINARY_DIR}/meson-cross-build.txt @ONLY)
 
+    set(single_thread "false")
+    set(thread_local_storage "picolibc")
+    set(atomic_ungetc "true")
+    if(DISABLE_THREADS)
+      set(single_thread "true")
+      set(thread_local_storage "false")
+      set(atomic_ungetc "false")
+    endif()
+
     ExternalProject_Add(
         picolibc
         STAMP_DIR ${PROJECT_PREFIX}/picolibc/${VARIANT_BUILD_ID}/stamp
@@ -474,6 +484,9 @@ if(C_LIBRARY STREQUAL picolibc)
             --prefix <INSTALL_DIR>
             --cross-file ${CMAKE_CURRENT_BINARY_DIR}/meson-cross-build.txt
             --buildtype=${LIBRARY_MESON_BUILD_TYPE}
+            -Dsingle-thread=${single_thread}
+            -Dthread-local-storage=${thread_local_storage}
+            -Datomic-ungetc=${atomic_ungetc}
             <SOURCE_DIR>
         BUILD_COMMAND ${MESON_EXECUTABLE} compile
         INSTALL_COMMAND ${MESON_EXECUTABLE} install ${MESON_INSTALL_QUIET}
