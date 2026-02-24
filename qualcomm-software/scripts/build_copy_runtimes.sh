@@ -25,12 +25,13 @@ export CXX=clang++
 mkdir -p "${REPO_ROOT}"/build
 cd "${REPO_ROOT}"/build
 
-python3 ../qualcomm-software/cmake/copy_target_libraries.py --distribution-file=cpullvm-*.tar.xz --build-dir=$PWD
+python3 ../qualcomm-software/cmake/copy_target_libraries.py --include-linux-libraries --distribution-file=cpullvm-*.tar.xz --build-dir=$PWD
 
 cmake ../qualcomm-software \
  -GNinja \
  -DFETCHCONTENT_QUIET=OFF \
  -DPREBUILT_TARGET_LIBRARIES=ON \
+ -DENABLE_LINUX_LIBRARIES=ON \
  ${EXTRA_CMAKE_ARGS}
 
 ninja package-llvm-toolchain
