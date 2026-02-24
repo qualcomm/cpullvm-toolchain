@@ -1,14 +1,14 @@
-# Contributing to CPULLVM Toolchain
+# Contributing to CPULLVM Toolchain Project
 
-Thank you for your interest in the CPULLVM Toolchain.
+Thank you for your interest in the CPULLVM Toolchain project.
 
-The CPULLVM Toolchain repository is a fork of the [llvm-project](https://github.com/llvm/llvm-project/). It includes an additional qualcomm-software directory containing build scripts used to produce the CPULLVM Toolchain, as well as documentation and CI workflow scripts. Additionally, the CPULLVM Toolchain allows for integration with external projects such as the Picolibc C-library and MUSL.
+The CPULLVM Toolchain repository is a fork of the [llvm-project](https://github.com/llvm/llvm-project/). It includes an additional qualcomm-software directory containing build scripts used to produce the CPULLVM toolchain, as well as documentation and CI workflow scripts. Additionally, CPULLVM allows for integration with external projects such as the Picolibc and musl-embedded.
 
 # Contribution Policy
 
-The CPULLVM Toolchain repository is synchronized with the upstream llvm-project (including main and release branches). As such, we do not accept external code contributions or pull requests for core components. Any changes that can be made in the upstream project must be made in the upstream project.
+CPULLVM is composed of a number of [upstream projects](README.md). As a general policy, this repository does not accept code contributions or pull requests for these upstream components. Any changes that are applicable to an upstream project must be made directly in the corresponding upstream repository.
 
-**For guidance on how to contribute to the upstream projects see:**
+For guidance on how to contribute to the upstream projects see:
 
 [Contributing to LLVM](https://llvm.org/docs/Contributing.html)
 
@@ -16,7 +16,7 @@ The CPULLVM Toolchain repository is synchronized with the upstream llvm-project 
 
 [Contributing to ELD](https://github.com/qualcomm/eld/blob/main/CONTRIBUTING.md)
 
-# Accepted Contributions
+Accepted Contributions:
 
 While core code changes must go upstream, we welcome contributions to this repository that improve:
 
@@ -29,11 +29,11 @@ While core code changes must go upstream, we welcome contributions to this repos
 
 The CPULLVM Toolchain is heavily dependent on the LLVM, Picolibc, and ELD projects. If you identify an issue that is generic to one of these upstream projects, please submit it directly to the respective upstream repository.
 
-**For CPULLVM Toolchain specific issues:**
+1. For CPULLVM Toolchain specific issues:
 
 [CPULLVM Toolchain Issue Tracker](https://github.com/qualcomm/cpullvm-toolchain/issues)
 
-**Other upstream projects:**
+2. Other upstream projects:
 
 [LLVM Issue Tracker](https://github.com/llvm/llvm-project/issues)
 
@@ -41,11 +41,11 @@ The CPULLVM Toolchain is heavily dependent on the LLVM, Picolibc, and ELD projec
 
 [ELD Issue Tracker](https://github.com/qualcomm/eld/issues)
 
-## Branching Strategy
+# Branching Strategy
 
 In general, contributors should develop on branches based off of `qualcomm-software` and pull requests should be made against `qualcomm-software`.
 
-## Submitting a pull request
+# Submitting a pull request
 
 1. Please read our [code of conduct](CODE_OF_CONDUCT.md) and [license](LICENSE.TXT).  
 2. [Fork](https://github.com/qualcomm/cpullvm-toolchain/fork) and clone the repository.
@@ -92,7 +92,7 @@ In general, contributors should develop on branches based off of `qualcomm-softw
     
 ## Security Analysis of Pull Requests
 
-To maintain the security and integrity of this project, all pull requests from external contributors are automatically scanned using [Semgrep](https://github.com/semgrep/semgrep) to detect insecure coding patterns and potential security flaws.
+To maintain the security and integrity of this project, all pull requests are automatically scanned using [Semgrep](https://github.com/semgrep/semgrep) to detect insecure coding patterns and potential security flaws.
 
 **Static Analysis with Semgrep:**  We use Semgrep to perform lightweight, fast static analysis on every PR. This helps identify risky code patterns and logic flaws early in the development process.
 
