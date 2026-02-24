@@ -62,3 +62,15 @@ jobs:
       - name: Test
         if: matrix.test_script != ''
         run: ./qualcomm-software/scripts/${{ matrix.test_script }}
+
+      - name: Upload built packages
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cpullvm-packages-${{ matrix.build_script }}-${{ matrix.target_os }}
+          path: build*/**/meson-logs/*.txt
+          retention-days: 7
+
+      - name: Dump logs
+        if: always()
+        run: cat /local/mnt/workspace/actions-runner-2/_work/cpullvm-toolchain/cpullvm-toolchain/build/multilib-builds/picolibc/aarch64a/build/meson-logs/timegm.txt
