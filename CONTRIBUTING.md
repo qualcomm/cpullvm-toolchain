@@ -6,7 +6,7 @@ The CPULLVM Toolchain repository is a fork of the [llvm-project](https://github.
 
 # Contribution Policy
 
-CPULLVM is composed of a number of [upstream projects](README.md). As a general policy, this repository does not accept code contributions or pull requests for these upstream components. Any changes that are applicable to an upstream project must be made directly in the corresponding upstream repository.
+CPULLVM is composed of a number of [upstream projects](qualcomm-software/README.md#Components). As a general policy, this repository does not accept code contributions or pull requests for these upstream components. Any changes that are applicable to an upstream project must be made directly in the corresponding upstream repository.
 
 For guidance on how to contribute to the upstream projects see:
 
