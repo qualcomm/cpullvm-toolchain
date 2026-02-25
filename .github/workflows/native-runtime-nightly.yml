@@ -18,6 +18,7 @@ name: Native Runtime Nightly Build and Test
 
 on:
   workflow_dispatch:
+  pull_request:
 
 permissions:
   contents: read
@@ -40,6 +41,12 @@ jobs:
             install_script: install_dependencies.sh
             target_os: Linux-AArch64
             runner: ubuntu-22.04-arm
+
+          - build_script: build_no_qemu.sh
+            test_script: test.sh
+            install_script: install_dependencies.sh
+            target_os: Linux-x86_64
+            runner: ubuntu-24.04
 
           - build_script: build_musl-embedded_overlay.sh
             test_script: ''
