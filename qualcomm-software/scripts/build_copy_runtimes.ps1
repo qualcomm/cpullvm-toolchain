@@ -24,12 +24,13 @@ $buildDir = (Join-Path $repoRoot build)
 mkdir $buildDir -Force
 cd $buildDir
 
-python3 ..\qualcomm-software\cmake\copy_target_libraries.py --distribution-file=cpullvm-*.tar.xz --build-dir=$buildDir
+python3 ..\qualcomm-software\cmake\copy_target_libraries.py --include-linux-libraries --distribution-file=cpullvm-*.tar.xz --build-dir=$buildDir
 
 cmake ..\qualcomm-software `
   -GNinja `
   -DFETCHCONTENT_QUIET=OFF `
   -DPREBUILT_TARGET_LIBRARIES=ON `
+  -DENABLE_LINUX_LIBRARIES=ON `
   -DCMAKE_C_COMPILER=clang-cl `
   -DCMAKE_CXX_COMPILER=clang-cl
 

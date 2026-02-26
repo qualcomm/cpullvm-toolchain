@@ -134,8 +134,8 @@ option(
     "Include additional library variants for use on Linux targets"
     OFF
 )
-if(ENABLE_LINUX_LIBRARIES AND WIN32)
-    message(FATAL_ERROR "ENABLE_LINUX_LIBRARIES is not permitted on Windows")
+if((ENABLE_LINUX_LIBRARIES AND WIN32) AND NOT PREBUILT_TARGET_LIBRARIES)
+    message(FATAL_ERROR "Building Linux libraries from source is not supported on Windows")
 endif()
 option(LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL
     "Make cpack build an overlay package that can be unpacked over the main toolchain to install a secondary set of libraries based on musl-embedded."
