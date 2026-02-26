@@ -134,9 +134,18 @@ option(
     "Include additional library variants for use on Linux targets"
     OFF
 )
+option(
+    ENABLE_WINDOWS_LIBRARIES
+    "Include additional library variants for use on Windows targets"
+    "${CMAKE_HOST_WIN32}"
+)
 if((ENABLE_LINUX_LIBRARIES AND WIN32) AND NOT PREBUILT_TARGET_LIBRARIES)
     message(FATAL_ERROR "Building Linux libraries from source is not supported on Windows")
 endif()
+if(ENABLE_WINDOWS_LIBRARIES AND NOT CMAKE_HOST_WIN32)
+    message(FATAL_ERROR "Building Windows libraries from source is not supported on Linux")
+endif()
+
 option(LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL
     "Make cpack build an overlay package that can be unpacked over the main toolchain to install a secondary set of libraries based on musl-embedded."
     ${overlay_install_default})
@@ -651,6 +660,38 @@ if(NOT PREBUILT_TARGET_LIBRARIES)
     endif()
 endif()
 
+if(ENABLE_WINDOWS_LIBRARIES)
+    set(windows_library_prefix ${CMAKE_BINARY_DIR}/windows-library-builds)
+    ExternalProject_Add(
+        windows-libraries
+        STAMP_DIR ${windows_library_prefix}/stamp
+        BINARY_DIR ${windows_library_prefix}/build
+        TMP_DIR ${windows_library_prefix}/tmp
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/scripts
+        INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/llvm/windows-libraries
+        DEPENDS ${lib_tool_dependencies}
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND
+            powershell -ExecutionPolicy Bypass -File "<SOURCE_DIR>/build_windows_runtimes.ps1"
+                -ToolsPath ${CMAKE_CURRENT_BINARY_DIR}/llvm/bin
+                -BaseBuildDir <BINARY_DIR>
+                -BaseInstallDir <INSTALL_DIR>
+                -LLVMSrcDir ${llvmproject_src_dir}
+        INSTALL_COMMAND ""
+        USES_TERMINAL_CONFIGURE TRUE
+        USES_TERMINAL_BUILD TRUE
+        USES_TERMINAL_INSTALL TRUE
+        STEP_TARGETS build install
+        LOG_BUILD TRUE
+        BUILD_ALWAYS TRUE
+    )
+
+    add_dependencies(
+        llvm-toolchain-runtimes
+        windows-libraries-install
+    )
+endif()
+
 FILE(WRITE "${CMAKE_BINARY_DIR}/llvm/${TARGET_CFI_DIR}/cfi_ignorelist.txt" "")
 install(
     FILES
@@ -676,6 +717,15 @@ if(ENABLE_LINUX_LIBRARIES)
     # compiler-rt
     install(
         DIRECTORY ${LLVM_BINARY_DIR}/linux-libraries/resource-dir/.
+        DESTINATION lib/clang/${LLVM_VERSION_MAJOR}
+        COMPONENT llvm-toolchain-libs
+    )
+endif()
+
+if(ENABLE_WINDOWS_LIBRARIES)
+    # compiler-rt
+    install(
+        DIRECTORY ${LLVM_BINARY_DIR}/windows-libraries/.
         DESTINATION lib/clang/${LLVM_VERSION_MAJOR}
         COMPONENT llvm-toolchain-libs
     )
