@@ -1,0 +1,268 @@
+From 49df6eb1e93cfc707aeec0697d319317f107a3c6 Mon Sep 17 00:00:00 2001
+From: Shankar Easwaran <seaswara@qti.qualcomm.com>
+Date: Wed, 25 Feb 2026 22:31:18 -0600
+Subject: [PATCH] [aarch64] Fix TLS IE/GD support
+
+This fixes an issue when object files built with TLS models
+with large alignments would not produce the right values
+when used with *static* links
+
+- initial-exec
+- global-dynamic
+
+Fix description :
+------------------
+
+- AArch64IEGOT was incorrectly created with GOT::TLS_LE
+- compute TLS offsets as done in static links to properly set the GOT
+  slots reserved for IE/GD models
+- updateTLSIEGOTOffsets() applies the correct static TLS block offset
+
+Resolves #868
+
+Signed-off-by: Shankar Easwaran <seaswara@qti.qualcomm.com>
+(cherry picked from commit 7726200f067530e1a802041ce29f54909ef7ae07)
+---
+ lib/Target/AArch64/AArch64GOT.h               | 23 +++++++++---
+ lib/Target/AArch64/AArch64LDBackend.cpp       | 11 ++++++
+ lib/Target/AArch64/AArch64LDBackend.h         |  2 ++
+ lib/Target/AArch64/AArch64Relocator.cpp       | 35 ++++++++++++++++---
+ .../standalone/TLS_GD_ALIGN/GDAlign.test      |  8 +++++
+ .../standalone/TLS_GD_ALIGN/Inputs/gd-align.c |  4 +++
+ .../standalone/TLS_IE_ALIGN/IEAlign.test      |  8 +++++
+ .../standalone/TLS_IE_ALIGN/Inputs/ie-align.c |  4 +++
+ 8 files changed, 85 insertions(+), 10 deletions(-)
+ create mode 100644 test/AArch64/standalone/TLS_GD_ALIGN/GDAlign.test
+ create mode 100644 test/AArch64/standalone/TLS_GD_ALIGN/Inputs/gd-align.c
+ create mode 100644 test/AArch64/standalone/TLS_IE_ALIGN/IEAlign.test
+ create mode 100644 test/AArch64/standalone/TLS_IE_ALIGN/Inputs/ie-align.c
+
+diff --git a/lib/Target/AArch64/AArch64GOT.h b/lib/Target/AArch64/AArch64GOT.h
+index a13a42d0..83b267f7 100644
+--- a/lib/Target/AArch64/AArch64GOT.h
++++ b/lib/Target/AArch64/AArch64GOT.h
+@@ -28,14 +28,16 @@ public:
+   // Going to be used by GOTPLT0
+   AArch64GOT(GOTType T, ELFSection *O, ResolveInfo *R, uint32_t Align,
+              uint32_t Size)
+-      : GOT(T, O, R, Align, Size) {
++      : GOT(T, O, R, Align, Size), m_ReservedValue(0),
++        m_HasReservedValue(false) {
+     if (O)
+       O->addFragmentAndUpdateSize(this);
+   }
+ 
+   // Helper constructor for GOT.
+   AArch64GOT(GOTType T, ELFSection *O, ResolveInfo *R)
+-      : GOT(T, O, R, 8, 8), Value{0, 0, 0, 0, 0, 0, 0, 0} {
++      : GOT(T, O, R, 8, 8), m_ReservedValue(0), m_HasReservedValue(false),
++        Value{0, 0, 0, 0, 0, 0, 0, 0} {
+     if (O)
+       O->addFragmentAndUpdateSize(this);
+   }
+@@ -58,17 +60,28 @@ public:
+     // symbol value.
+     if (getValueType() == GOT::SymbolValue)
+       Content.a = symInfo()->outSymbol()->value();
+-    if (getValueType() == GOT::TLSStaticSymbolValue)
+-      Content.a = 0x10 + symInfo()->outSymbol()->value();
++    if (getValueType() == GOT::TLSStaticSymbolValue) {
++      if (m_HasReservedValue)
++        Content.a = m_ReservedValue;
++      else
++        Content.a = 0x10 + symInfo()->outSymbol()->value();
++    }
+     std::memcpy((void *)Value, (void *)&Content.a, sizeof(Value));
+     return llvm::ArrayRef(Value);
+   }
+ 
++  void setReservedValue(uint64_t val) {
++    m_ReservedValue = val;
++    m_HasReservedValue = true;
++  }
++
+   static AArch64GOT *Create(ELFSection *O, ResolveInfo *R) {
+     return (make<AArch64GOT>(GOT::Regular, O, R));
+   }
+ 
+ private:
++  uint64_t m_ReservedValue;
++  bool m_HasReservedValue;
+   uint8_t Value[8];
+ };
+ 
+@@ -138,7 +151,7 @@ private:
+ 
+ class AArch64IEGOT : public AArch64GOT {
+ public:
+-  AArch64IEGOT(ELFSection *O, ResolveInfo *R) : AArch64GOT(GOT::TLS_LE, O, R) {}
++  AArch64IEGOT(ELFSection *O, ResolveInfo *R) : AArch64GOT(GOT::TLS_IE, O, R) {}
+ 
+   AArch64GOT *getFirst() override { return this; }
+ 
+diff --git a/lib/Target/AArch64/AArch64LDBackend.cpp b/lib/Target/AArch64/AArch64LDBackend.cpp
+index fb6f5ad1..cd33a4c6 100644
+--- a/lib/Target/AArch64/AArch64LDBackend.cpp
++++ b/lib/Target/AArch64/AArch64LDBackend.cpp
+@@ -738,6 +738,17 @@ AArch64GOT *AArch64GNUInfoLDBackend::findEntryInGOT(ResolveInfo *I) const {
+   return Entry->second;
+ }
+ 
++void AArch64GNUInfoLDBackend::updateTLSIEGOTOffsets(uint64_t StaticTLSBlockVarOffset) {
++  for (auto &Entry : m_GOTMap) {
++    AArch64GOT *G = Entry.second;
++    if (!G || G->getType() != GOT::TLS_IE ||
++        G->getValueType() != GOT::TLSStaticSymbolValue || !G->symInfo())
++      continue;
++    G->setReservedValue(StaticTLSBlockVarOffset +
++                        G->symInfo()->outSymbol()->value());
++  }
++}
++
+ // Create PLT entry.
+ AArch64PLT *AArch64GNUInfoLDBackend::createPLT(ELFObjectFile *Obj,
+                                                ResolveInfo *R,
+diff --git a/lib/Target/AArch64/AArch64LDBackend.h b/lib/Target/AArch64/AArch64LDBackend.h
+index 9c664f80..bfbe50a8 100644
+--- a/lib/Target/AArch64/AArch64LDBackend.h
++++ b/lib/Target/AArch64/AArch64LDBackend.h
+@@ -97,6 +97,8 @@ public:
+ 
+   AArch64GOT *findEntryInGOT(ResolveInfo *) const;
+ 
++  void updateTLSIEGOTOffsets(uint64_t StaticTLSBlockVarOffset);
++
+   // ---  PLT Support ------
+   AArch64PLT *createPLT(ELFObjectFile *Obj, ResolveInfo *sym,
+                         bool isIRelative = false);
+diff --git a/lib/Target/AArch64/AArch64Relocator.cpp b/lib/Target/AArch64/AArch64Relocator.cpp
+index 107076d2..3a1bda40 100644
+--- a/lib/Target/AArch64/AArch64Relocator.cpp
++++ b/lib/Target/AArch64/AArch64Relocator.cpp
+@@ -998,9 +998,15 @@ Relocator::Result tls_gottprel_page(Relocation &pReloc,
+                                     AArch64Relocator &pParent) {
+   DiagnosticEngine *DiagEngine = pParent.config().getDiagEngine();
+   Relocator::DWord A = pReloc.addend();
+-  Relocator::DWord X = pParent.getSymValue(&pReloc) + 0x10;
+ 
+   if (!(pReloc.symInfo()->reserved() & Relocator::ReserveGOT)) {
++    const auto &OptTLSBlockVarOffset = pParent.getStaticTLSBlockVarOffset();
++    if (!OptTLSBlockVarOffset.has_value()) {
++      pParent.config().raise(Diag::no_pt_tls_segment);
++      return Relocator::Result::BadReloc;
++    }
++    Relocator::DWord X =
++        pParent.getSymValue(&pReloc) + OptTLSBlockVarOffset.value();
+     // Convert to movz
+     uint32_t movz = 0xD2A00000 | (pReloc.target() & 0x0000001F);
+     pReloc.target() = helper_reencode_movzk_imm(movz, X >> 16);
+@@ -1022,9 +1028,15 @@ Relocator::Result tls_gottprel_page(Relocation &pReloc,
+ Relocator::Result tls_gottprel_lo(Relocation &pReloc,
+                                   AArch64Relocator &pParent) {
+   Relocator::DWord A = pReloc.addend();
+-  Relocator::DWord X = pParent.getSymValue(&pReloc) + 0x10;
+ 
+   if (!(pReloc.symInfo()->reserved() & Relocator::ReserveGOT)) {
++    const auto &OptTLSBlockVarOffset = pParent.getStaticTLSBlockVarOffset();
++    if (!OptTLSBlockVarOffset.has_value()) {
++      pParent.config().raise(Diag::no_pt_tls_segment);
++      return Relocator::Result::BadReloc;
++    }
++    Relocator::DWord X =
++        pParent.getSymValue(&pReloc) + OptTLSBlockVarOffset.value();
+     // Convert to movk
+     uint32_t movk = 0xF2800000 | (pReloc.target() & 0x0000001F);
+     pReloc.target() = helper_reencode_movzk_imm(movk, X);
+@@ -1070,9 +1082,15 @@ Relocator::Result tls_tprel(Relocation &pReloc, AArch64Relocator &pParent) {
+ Relocator::Result tls_tlsdesc_page(Relocation &pReloc,
+                                    AArch64Relocator &pParent) {
+   Relocator::DWord A = pReloc.addend();
+-  Relocator::DWord X = pParent.getSymValue(&pReloc) + 0x10;
+ 
+   if (!(pReloc.symInfo()->reserved() & Relocator::ReserveGOT)) {
++    const auto &OptTLSBlockVarOffset = pParent.getStaticTLSBlockVarOffset();
++    if (!OptTLSBlockVarOffset.has_value()) {
++      pParent.config().raise(Diag::no_pt_tls_segment);
++      return Relocator::Result::BadReloc;
++    }
++    Relocator::DWord X =
++        pParent.getSymValue(&pReloc) + OptTLSBlockVarOffset.value();
+     // Convert to movz
+     uint32_t movz = 0xD2A00000 | (pReloc.target() & 0x0000001F);
+     pReloc.target() = helper_reencode_movzk_imm(movz, X >> 16);
+@@ -1095,9 +1113,15 @@ Relocator::Result tls_tlsdesc_page(Relocation &pReloc,
+ Relocator::Result tls_tlsdesc_lo(Relocation &pReloc,
+                                  AArch64Relocator &pParent) {
+   Relocator::DWord A = pReloc.addend();
+-  Relocator::DWord X = pParent.getSymValue(&pReloc) + 0x10;
+ 
+   if (!(pReloc.symInfo()->reserved() & Relocator::ReserveGOT)) {
++    const auto &OptTLSBlockVarOffset = pParent.getStaticTLSBlockVarOffset();
++    if (!OptTLSBlockVarOffset.has_value()) {
++      pParent.config().raise(Diag::no_pt_tls_segment);
++      return Relocator::Result::BadReloc;
++    }
++    Relocator::DWord X =
++        pParent.getSymValue(&pReloc) + OptTLSBlockVarOffset.value();
+     // Convert to movk, save to x0
+     uint32_t movk = 0xF2800000;
+     pReloc.target() = helper_reencode_movzk_imm(movk, X);
+@@ -1173,4 +1197,5 @@ void AArch64Relocator::computeTLSOffsets() {
+   StaticTLSBlockVarOffset = 2 * WordSize;
+   *StaticTLSBlockVarOffset +=
+       ((FirstTLSSegVirtualAddr - 2 * WordSize) & (MaxTLSSegAlignment - 1));
+-}
+\ No newline at end of file
++  m_Target.updateTLSIEGOTOffsets(StaticTLSBlockVarOffset.value());
++}
+diff --git a/test/AArch64/standalone/TLS_GD_ALIGN/GDAlign.test b/test/AArch64/standalone/TLS_GD_ALIGN/GDAlign.test
+new file mode 100644
+index 00000000..5b0ad7be
+--- /dev/null
++++ b/test/AArch64/standalone/TLS_GD_ALIGN/GDAlign.test
+@@ -0,0 +1,8 @@
++#---GDAlign.test----------------------------------------------------------#
++# Check that TLS GD GOT entries account for TLS block alignment padding.
++RUN: %clang %clangopts -target aarch64 -c %p/Inputs/gd-align.c -o %t.o -fPIC -ftls-model=global-dynamic
++RUN: %link %linkopts -march aarch64 %t.o -o %t.out --no-threads
++RUN: %readelf -x .got %t.out | %filecheck %s
++
++CHECK: .got
++CHECK: 80000000 00000000
+diff --git a/test/AArch64/standalone/TLS_GD_ALIGN/Inputs/gd-align.c b/test/AArch64/standalone/TLS_GD_ALIGN/Inputs/gd-align.c
+new file mode 100644
+index 00000000..ea67cd78
+--- /dev/null
++++ b/test/AArch64/standalone/TLS_GD_ALIGN/Inputs/gd-align.c
+@@ -0,0 +1,4 @@
++__thread int a = 12;
++__attribute__((aligned(128))) __thread int b = 13;
++
++int foo(void) { return a; }
+diff --git a/test/AArch64/standalone/TLS_IE_ALIGN/IEAlign.test b/test/AArch64/standalone/TLS_IE_ALIGN/IEAlign.test
+new file mode 100644
+index 00000000..34d637a5
+--- /dev/null
++++ b/test/AArch64/standalone/TLS_IE_ALIGN/IEAlign.test
+@@ -0,0 +1,8 @@
++#---IEAlign.test----------------------------------------------------------#
++# Check that TLS IE GOT entries account for TLS block alignment padding.
++RUN: %clang %clangopts -target aarch64 -c %p/Inputs/ie-align.c -o %t.o -fPIC -ftls-model=initial-exec
++RUN: %link %linkopts -march aarch64 %t.o -o %t.out --no-threads
++RUN: %readelf -x .got %t.out | %filecheck %s
++
++CHECK: .got
++CHECK: 80000000 00000000
+diff --git a/test/AArch64/standalone/TLS_IE_ALIGN/Inputs/ie-align.c b/test/AArch64/standalone/TLS_IE_ALIGN/Inputs/ie-align.c
+new file mode 100644
+index 00000000..ea67cd78
+--- /dev/null
++++ b/test/AArch64/standalone/TLS_IE_ALIGN/Inputs/ie-align.c
+@@ -0,0 +1,4 @@
++__thread int a = 12;
++__attribute__((aligned(128))) __thread int b = 13;
++
++int foo(void) { return a; }
+-- 
+2.34.1
+
