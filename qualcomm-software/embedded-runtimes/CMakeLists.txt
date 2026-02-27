@@ -178,7 +178,13 @@ if(ENABLE_LIBC_TESTS OR ENABLE_COMPILER_RT_TESTS OR ENABLE_LIBCXX_TESTS)
             find_program(QEMU_EXECUTABLE qemu-system-aarch64 REQUIRED)
         elseif(TARGET_ARCH MATCHES "^riscv32")
             if(VARIANT MATCHES "^riscv32ima_xqci_ilp32")
-                find_program(QEMU_EXECUTABLE qemu-system-riscv32-xqci REQUIRED)
+                find_program(QEMU_EXECUTABLE qemu-system-riscv32-xqci)
+                if(NOT QEMU_EXECUTABLE)
+                    message(STATUS "qemu-system-riscv32-xqci not found. Disabling QEMU tests for ${VARIANT}.")
+                    set(ENABLE_LIBC_TESTS OFF CACHE BOOL "Enable libc tests (picolibc only)." FORCE)
+                    set(ENABLE_COMPILER_RT_TESTS OFF CACHE BOOL "Enable compiler-rt tests." FORCE)
+                    set(ENABLE_LIBCXX_TESTS OFF CACHE BOOL "Enable libcxx tests." FORCE)
+                endif()
             else()
                 find_program(QEMU_EXECUTABLE qemu-system-riscv32 REQUIRED)
             endif()
@@ -188,22 +194,24 @@ if(ENABLE_LIBC_TESTS OR ENABLE_COMPILER_RT_TESTS OR ENABLE_LIBCXX_TESTS)
             find_program(QEMU_EXECUTABLE qemu-system-arm REQUIRED)
         endif()
 
-        # Use colon as a separator because comma and semicolon are used for
-        # other purposes in CMake.
-        string(REPLACE " " ":" qemu_params_list "${QEMU_PARAMS}")
+        if(QEMU_EXECUTABLE)
+            # Use colon as a separator because comma and semicolon are used for
+            # other purposes in CMake.
+            string(REPLACE " " ":" qemu_params_list "${QEMU_PARAMS}")
 
-        set(test_executor_params --qemu-command ${QEMU_EXECUTABLE} --qemu-machine ${QEMU_MACHINE})
-        if(QEMU_CPU)
-            list(APPEND test_executor_params --qemu-cpu ${QEMU_CPU})
+            set(test_executor_params --qemu-command ${QEMU_EXECUTABLE} --qemu-machine ${QEMU_MACHINE})
+            if(QEMU_CPU)
+                list(APPEND test_executor_params --qemu-cpu ${QEMU_CPU})
+            endif()
+            if(qemu_params_list)
+                list(APPEND test_executor_params "--qemu-params=${qemu_params_list}")
+            endif()
+            set(
+                lit_test_executor
+                ${CMAKE_CURRENT_SOURCE_DIR}/test-support/lit-exec-qemu.py
+                ${test_executor_params}
+            )
         endif()
-        if(qemu_params_list)
-            list(APPEND test_executor_params "--qemu-params=${qemu_params_list}")
-        endif()
-        set(
-            lit_test_executor
-            ${CMAKE_CURRENT_SOURCE_DIR}/test-support/lit-exec-qemu.py
-            ${test_executor_params}
-        )
     endif()
     list(JOIN lit_test_executor " " lit_test_executor)
 endif()
