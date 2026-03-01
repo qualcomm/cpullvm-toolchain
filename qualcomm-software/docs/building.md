@@ -29,7 +29,7 @@ not installed.
 A relatively recent version of QEMU is required to support the latest RISC-V extensions.
 CPULLVM currently builds and tests with QEMU v10.1.3.
 
-The `riscv32ima_xqci_ilp32` library-test variant requires an [Xqci](https://github.com/quic/riscv-unified-db/releases) enabled QEMU build. Clone and build the [QEMU Xqci fork](https://github.com/quic/qemu/tree/feature/xqci), and ensure the binary is available as `qemu-system-riscv32-xqci` in your `PATH`:
+The `riscv32ima_xqci_ilp32` library-test variant requires an [Xqci and Xqccmp](https://github.com/quic/riscv-unified-db/releases) enabled QEMU build. Clone and build the [QEMU Xqci fork](https://github.com/quic/qemu/tree/feature/xqci), and ensure the binary is available as `qemu-system-riscv32-xqci` in your `PATH`:
 
 ```
 git clone --branch feature/xqci https://github.com/quic/qemu.git qemu-xqci
