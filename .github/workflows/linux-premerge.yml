@@ -59,6 +59,15 @@ jobs:
       - name: Build toolchain
         run: ./qualcomm-software/scripts/${{ matrix.build_script }}
 
+      - name: Upload built packages
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: cpullvm-packages-${{ matrix.build_script }}-${{ matrix.target_os }}
+          path: |
+            build*/cpullvm-*.tar.xz
+          retention-days: 1
+
       - name: Test
         if: matrix.test_script != ''
         run: ./qualcomm-software/scripts/${{ matrix.test_script }}
