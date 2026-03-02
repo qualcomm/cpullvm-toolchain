@@ -45,9 +45,6 @@ jobs:
       - name: Build
         run: ./qualcomm-software/scripts/build.sh
 
-      - name: Test
-        run: ./qualcomm-software/scripts/test.sh
-
       - name: Upload built packages
         uses: actions/upload-artifact@v4
         if: success()
@@ -56,6 +53,9 @@ jobs:
           path: build*/cpullvm-*.tar.xz
           if-no-files-found: error
           retention-days: 7
+
+      - name: Test
+        run: ./qualcomm-software/scripts/test.sh
 
   build-and-test:
     if: github.repository == 'qualcomm/cpullvm-toolchain'
@@ -123,10 +123,6 @@ jobs:
       - name: Build
         run: ./qualcomm-software/scripts/${{ matrix.build_script }}
 
-      - name: Test
-        if: matrix.test_script != ''
-        run: ./qualcomm-software/scripts/${{ matrix.test_script }}
-
       - name: Upload built packages
         uses: actions/upload-artifact@v4
         if: success()
@@ -137,3 +133,7 @@ jobs:
             build*/cpullvm-*.zip
             !build/cpullvm-*-Linux-x86_64.tar.xz
           retention-days: 7
+
+      - name: Test
+        if: matrix.test_script != ''
+        run: ./qualcomm-software/scripts/${{ matrix.test_script }}
