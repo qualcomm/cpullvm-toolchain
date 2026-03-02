@@ -2,7 +2,7 @@
 
 Thank you for your interest in the CPULLVM Toolchain project.
 
-The CPULLVM Toolchain repository is a fork of the [llvm-project](https://github.com/llvm/llvm-project/). It includes an additional qualcomm-software directory containing build scripts used to produce the CPULLVM toolchain, as well as documentation and CI workflow scripts. Additionally, CPULLVM allows for integration with external projects such as the Picolibc and musl-embedded.
+The CPULLVM Toolchain repository is a fork of [llvm-project](https://github.com/llvm/llvm-project/). It includes an additional qualcomm-software directory that contains build scripts for generating the CPULLVM toolchain, along with documentation and CI workflow scripts and recipes. CPULLVM also supports integration with external projects such as Picolibc and musl-embedded.
 
 # Contribution Policy
 
@@ -10,12 +10,12 @@ CPULLVM is composed of a number of [upstream projects](qualcomm-software/README.
 
 For guidance on how to contribute to the upstream projects see:
 
-* llvm-project [Contributing to LLVM](https://llvm.org/docs/Contributing.html)
-* picolibc     [Contributing to Picolibc](https://github.com/picolibc/picolibc/blob/main/CONTRIBUTING.md)
-* ELD          [Contributing to ELD](https://github.com/qualcomm/eld/blob/main/CONTRIBUTING.md)
-
+* llvm-project   [Contributing to LLVM](https://llvm.org/docs/Contributing.html)
+* picolibc       [Contributing to Picolibc](https://github.com/picolibc/picolibc/blob/main/CONTRIBUTING.md)
+* ELD            [Contributing to ELD](https://github.com/qualcomm/eld/blob/main/CONTRIBUTING.md)
+* musl-embedded [Contributing to musl-embedded](https://github.com/qualcomm/musl-embedded/blob/main)
+  
 Accepted Contributions:
-
 While core code changes must go upstream, we welcome contributions to this repository that improve:
 
 * Build and Test infrastructure
@@ -25,20 +25,18 @@ While core code changes must go upstream, we welcome contributions to this repos
 
 # Reporting Issues
 
-The CPULLVM Toolchain is heavily dependent on the LLVM, Picolibc, and ELD projects. If you identify an issue that is generic to one of these upstream projects, please submit it directly to the respective upstream repository.
+The CPULLVM toolchain is heavily dependent on the LLVM, Picolibc, and ELD projects. If you identify an issue that is generic to one of these upstream projects, please submit it directly to the respective upstream repository.
 
-For CPULLVM Toolchain specific issues:
-
+For reporting issues in qualcomm software build scripts and recipes, please use the Gitrhub issues:
 * [CPULLVM Toolchain Issue Tracker](https://github.com/qualcomm/cpullvm-toolchain/issues)
 
 Other upstream projects:
 
 * [LLVM Issue Tracker](https://github.com/llvm/llvm-project/issues)
-
 * [Picolibc Issue Tracker](https://github.com/picolibc/picolibc/issues)
-
 * [ELD Issue Tracker](https://github.com/qualcomm/eld/issues)
-
+* [musl-embedded Issue Tracker](https://github.com/qualcomm/musl-embedded/issues)
+  
 # Branching Strategy
 
 In general, contributors should develop on branches based off of `qualcomm-software` and pull requests should be made against `qualcomm-software`.
