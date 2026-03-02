@@ -59,11 +59,10 @@
 # CHECK-IMAFC-ZCB-ZCMP-ZBA-ZBB-ILP32F-PIC: riscv32-unknown-elf/riscv32imafc_zcb_zcmp_zba_zbb_ilp32f{{$}}
 # CHECK-IMAFC-ZCB-ZCMP-ZBA-ZBB-ILP32F-PIC-EMPTY:
 
-# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=CHECK-IMA-XQCI-ILP32-NO-PIC
-
-# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqci_xqccmp -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=CHECK-IMA-XQCI-ILP32-NO-PIC
-# CHECK-IMA-XQCI-ILP32-NO-PIC: riscv32-unknown-elf/riscv32ima_xqci_ilp32_nopic{{$}}
-# CHECK-IMA-XQCI-ILP32-NO-PIC-EMPTY:
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp -mabi=ilp32 -fmultilib-flag=no-threads -fno-pic 2>&1 | FileCheck %s --check-prefix=CHECK-IMA-XQCI-ILP32-NO-THREADS-NO-PIC
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqci_xqccmp -mabi=ilp32 -fmultilib-flag=no-threads -fno-pic 2>&1 | FileCheck %s --check-prefix=CHECK-IMA-XQCI-ILP32-NO-THREADS-NO-PIC
+# CHECK-IMA-XQCI-ILP32-NO-THREADS-NO-PIC: riscv32-unknown-elf/riscv32ima_xqci_ilp32_nothreads_nopic{{$}}
+# CHECK-IMA-XQCI-ILP32-NO-THREADS-NO-PIC-EMPTY:
 
 # RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imafdzca_zcf -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=NOT-FOUND

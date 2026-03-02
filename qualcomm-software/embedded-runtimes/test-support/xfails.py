@@ -158,7 +158,7 @@ def main():
             result=NewResult.EXCLUDE,
             project="picolibc",
             variants=[
-                "riscv32ima_xqci_ilp32_nopic"
+                "riscv32ima_xqci_ilp32_nothreads_nopic"
             ],
             description="This test times out for some reason and we will most probably need a fix in QEMU. Disable until we have one.",
         ),

@@ -41,7 +41,7 @@ ninja
 mv "<path-to>/qemu-system-riscv32" "<path-to>/qemu-system-riscv32-xqci"
 ```
 
-Refer to the [Xqci json](https://github.com/qualcomm/cpullvm-toolchain/blob/qualcomm-software/qualcomm-software/embedded-multilib/json/variants/riscv32ima_xqci_ilp32_nopic.json) file for the flags that need to be passed to QEMU.
+Refer to the [Xqci json](https://github.com/qualcomm/cpullvm-toolchain/blob/qualcomm-software/qualcomm-software/embedded-multilib/json/variants/riscv32ima_xqci_ilp32_nothreads_nopic.json) file for the flags that need to be passed to QEMU.
 
 ## Patching
 

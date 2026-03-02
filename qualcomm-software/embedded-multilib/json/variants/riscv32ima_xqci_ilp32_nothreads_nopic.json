@@ -2,8 +2,8 @@
     "args": {
         "common": {
             "TARGET_ARCH": "riscv32",
-            "VARIANT": "riscv32ima_xqci_ilp32_nopic",
-            "COMPILE_FLAGS": "-march=rv32ima_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp -mabi=ilp32 -fno-pic",
+            "VARIANT": "riscv32ima_xqci_ilp32_nothreads_nopic",
+            "COMPILE_FLAGS": "-march=rv32ima_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp -mabi=ilp32 -fmultilib-flag=no-threads -fno-pic",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",
@@ -20,7 +20,8 @@
             "ENABLE_CXX_LIBS": "ON",
             "ENABLE_LIBC_TESTS": "ON",
             "ENABLE_COMPILER_RT_TESTS": "OFF",
-            "ENABLE_LIBCXX_TESTS": "OFF"
+            "ENABLE_LIBCXX_TESTS": "OFF",
+            "DISABLE_THREADS": "ON"
         }
     }
 }
