@@ -1,4 +1,4 @@
-From c3a38e17e34689471f195887e482ca48dec92f1c Mon Sep 17 00:00:00 2001
+From 6aab1f9391f9067f96c960c74bc1bd53dd05688f Mon Sep 17 00:00:00 2001
 From: Shankar Easwaran <seaswara@qti.qualcomm.com>
 Date: Mon, 2 Mar 2026 15:52:08 -0600
 Subject: [PATCH] [AArch64] Static TLS support
@@ -13,6 +13,7 @@ The patch was trying to setup the GOT slots with values before the
 values were finalized.
 
 Signed-off-by: Shankar Easwaran <seaswara@qti.qualcomm.com>
+(cherry picked from commit c3a38e17e34689471f195887e482ca48dec92f1c)
 ---
  lib/Target/AArch64/AArch64GOT.cpp             | 21 +++++++++++-
  lib/Target/AArch64/AArch64GOT.h               | 21 ++----------
@@ -118,7 +119,7 @@ index a13a42d0..7161a1af 100644
  
  #endif
 diff --git a/lib/Target/AArch64/AArch64LDBackend.cpp b/lib/Target/AArch64/AArch64LDBackend.cpp
-index 0795a4f3..2b0beeb6 100644
+index 69470cd0..a597696f 100644
 --- a/lib/Target/AArch64/AArch64LDBackend.cpp
 +++ b/lib/Target/AArch64/AArch64LDBackend.cpp
 @@ -574,6 +574,28 @@ bool AArch64LDBackend::finalizeTargetSymbols() {
@@ -150,7 +151,7 @@ index 0795a4f3..2b0beeb6 100644
  void AArch64LDBackend::setOptions() {
    bool linkerScriptHasSectionsCommand =
        m_Module.getScript().linkerScriptHasSectionsCommand();
-@@ -925,6 +947,8 @@ GNULDBackend *createAArch64LDBackend(Module &pModule) {
+@@ -921,6 +943,8 @@ GNULDBackend *createAArch64LDBackend(Module &pModule) {
                                         make<AArch64Info>(pModule.getConfig()));
  }
  
@@ -160,7 +161,7 @@ index 0795a4f3..2b0beeb6 100644
  
  //===----------------------------------------------------------------------===//
 diff --git a/lib/Target/AArch64/AArch64LDBackend.h b/lib/Target/AArch64/AArch64LDBackend.h
-index a7124791..173d1582 100644
+index 44123b17..435095f6 100644
 --- a/lib/Target/AArch64/AArch64LDBackend.h
 +++ b/lib/Target/AArch64/AArch64LDBackend.h
 @@ -28,6 +28,8 @@ namespace eld {
@@ -172,7 +173,7 @@ index a7124791..173d1582 100644
  
  //===----------------------------------------------------------------------===//
  /// AArch64LDBackend - linker backend of AArch64 target of GNU ELF format
-@@ -162,6 +164,12 @@ public:
+@@ -156,6 +158,12 @@ public:
  
    std::size_t GOTEntriesCount() const override { return m_GOTMap.size(); }
  
@@ -185,7 +186,7 @@ index a7124791..173d1582 100644
  private:
    ELFSection *createGOTSection(InputFile &InputFile);
    ELFSection *createGOTPLTSection(InputFile &InputFile);
-@@ -198,6 +206,9 @@ private:
+@@ -192,6 +200,9 @@ private:
    // Create GNU property section.
    void createGNUPropertySection(bool);
  
@@ -195,7 +196,7 @@ index a7124791..173d1582 100644
  private:
    AArch64ErrataFactory *m_pErrata843419Factory;
  
-@@ -218,6 +229,11 @@ private:
+@@ -212,6 +223,11 @@ private:
    llvm::DenseMap<ResolveInfo *, AArch64GOT *> m_GOTPLTMap;
    llvm::DenseMap<ResolveInfo *, AArch64PLT *> m_PLTMap;
    std::unordered_map<InputFile *, uint32_t> NoteGNUPropertyMap;
@@ -208,10 +209,10 @@ index a7124791..173d1582 100644
  } // namespace eld
  
 diff --git a/lib/Target/AArch64/AArch64Relocator.cpp b/lib/Target/AArch64/AArch64Relocator.cpp
-index 08fafd30..d1730d16 100644
+index 2d56ee13..cbef6804 100644
 --- a/lib/Target/AArch64/AArch64Relocator.cpp
 +++ b/lib/Target/AArch64/AArch64Relocator.cpp
-@@ -1109,9 +1109,10 @@ Relocator::Result tls_gottprel_page(Relocation &pReloc,
+@@ -998,9 +998,10 @@ Relocator::Result tls_gottprel_page(Relocation &pReloc,
                                      AArch64Relocator &pParent) {
    DiagnosticEngine *DiagEngine = pParent.config().getDiagEngine();
    Relocator::DWord A = pReloc.addend();
@@ -223,7 +224,7 @@ index 08fafd30..d1730d16 100644
      // Convert to movz
      uint32_t movz = 0xD2A00000 | (pReloc.target() & 0x0000001F);
      pReloc.target() = helper_reencode_movzk_imm(movz, X >> 16);
-@@ -1133,9 +1134,10 @@ Relocator::Result tls_gottprel_page(Relocation &pReloc,
+@@ -1022,9 +1023,10 @@ Relocator::Result tls_gottprel_page(Relocation &pReloc,
  Relocator::Result tls_gottprel_lo(Relocation &pReloc,
                                    AArch64Relocator &pParent) {
    Relocator::DWord A = pReloc.addend();
@@ -235,7 +236,7 @@ index 08fafd30..d1730d16 100644
      // Convert to movk
      uint32_t movk = 0xF2800000 | (pReloc.target() & 0x0000001F);
      pReloc.target() = helper_reencode_movzk_imm(movk, X);
-@@ -1156,14 +1158,8 @@ Relocator::Result tls_gottprel_lo(Relocation &pReloc,
+@@ -1045,14 +1047,8 @@ Relocator::Result tls_gottprel_lo(Relocation &pReloc,
  // R_AARCH64_TLSLE_ADD_TPREL_LO12
  // R_AARCH64_TLSLE_ADD_TPREL_LO12_NC : TPREL(S+A)
  Relocator::Result tls_tprel(Relocation &pReloc, AArch64Relocator &pParent) {
@@ -251,7 +252,7 @@ index 08fafd30..d1730d16 100644
  
    if (pReloc.type() == llvm::ELF::R_AARCH64_TLSLE_ADD_TPREL_HI12) {
      if (!llvm::isUInt<24>(X))
-@@ -1181,9 +1177,10 @@ Relocator::Result tls_tprel(Relocation &pReloc, AArch64Relocator &pParent) {
+@@ -1070,9 +1066,10 @@ Relocator::Result tls_tprel(Relocation &pReloc, AArch64Relocator &pParent) {
  Relocator::Result tls_tlsdesc_page(Relocation &pReloc,
                                     AArch64Relocator &pParent) {
    Relocator::DWord A = pReloc.addend();
@@ -263,7 +264,7 @@ index 08fafd30..d1730d16 100644
      // Convert to movz
      uint32_t movz = 0xD2A00000 | (pReloc.target() & 0x0000001F);
      pReloc.target() = helper_reencode_movzk_imm(movz, X >> 16);
-@@ -1206,9 +1203,10 @@ Relocator::Result tls_tlsdesc_page(Relocation &pReloc,
+@@ -1095,9 +1092,10 @@ Relocator::Result tls_tlsdesc_page(Relocation &pReloc,
  Relocator::Result tls_tlsdesc_lo(Relocation &pReloc,
                                   AArch64Relocator &pParent) {
    Relocator::DWord A = pReloc.addend();
@@ -275,7 +276,7 @@ index 08fafd30..d1730d16 100644
      // Convert to movk, save to x0
      uint32_t movk = 0xF2800000;
      pReloc.target() = helper_reencode_movzk_imm(movk, X);
-@@ -1272,16 +1270,3 @@ Relocator::Result copyInstruction(Relocation &pReloc,
+@@ -1161,16 +1159,3 @@ Relocator::Result copyInstruction(Relocation &pReloc,
    pReloc.target() = insn;
    return Relocator::OK;
  }
@@ -292,8 +293,9 @@ index 08fafd30..d1730d16 100644
 -  *StaticTLSBlockVarOffset +=
 -      ((FirstTLSSegVirtualAddr - 2 * WordSize) & (MaxTLSSegAlignment - 1));
 -}
+\ No newline at end of file
 diff --git a/lib/Target/AArch64/AArch64Relocator.h b/lib/Target/AArch64/AArch64Relocator.h
-index 9c1d987b..ddadab50 100644
+index 0b499375..7c4fa95b 100644
 --- a/lib/Target/AArch64/AArch64Relocator.h
 +++ b/lib/Target/AArch64/AArch64Relocator.h
 @@ -75,12 +75,6 @@ public:
@@ -307,9 +309,9 @@ index 9c1d987b..ddadab50 100644
 -  }
 -
  private:
-   bool isInvalidReloc(Relocation &pReloc) const;
-   bool isRelocSupported(Relocation &pReloc) const;
-@@ -95,11 +89,6 @@ private:
+   bool isInvalidReloc(Relocation &pType) const;
+   void scanLocalReloc(InputFile &pInput, Relocation &pReloc,
+@@ -92,11 +86,6 @@ private:
  
  private:
    AArch64LDBackend &m_Target;
