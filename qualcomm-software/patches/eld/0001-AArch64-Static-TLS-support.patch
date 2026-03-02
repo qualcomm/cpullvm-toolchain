@@ -1,0 +1,418 @@
+From c3a38e17e34689471f195887e482ca48dec92f1c Mon Sep 17 00:00:00 2001
+From: Shankar Easwaran <seaswara@qti.qualcomm.com>
+Date: Mon, 2 Mar 2026 15:52:08 -0600
+Subject: [PATCH] [AArch64] Static TLS support
+
+Re-implement static TLS support for correctly handling TCB size
+with varying alignments.
+
+Symbol values during relocation only can be accessed by calling
+getSymValue as per design.
+
+The patch was trying to setup the GOT slots with values before the
+values were finalized.
+
+Signed-off-by: Shankar Easwaran <seaswara@qti.qualcomm.com>
+---
+ lib/Target/AArch64/AArch64GOT.cpp             | 21 +++++++++++-
+ lib/Target/AArch64/AArch64GOT.h               | 21 ++----------
+ lib/Target/AArch64/AArch64LDBackend.cpp       | 24 ++++++++++++++
+ lib/Target/AArch64/AArch64LDBackend.h         | 16 +++++++++
+ lib/Target/AArch64/AArch64Relocator.cpp       | 33 +++++--------------
+ lib/Target/AArch64/AArch64Relocator.h         | 11 -------
+ .../standalone/TLS_GD_ALIGN/GDAlign.test      |  8 +++++
+ .../standalone/TLS_GD_ALIGN/Inputs/gd-align.c |  4 +++
+ .../standalone/TLS_IE_ALIGN/IEAlign.test      |  8 +++++
+ .../standalone/TLS_IE_ALIGN/Inputs/ie-align.c |  4 +++
+ .../TLS_IE_GOT_Offsets/Inputs/hw1.c           | 10 ++++++
+ .../TLS_IE_GOT_Offsets.test                   | 22 +++++++++++++
+ 12 files changed, 128 insertions(+), 54 deletions(-)
+ create mode 100644 test/AArch64/standalone/TLS_GD_ALIGN/GDAlign.test
+ create mode 100644 test/AArch64/standalone/TLS_GD_ALIGN/Inputs/gd-align.c
+ create mode 100644 test/AArch64/standalone/TLS_IE_ALIGN/IEAlign.test
+ create mode 100644 test/AArch64/standalone/TLS_IE_ALIGN/Inputs/ie-align.c
+ create mode 100644 test/AArch64/standalone/TLS_IE_GOT_Offsets/Inputs/hw1.c
+ create mode 100644 test/AArch64/standalone/TLS_IE_GOT_Offsets/TLS_IE_GOT_Offsets.test
+
+diff --git a/lib/Target/AArch64/AArch64GOT.cpp b/lib/Target/AArch64/AArch64GOT.cpp
+index 5d04c317..8efbc51f 100644
+--- a/lib/Target/AArch64/AArch64GOT.cpp
++++ b/lib/Target/AArch64/AArch64GOT.cpp
+@@ -4,7 +4,7 @@
+ // SPDX-License-Identifier: BSD-3-Clause
+ //===----------------------------------------------------------------------===//
+ 
+-#include "AArch64GOT.h"
++#include "AArch64LDBackend.h"
+ #include "eld/Readers/ELFSection.h"
+ #include "eld/Readers/Relocation.h"
+ #include "eld/Support/Memory.h"
+@@ -45,3 +45,22 @@ AArch64GOTPLTN *AArch64GOTPLTN::Create(ELFSection *O, ResolveInfo *R,
+   }
+   return G;
+ }
++
++llvm::ArrayRef<uint8_t> AArch64GOT::getContent() const {
++  // Convert uint32_t to ArrayRef.
++  typedef union {
++    uint64_t a;
++    uint8_t b[8];
++  } C;
++  C Content;
++  Content.a = 0;
++  // If the GOT contents needs to reflect a symbol value, then we use the
++  // symbol value.
++  if (getValueType() == GOT::SymbolValue)
++    Content.a = symInfo()->outSymbol()->value();
++  if (getValueType() == GOT::TLSStaticSymbolValue)
++    Content.a =
++        AArch64LDBackend::getStaticTCBSize() + symInfo()->outSymbol()->value();
++  std::memcpy((void *)Value, (void *)&Content.a, sizeof(Value));
++  return llvm::ArrayRef(Value);
++}
+diff --git a/lib/Target/AArch64/AArch64GOT.h b/lib/Target/AArch64/AArch64GOT.h
+index a13a42d0..7161a1af 100644
+--- a/lib/Target/AArch64/AArch64GOT.h
++++ b/lib/Target/AArch64/AArch64GOT.h
+@@ -14,8 +14,8 @@
+ #define ELD_TARGET_AARCH64_GOT_H
+ 
+ #include "eld/Fragment/GOT.h"
++#include "eld/Readers/ELFSection.h"
+ #include "eld/Support/Memory.h"
+-#include "eld/Target/GNULDBackend.h"
+ 
+ namespace eld {
+ 
+@@ -46,23 +46,7 @@ public:
+ 
+   virtual AArch64GOT *getNext() { return nullptr; }
+ 
+-  llvm::ArrayRef<uint8_t> getContent() const override {
+-    // Convert uint32_t to ArrayRef.
+-    typedef union {
+-      uint64_t a;
+-      uint8_t b[8];
+-    } C;
+-    C Content;
+-    Content.a = 0;
+-    // If the GOT contents needs to reflect a symbol value, then we use the
+-    // symbol value.
+-    if (getValueType() == GOT::SymbolValue)
+-      Content.a = symInfo()->outSymbol()->value();
+-    if (getValueType() == GOT::TLSStaticSymbolValue)
+-      Content.a = 0x10 + symInfo()->outSymbol()->value();
+-    std::memcpy((void *)Value, (void *)&Content.a, sizeof(Value));
+-    return llvm::ArrayRef(Value);
+-  }
++  llvm::ArrayRef<uint8_t> getContent() const override;
+ 
+   static AArch64GOT *Create(ELFSection *O, ResolveInfo *R) {
+     return (make<AArch64GOT>(GOT::Regular, O, R));
+@@ -148,6 +132,7 @@ public:
+     return (make<AArch64IEGOT>(O, R));
+   }
+ };
++
+ } // namespace eld
+ 
+ #endif
+diff --git a/lib/Target/AArch64/AArch64LDBackend.cpp b/lib/Target/AArch64/AArch64LDBackend.cpp
+index 0795a4f3..2b0beeb6 100644
+--- a/lib/Target/AArch64/AArch64LDBackend.cpp
++++ b/lib/Target/AArch64/AArch64LDBackend.cpp
+@@ -574,6 +574,28 @@ bool AArch64LDBackend::finalizeTargetSymbols() {
+   return true;
+ }
+ 
++void AArch64LDBackend::setupStaticTCBForTLSSupport() {
++  if (!config().isCodeStatic())
++    return;
++  const uint32_t WordSize = 0x8;
++  auto OptFirstTLSSegVirtualAddr =
++      getRelocator()->getFirstTLSSegmentVirtualAddr();
++  auto OptMaxTLSSegAlignment = getRelocator()->getMaxTLSSegmentAlign();
++  if (!OptFirstTLSSegVirtualAddr || !OptMaxTLSSegAlignment)
++    return;
++  auto FirstTLSSegVirtualAddr = OptFirstTLSSegVirtualAddr.value();
++  auto MaxTLSSegAlignment = OptMaxTLSSegAlignment.value();
++  StaticTCBSize +=
++      ((FirstTLSSegVirtualAddr - 2 * WordSize) & (MaxTLSSegAlignment - 1));
++}
++
++void AArch64LDBackend::doPostLayout() {
++  // Setup TCB for static TLS support
++  setupStaticTCBForTLSSupport();
++
++  GNULDBackend::doPostLayout();
++}
++
+ void AArch64LDBackend::setOptions() {
+   bool linkerScriptHasSectionsCommand =
+       m_Module.getScript().linkerScriptHasSectionsCommand();
+@@ -925,6 +947,8 @@ GNULDBackend *createAArch64LDBackend(Module &pModule) {
+                                        make<AArch64Info>(pModule.getConfig()));
+ }
+ 
++uint64_t AArch64LDBackend::StaticTCBSize = 0x10;
++
+ } // namespace eld
+ 
+ //===----------------------------------------------------------------------===//
+diff --git a/lib/Target/AArch64/AArch64LDBackend.h b/lib/Target/AArch64/AArch64LDBackend.h
+index a7124791..173d1582 100644
+--- a/lib/Target/AArch64/AArch64LDBackend.h
++++ b/lib/Target/AArch64/AArch64LDBackend.h
+@@ -28,6 +28,8 @@ namespace eld {
+ 
+ class LinkerConfig;
+ class TargetInfo;
++class AArch64GOT;
++class AArch64PLT;
+ 
+ //===----------------------------------------------------------------------===//
+ /// AArch64LDBackend - linker backend of AArch64 target of GNU ELF format
+@@ -162,6 +164,12 @@ public:
+ 
+   std::size_t GOTEntriesCount() const override { return m_GOTMap.size(); }
+ 
++  // Get the size of static TCB to account for alignment
++  static uint64_t getStaticTCBSize() { return StaticTCBSize; }
++
++  /// postLayout - Backend can do any needed modification after layout
++  void doPostLayout() override;
++
+ private:
+   ELFSection *createGOTSection(InputFile &InputFile);
+   ELFSection *createGOTPLTSection(InputFile &InputFile);
+@@ -198,6 +206,9 @@ private:
+   // Create GNU property section.
+   void createGNUPropertySection(bool);
+ 
++  // Update TCB size to support TLS alignment
++  void setupStaticTCBForTLSSupport();
++
+ private:
+   AArch64ErrataFactory *m_pErrata843419Factory;
+ 
+@@ -218,6 +229,11 @@ private:
+   llvm::DenseMap<ResolveInfo *, AArch64GOT *> m_GOTPLTMap;
+   llvm::DenseMap<ResolveInfo *, AArch64PLT *> m_PLTMap;
+   std::unordered_map<InputFile *, uint32_t> NoteGNUPropertyMap;
++  /// The static TLS block contains an optional gap at the beginning,
++  /// that is followed by an optional alignment padding. The TLS variables
++  /// are stored after the alignment padding. This member stores the
++  /// offset in the static TLS block from where the variables start.
++  static uint64_t StaticTCBSize;
+ };
+ } // namespace eld
+ 
+diff --git a/lib/Target/AArch64/AArch64Relocator.cpp b/lib/Target/AArch64/AArch64Relocator.cpp
+index 08fafd30..d1730d16 100644
+--- a/lib/Target/AArch64/AArch64Relocator.cpp
++++ b/lib/Target/AArch64/AArch64Relocator.cpp
+@@ -1109,9 +1109,10 @@ Relocator::Result tls_gottprel_page(Relocation &pReloc,
+                                     AArch64Relocator &pParent) {
+   DiagnosticEngine *DiagEngine = pParent.config().getDiagEngine();
+   Relocator::DWord A = pReloc.addend();
+-  Relocator::DWord X = pParent.getSymValue(&pReloc) + 0x10;
+ 
+   if (!(pReloc.symInfo()->reserved() & Relocator::ReserveGOT)) {
++    Relocator::DWord X =
++        pParent.getSymValue(&pReloc) + AArch64LDBackend::getStaticTCBSize();
+     // Convert to movz
+     uint32_t movz = 0xD2A00000 | (pReloc.target() & 0x0000001F);
+     pReloc.target() = helper_reencode_movzk_imm(movz, X >> 16);
+@@ -1133,9 +1134,10 @@ Relocator::Result tls_gottprel_page(Relocation &pReloc,
+ Relocator::Result tls_gottprel_lo(Relocation &pReloc,
+                                   AArch64Relocator &pParent) {
+   Relocator::DWord A = pReloc.addend();
+-  Relocator::DWord X = pParent.getSymValue(&pReloc) + 0x10;
+ 
+   if (!(pReloc.symInfo()->reserved() & Relocator::ReserveGOT)) {
++    Relocator::DWord X =
++        pParent.getSymValue(&pReloc) + AArch64LDBackend::getStaticTCBSize();
+     // Convert to movk
+     uint32_t movk = 0xF2800000 | (pReloc.target() & 0x0000001F);
+     pReloc.target() = helper_reencode_movzk_imm(movk, X);
+@@ -1156,14 +1158,8 @@ Relocator::Result tls_gottprel_lo(Relocation &pReloc,
+ // R_AARCH64_TLSLE_ADD_TPREL_LO12
+ // R_AARCH64_TLSLE_ADD_TPREL_LO12_NC : TPREL(S+A)
+ Relocator::Result tls_tprel(Relocation &pReloc, AArch64Relocator &pParent) {
+-  const auto &OptTLSBlockVarOffset = pParent.getStaticTLSBlockVarOffset();
+-  if (!OptTLSBlockVarOffset.has_value()) {
+-    pParent.config().raise(Diag::no_pt_tls_segment);
+-    return Relocator::Result::BadReloc;
+-  }
+-
+   Relocator::DWord X =
+-      pParent.getSymValue(&pReloc) + OptTLSBlockVarOffset.value();
++      pParent.getSymValue(&pReloc) + AArch64LDBackend::getStaticTCBSize();
+ 
+   if (pReloc.type() == llvm::ELF::R_AARCH64_TLSLE_ADD_TPREL_HI12) {
+     if (!llvm::isUInt<24>(X))
+@@ -1181,9 +1177,10 @@ Relocator::Result tls_tprel(Relocation &pReloc, AArch64Relocator &pParent) {
+ Relocator::Result tls_tlsdesc_page(Relocation &pReloc,
+                                    AArch64Relocator &pParent) {
+   Relocator::DWord A = pReloc.addend();
+-  Relocator::DWord X = pParent.getSymValue(&pReloc) + 0x10;
+ 
+   if (!(pReloc.symInfo()->reserved() & Relocator::ReserveGOT)) {
++    Relocator::DWord X =
++        pParent.getSymValue(&pReloc) + AArch64LDBackend::getStaticTCBSize();
+     // Convert to movz
+     uint32_t movz = 0xD2A00000 | (pReloc.target() & 0x0000001F);
+     pReloc.target() = helper_reencode_movzk_imm(movz, X >> 16);
+@@ -1206,9 +1203,10 @@ Relocator::Result tls_tlsdesc_page(Relocation &pReloc,
+ Relocator::Result tls_tlsdesc_lo(Relocation &pReloc,
+                                  AArch64Relocator &pParent) {
+   Relocator::DWord A = pReloc.addend();
+-  Relocator::DWord X = pParent.getSymValue(&pReloc) + 0x10;
+ 
+   if (!(pReloc.symInfo()->reserved() & Relocator::ReserveGOT)) {
++    Relocator::DWord X =
++        pParent.getSymValue(&pReloc) + AArch64LDBackend::getStaticTCBSize();
+     // Convert to movk, save to x0
+     uint32_t movk = 0xF2800000;
+     pReloc.target() = helper_reencode_movzk_imm(movk, X);
+@@ -1272,16 +1270,3 @@ Relocator::Result copyInstruction(Relocation &pReloc,
+   pReloc.target() = insn;
+   return Relocator::OK;
+ }
+-
+-void AArch64Relocator::computeTLSOffsets() {
+-  const uint32_t WordSize = 0x8;
+-  auto OptFirstTLSSegVirtualAddr = getFirstTLSSegmentVirtualAddr();
+-  auto OptMaxTLSSegAlignment = getMaxTLSSegmentAlign();
+-  if (!OptFirstTLSSegVirtualAddr || !OptMaxTLSSegAlignment)
+-    return;
+-  auto FirstTLSSegVirtualAddr = OptFirstTLSSegVirtualAddr.value();
+-  auto MaxTLSSegAlignment = OptMaxTLSSegAlignment.value();
+-  StaticTLSBlockVarOffset = 2 * WordSize;
+-  *StaticTLSBlockVarOffset +=
+-      ((FirstTLSSegVirtualAddr - 2 * WordSize) & (MaxTLSSegAlignment - 1));
+-}
+diff --git a/lib/Target/AArch64/AArch64Relocator.h b/lib/Target/AArch64/AArch64Relocator.h
+index 9c1d987b..ddadab50 100644
+--- a/lib/Target/AArch64/AArch64Relocator.h
++++ b/lib/Target/AArch64/AArch64Relocator.h
+@@ -75,12 +75,6 @@ public:
+   void partialScanRelocation(Relocation &pReloc,
+                              const ELFSection &pSection) override;
+ 
+-  void computeTLSOffsets() override;
+-
+-  std::optional<uint64_t> getStaticTLSBlockVarOffset() const {
+-    return StaticTLSBlockVarOffset;
+-  }
+-
+ private:
+   bool isInvalidReloc(Relocation &pReloc) const;
+   bool isRelocSupported(Relocation &pReloc) const;
+@@ -95,11 +89,6 @@ private:
+ 
+ private:
+   AArch64LDBackend &m_Target;
+-  /// The static TLS block contains an optional gap at the beginning,
+-  /// that is followed by an optional alignment padding. The TLS variables
+-  /// are stored after the alignment padding. This member stores the
+-  /// offset in the static TLS block from where the variables start.
+-  std::optional<uint64_t> StaticTLSBlockVarOffset;
+ };
+ 
+ } // namespace eld
+diff --git a/test/AArch64/standalone/TLS_GD_ALIGN/GDAlign.test b/test/AArch64/standalone/TLS_GD_ALIGN/GDAlign.test
+new file mode 100644
+index 00000000..5b0ad7be
+--- /dev/null
++++ b/test/AArch64/standalone/TLS_GD_ALIGN/GDAlign.test
+@@ -0,0 +1,8 @@
++#---GDAlign.test----------------------------------------------------------#
++# Check that TLS GD GOT entries account for TLS block alignment padding.
++RUN: %clang %clangopts -target aarch64 -c %p/Inputs/gd-align.c -o %t.o -fPIC -ftls-model=global-dynamic
++RUN: %link %linkopts -march aarch64 %t.o -o %t.out --no-threads
++RUN: %readelf -x .got %t.out | %filecheck %s
++
++CHECK: .got
++CHECK: 80000000 00000000
+diff --git a/test/AArch64/standalone/TLS_GD_ALIGN/Inputs/gd-align.c b/test/AArch64/standalone/TLS_GD_ALIGN/Inputs/gd-align.c
+new file mode 100644
+index 00000000..ea67cd78
+--- /dev/null
++++ b/test/AArch64/standalone/TLS_GD_ALIGN/Inputs/gd-align.c
+@@ -0,0 +1,4 @@
++__thread int a = 12;
++__attribute__((aligned(128))) __thread int b = 13;
++
++int foo(void) { return a; }
+diff --git a/test/AArch64/standalone/TLS_IE_ALIGN/IEAlign.test b/test/AArch64/standalone/TLS_IE_ALIGN/IEAlign.test
+new file mode 100644
+index 00000000..34d637a5
+--- /dev/null
++++ b/test/AArch64/standalone/TLS_IE_ALIGN/IEAlign.test
+@@ -0,0 +1,8 @@
++#---IEAlign.test----------------------------------------------------------#
++# Check that TLS IE GOT entries account for TLS block alignment padding.
++RUN: %clang %clangopts -target aarch64 -c %p/Inputs/ie-align.c -o %t.o -fPIC -ftls-model=initial-exec
++RUN: %link %linkopts -march aarch64 %t.o -o %t.out --no-threads
++RUN: %readelf -x .got %t.out | %filecheck %s
++
++CHECK: .got
++CHECK: 80000000 00000000
+diff --git a/test/AArch64/standalone/TLS_IE_ALIGN/Inputs/ie-align.c b/test/AArch64/standalone/TLS_IE_ALIGN/Inputs/ie-align.c
+new file mode 100644
+index 00000000..ea67cd78
+--- /dev/null
++++ b/test/AArch64/standalone/TLS_IE_ALIGN/Inputs/ie-align.c
+@@ -0,0 +1,4 @@
++__thread int a = 12;
++__attribute__((aligned(128))) __thread int b = 13;
++
++int foo(void) { return a; }
+diff --git a/test/AArch64/standalone/TLS_IE_GOT_Offsets/Inputs/hw1.c b/test/AArch64/standalone/TLS_IE_GOT_Offsets/Inputs/hw1.c
+new file mode 100644
+index 00000000..ff212d78
+--- /dev/null
++++ b/test/AArch64/standalone/TLS_IE_GOT_Offsets/Inputs/hw1.c
+@@ -0,0 +1,10 @@
++__thread int b = 0;
++__thread int c = 0;
++
++int bar() {
++  b = 1;
++  c = 2;
++  return b + c;
++}
++
++int main() { return bar(); }
+diff --git a/test/AArch64/standalone/TLS_IE_GOT_Offsets/TLS_IE_GOT_Offsets.test b/test/AArch64/standalone/TLS_IE_GOT_Offsets/TLS_IE_GOT_Offsets.test
+new file mode 100644
+index 00000000..54bdc804
+--- /dev/null
++++ b/test/AArch64/standalone/TLS_IE_GOT_Offsets/TLS_IE_GOT_Offsets.test
+@@ -0,0 +1,22 @@
++#---TLS_IE_GOT_Offsets.test------------------------------------------------#
++# Check that TLS IE GOT entries have the correct offsets (0x10 and 0x14)
++# for two thread-local variables using the initial-exec model.
++#
++# The test verifies that:
++# - Variable 'b' (first TLS variable) gets GOT entry with offset 0x10
++# - Variable 'c' (second TLS variable) gets GOT entry with offset 0x14
++#
++# These offsets account for the TLS block alignment padding. The TLS segment
++# has alignment 0x4, and with the AArch64 TLS layout, the offsets include
++# the necessary padding to align the TLS block properly (0x10 = 16 bytes of
++# padding, then 'b' at offset 0x10, 'c' at offset 0x14).
++
++RUN: %clang %clangopts -target aarch64 -c %p/Inputs/hw1.c -o %t.o \
++RUN: -fPIC -ftls-model=initial-exec -fdata-sections
++RUN: %link %linkopts -march aarch64 %t.o -o %t.out --no-threads
++RUN: %readelf -x .got %t.out | %filecheck %s
++
++# The .got section should contain two TLS IE entries with offsets 0x10 and 0x14
++# in little-endian format (10000000 00000000 = 0x10, 14000000 00000000 = 0x14)
++CHECK: .got
++CHECK: 10000000 00000000 14000000 00000000
+-- 
+2.34.1
+
