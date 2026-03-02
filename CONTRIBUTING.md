@@ -1,4 +1,4 @@
-# Contributing to CPULLVM Toolchain Project
+# Contributing to the CPULLVM Toolchain Project
 
 Thank you for your interest in the CPULLVM Toolchain project.
 
@@ -27,7 +27,7 @@ While core code changes must go upstream, we welcome contributions to this repos
 
 The CPULLVM toolchain is heavily dependent on the LLVM, Picolibc, and ELD projects. If you identify an issue that is generic to one of these upstream projects, please submit it directly to the respective upstream repository.
 
-For reporting issues in qualcomm software build scripts and recipes, please use the Gitrhub issues:
+For reporting issues in qualcomm software build scripts and recipes, please use the GitHub issues:
 * [CPULLVM Toolchain Issue Tracker](https://github.com/qualcomm/cpullvm-toolchain/issues)
 
 Other upstream projects:
