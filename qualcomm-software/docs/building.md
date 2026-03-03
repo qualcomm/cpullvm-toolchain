@@ -29,7 +29,7 @@ not installed.
 A relatively recent version of QEMU is required to support the latest RISC-V extensions.
 CPULLVM currently builds and tests with QEMU v10.1.3.
 
-The `riscv32ima_xqci_ilp32` library-test variant requires an [Xqci and Xqccmp](https://github.com/quic/riscv-unified-db/releases) enabled QEMU build. Clone and build the [QEMU Xqci fork](https://github.com/quic/qemu/tree/feature/xqci), and ensure the binary is available as `qemu-system-riscv32-xqci` in your `PATH`:
+The `riscv32im_xqci_ilp32` library-test variant requires an [Xqci and Xqccmp](https://github.com/quic/riscv-unified-db/releases) enabled QEMU build. Clone and build the [QEMU Xqci fork](https://github.com/quic/qemu/tree/feature/xqci), and ensure the binary is available as `qemu-system-riscv32-xqci` in your `PATH`:
 
 ```
 git clone --branch feature/xqci https://github.com/quic/qemu.git qemu-xqci
@@ -41,7 +41,7 @@ ninja
 mv "<path-to>/qemu-system-riscv32" "<path-to>/qemu-system-riscv32-xqci"
 ```
 
-Refer to the [Xqci json](https://github.com/qualcomm/cpullvm-toolchain/blob/qualcomm-software/qualcomm-software/embedded-multilib/json/variants/riscv32ima_xqci_ilp32_nothreads_nopic.json) file for the flags that need to be passed to QEMU.
+Refer to the [Xqci json](https://github.com/qualcomm/cpullvm-toolchain/blob/qualcomm-software/qualcomm-software/embedded-multilib/json/variants/riscv32im_xqci_ilp32_nothreads_nopic.json) file for the flags that need to be passed to QEMU.
 
 ## Patching
 
