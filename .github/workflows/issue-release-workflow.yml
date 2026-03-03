@@ -54,7 +54,10 @@ jobs:
       - name: Setup Environment
         run: |
           pip install --require-hashes -r ./llvm/utils/git/requirements.txt
-          ./llvm/utils/git/github-automation.py --token ${{ github.token }} setup-llvmbot-git
+
+          # Set committer identity for commits created by this workflow
+          git config user.name  "cpullvmbot"
+          git config user.email "cpullvmbot@qti.qualcomm.com"
 
       - name: Backport Commits
         run: |
