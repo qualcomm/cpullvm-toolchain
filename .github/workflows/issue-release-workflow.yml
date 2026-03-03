@@ -64,10 +64,10 @@ jobs:
           printf "%s" "$COMMENT_BODY" |
           ./llvm/utils/git/github-automation.py \
           --repo "$GITHUB_REPOSITORY" \
-          --branch-repo "$GITHUB_REPOSITORY" \
           --token "${{ secrets.RELEASE_WORKFLOW_PR_CREATE }}" \
           release-workflow \
           --branch-repo-token ${{ secrets.RELEASE_WORKFLOW_PUSH_SECRET }} \
+          --branch-repo "$GITHUB_REPOSITORY" \
           --issue-number ${{ github.event.issue.number }} \
           --requested-by ${{ (github.event.action == 'opened' && github.event.issue.user.login) || github.event.comment.user.login }} \
           auto
