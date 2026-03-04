@@ -1,4 +1,4 @@
-From 1f232f6e9ef452da806015569e69e1dac2d19971 Mon Sep 17 00:00:00 2001
+From fcb060c4778e3b47c4a1049995693124bc34b9c7 Mon Sep 17 00:00:00 2001
 From: Brian Cain <brian.cain@oss.qualcomm.com>
 Date: Tue, 3 Mar 2026 13:12:56 -0800
 Subject: [PATCH] Improve IFunc support for AArch64 static executables
@@ -27,6 +27,7 @@ Resolves #903
 
 Co-authored-by: Brian Cain <brian.cain@oss.qualcomm.com>
 Signed-off-by: Parth Arora <partaror@qti.qualcomm.com>
+(cherry picked from commit 1f232f6e9ef452da806015569e69e1dac2d19971)
 ---
  include/eld/SymbolResolver/ResolveInfo.h      |  2 +
  lib/Target/AArch64/AArch64LDBackend.cpp       |  5 +-
@@ -62,7 +63,7 @@ index 3a79b66e..e4cbd926 100644
    static const uint32_t GlobalOffset = 0;
    static const uint32_t GlobalMask = 1;
 diff --git a/lib/Target/AArch64/AArch64LDBackend.cpp b/lib/Target/AArch64/AArch64LDBackend.cpp
-index 2b0beeb6..f054a7b0 100644
+index a597696f..5ebe923f 100644
 --- a/lib/Target/AArch64/AArch64LDBackend.cpp
 +++ b/lib/Target/AArch64/AArch64LDBackend.cpp
 @@ -761,9 +761,8 @@ AArch64GOT *AArch64LDBackend::findEntryInGOT(ResolveInfo *I) const {
@@ -78,7 +79,7 @@ index 2b0beeb6..f054a7b0 100644
    if (R != nullptr && ((config().options().isSymbolTracingRequested() &&
                          config().options().traceSymbol(*R)) ||
 diff --git a/lib/Target/AArch64/AArch64Relocator.cpp b/lib/Target/AArch64/AArch64Relocator.cpp
-index d1730d16..ce21049d 100644
+index cbef6804..1b8c21e1 100644
 --- a/lib/Target/AArch64/AArch64Relocator.cpp
 +++ b/lib/Target/AArch64/AArch64Relocator.cpp
 @@ -7,6 +7,7 @@
@@ -89,23 +90,22 @@ index d1730d16..ce21049d 100644
  #include "AArch64RelocationFunctions.h"
  #include "AArch64RelocationHelpers.h"
  #include "eld/Config/LinkerConfig.h"
-@@ -344,13 +345,14 @@ void AArch64Relocator::scanGlobalReloc(InputFile &pInput, Relocation &pReloc,
+@@ -297,12 +298,13 @@ void AArch64Relocator::scanGlobalReloc(InputFile &pInput, Relocation &pReloc,
    ELFObjectFile *Obj = llvm::dyn_cast<ELFObjectFile>(&pInput);
    // rsym - The relocation target symbol
    ResolveInfo *rsym = pReloc.symInfo();
 -
    switch (pReloc.type()) {
-   case llvm::ELF::R_AARCH64_AUTH_ABS64:
    case llvm::ELF::R_AARCH64_ABS16:
    case llvm::ELF::R_AARCH64_ABS32:
    case llvm::ELF::R_AARCH64_ABS64: {
      std::lock_guard<std::mutex> relocGuard(m_RelocMutex);
 +    if (handleScanForNonPreemptibleIFunc(rsym, Obj))
 +      return;
-     bool isAuthAbs = pReloc.type() == llvm::ELF::R_AARCH64_AUTH_ABS64;
      // Absolute relocation type, symbol may needs PLT entry or
      // dynamic relocation entry
-@@ -447,18 +449,12 @@ void AArch64Relocator::scanGlobalReloc(InputFile &pInput, Relocation &pReloc,
+     bool isSymbolPreemptible = m_Target.isSymbolPreemptible(*rsym);
+@@ -383,18 +385,12 @@ void AArch64Relocator::scanGlobalReloc(InputFile &pInput, Relocation &pReloc,
    case llvm::ELF::R_AARCH64_JUMP26:
    case llvm::ELF::R_AARCH64_CALL26: {
      std::lock_guard<std::mutex> relocGuard(m_RelocMutex);
@@ -126,16 +126,16 @@ index d1730d16..ce21049d 100644
      // if symbol is defined in the output file and it's not
      // preemptible, no need plt
      if (!getTarget().isSymbolPreemptible(*rsym)) {
-@@ -477,6 +473,8 @@ void AArch64Relocator::scanGlobalReloc(InputFile &pInput, Relocation &pReloc,
+@@ -413,6 +409,8 @@ void AArch64Relocator::scanGlobalReloc(InputFile &pInput, Relocation &pReloc,
    case llvm::ELF::R_AARCH64_ADR_PREL_PG_HI21:
    case R_AARCH64_ADR_PREL_PG_HI21_NC: {
      std::lock_guard<std::mutex> relocGuard(m_RelocMutex);
 +    if (handleScanForNonPreemptibleIFunc(rsym, Obj))
 +      return;
-     if (relocNeedsDynRel(pReloc)) {
+     if (getTarget().symbolNeedsDynRel(*rsym, (rsym->reserved() & ReservePLT),
+                                       false)) {
        if (getTarget().symbolNeedsCopyReloc(pReloc, *rsym)) {
-         // check if the option -z nocopyreloc is given
-@@ -510,10 +508,13 @@ void AArch64Relocator::scanGlobalReloc(InputFile &pInput, Relocation &pReloc,
+@@ -447,10 +445,13 @@ void AArch64Relocator::scanGlobalReloc(InputFile &pInput, Relocation &pReloc,
    case llvm::ELF::R_AARCH64_LD64_GOT_LO12_NC:
    case llvm::ELF::R_AARCH64_LD64_GOTPAGE_LO15: {
      std::lock_guard<std::mutex> relocGuard(m_RelocMutex);
@@ -149,7 +149,7 @@ index d1730d16..ce21049d 100644
      // if the symbol cannot be fully resolved at link time, then we need a
      // dynamic relocation
      CreateGOT(Obj, pReloc, !config().isCodeStatic(), m_Target,
-@@ -686,7 +687,14 @@ Relocator::Result unsupport(Relocation &pReloc, AArch64Relocator &pParent) {
+@@ -605,7 +606,14 @@ Relocator::Result unsupport(Relocation &pReloc, AArch64Relocator &pParent) {
  Relocator::Result abs(Relocation &pReloc, AArch64Relocator &pParent) {
    ResolveInfo *rsym = pReloc.symInfo();
    Relocator::DWord A = pReloc.addend();
@@ -162,10 +162,10 @@ index d1730d16..ce21049d 100644
 +    // Create GOT slot for rsym with the fragment reference of P
 +  } else
 +    S = pParent.getSymValue(&pReloc);
-   Relocator::Address targetVal = S + A;
  
-   bool isAuthAbs = pReloc.type() == llvm::ELF::R_AARCH64_AUTH_ABS64;
-@@ -949,13 +957,24 @@ Relocator::Result condbr(Relocation &pReloc, AArch64Relocator &pParent) {
+   ELFSection *target_sect = pReloc.targetRef()->getOutputELFSection();
+   // If the flag of target section is not ALLOC, we will not scan this
+@@ -838,13 +846,24 @@ Relocator::Result condbr(Relocation &pReloc, AArch64Relocator &pParent) {
  
  // R_AARCH64_ADR_GOT_PAGE: Page(G(GDAT(S+A))) - Page(P)
  Relocator::Result adr_got_page(Relocation &pReloc, AArch64Relocator &pParent) {
@@ -195,7 +195,7 @@ index d1730d16..ce21049d 100644
    Relocator::DWord A = pReloc.addend();
    Relocator::Address P = pReloc.place(pParent.module());
    Relocator::DWord X =
-@@ -969,13 +988,27 @@ Relocator::Result adr_got_page(Relocation &pReloc, AArch64Relocator &pParent) {
+@@ -858,13 +877,27 @@ Relocator::Result adr_got_page(Relocation &pReloc, AArch64Relocator &pParent) {
  
  // R_AARCH64_LD64_GOT_LO12_NC: G(GDAT(S))
  Relocator::Result ld64_got_lo12(Relocation &pReloc, AArch64Relocator &pParent) {
@@ -227,7 +227,7 @@ index d1730d16..ce21049d 100644
    Relocator::DWord A = pReloc.addend();
    Relocator::DWord X = helper_get_page_offset(GOT_S + A);
  
-@@ -1270,3 +1303,15 @@ Relocator::Result copyInstruction(Relocation &pReloc,
+@@ -1159,3 +1192,15 @@ Relocator::Result copyInstruction(Relocation &pReloc,
    pReloc.target() = insn;
    return Relocator::OK;
  }
@@ -243,12 +243,11 @@ index d1730d16..ce21049d 100644
 +  symInfo->setReserved(symInfo->reserved() | ReservePLT);
 +  return true;
 +}
-\ No newline at end of file
 diff --git a/lib/Target/AArch64/AArch64Relocator.h b/lib/Target/AArch64/AArch64Relocator.h
-index ddadab50..6389e1ad 100644
+index 7c4fa95b..120e6267 100644
 --- a/lib/Target/AArch64/AArch64Relocator.h
 +++ b/lib/Target/AArch64/AArch64Relocator.h
-@@ -87,6 +87,9 @@ private:
+@@ -84,6 +84,9 @@ private:
                         eld::IRBuilder &pBuilder, ELFSection &pSection,
                         CopyRelocs &);
  
