@@ -6,6 +6,12 @@
             "flags": "--target=aarch64-unknown-none-elf"
         },
         {
+            "variant": "aarch64a_standalone",
+            "json": "aarch64a_standalone.json",
+            "flags": "--target=aarch64-unknown-none-elf -fmultilib-flag=standalone",
+            "libraries_supported": "musl-embedded"
+        },
+        {
             "variant": "aarch64a_pacret",
             "json": "aarch64a_pacret.json",
             "flags": "--target=aarch64-unknown-none-elf -march=armv8.3-a -mbranch-protection=pac-ret+leaf"
