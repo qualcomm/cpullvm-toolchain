@@ -1,0 +1,477 @@
+From 1f232f6e9ef452da806015569e69e1dac2d19971 Mon Sep 17 00:00:00 2001
+From: Brian Cain <brian.cain@oss.qualcomm.com>
+Date: Tue, 3 Mar 2026 13:12:56 -0800
+Subject: [PATCH] Improve IFunc support for AArch64 static executables
+
+This commit improves GNU IFunc support for static executables.
+GNU IFunc allows a function definition to be resolved at runtime.
+More information about IFUNC symbols can be found here:
+https://gcc.gnu.org/onlinedocs/gcc-5.3.0/gcc/Function-Attributes.html#index-g_t_0040code_007bifunc_007d-function-attribute-3095
+
+For each non-preemptible ifunc symbol that is referred in the codebase,
+we create a .plt entry and a corresponding .got.plt entry. In
+particular, we create .plt/.got.plt entry for an ifunc symbol when it is
+referred by either of these relocation types:
+- R_AARCH64_ABS*
+- R_AARCH64_(CONDBR19|JUMP26|CALL26)
+- R_AARCH_ADR_PREL_PG_*
+- R_AARCH64_ADR_GOT_*
+
+For ABS, CALL*, PREL_PG_* relocations, the value of ifunc symbol is
+taken as the address of its .plt entry.
+
+For ADR_GOT_* relocations, the value of the ifunc symbol is taken as the
+address of its .got.plt entry.
+
+Resolves #903
+
+Co-authored-by: Brian Cain <brian.cain@oss.qualcomm.com>
+Signed-off-by: Parth Arora <partaror@qti.qualcomm.com>
+---
+ include/eld/SymbolResolver/ResolveInfo.h      |  2 +
+ lib/Target/AArch64/AArch64LDBackend.cpp       |  5 +-
+ lib/Target/AArch64/AArch64Relocator.cpp       | 83 ++++++++++++++-----
+ lib/Target/AArch64/AArch64Relocator.h         |  3 +
+ test/AArch64/linux/IFuncs/IFuncs.test         | 51 ++++++++++++
+ test/AArch64/linux/IFuncs/Inputs/1.c          |  7 ++
+ test/AArch64/linux/IFuncs/Inputs/main.1.c     |  6 ++
+ test/AArch64/linux/IFuncs/Inputs/main.2.c     |  7 ++
+ test/AArch64/linux/IFuncs/Inputs/main.3.c     |  8 ++
+ test/AArch64/linux/IFuncs/Inputs/main.4.c     |  9 ++
+ .../standalone/IFuncGotAddr/IFuncGotAddr.s    | 79 ++++++++++++++++++
+ 11 files changed, 238 insertions(+), 22 deletions(-)
+ create mode 100644 test/AArch64/linux/IFuncs/IFuncs.test
+ create mode 100644 test/AArch64/linux/IFuncs/Inputs/1.c
+ create mode 100644 test/AArch64/linux/IFuncs/Inputs/main.1.c
+ create mode 100644 test/AArch64/linux/IFuncs/Inputs/main.2.c
+ create mode 100644 test/AArch64/linux/IFuncs/Inputs/main.3.c
+ create mode 100644 test/AArch64/linux/IFuncs/Inputs/main.4.c
+ create mode 100644 test/AArch64/standalone/IFuncGotAddr/IFuncGotAddr.s
+
+diff --git a/include/eld/SymbolResolver/ResolveInfo.h b/include/eld/SymbolResolver/ResolveInfo.h
+index 3a79b66e..e4cbd926 100644
+--- a/include/eld/SymbolResolver/ResolveInfo.h
++++ b/include/eld/SymbolResolver/ResolveInfo.h
+@@ -272,6 +272,8 @@ public:
+ 
+   bool canBePreemptible() const;
+ 
++  bool isIFunc() const { return type() == ResolveInfo::IndirectFunc; }
++
+ private:
+   static const uint32_t GlobalOffset = 0;
+   static const uint32_t GlobalMask = 1;
+diff --git a/lib/Target/AArch64/AArch64LDBackend.cpp b/lib/Target/AArch64/AArch64LDBackend.cpp
+index 2b0beeb6..f054a7b0 100644
+--- a/lib/Target/AArch64/AArch64LDBackend.cpp
++++ b/lib/Target/AArch64/AArch64LDBackend.cpp
+@@ -761,9 +761,8 @@ AArch64GOT *AArch64LDBackend::findEntryInGOT(ResolveInfo *I) const {
+ }
+ 
+ // Create PLT entry.
+-AArch64PLT *AArch64LDBackend::createPLT(ELFObjectFile *Obj,
+-                                               ResolveInfo *R,
+-                                               bool isIRelative) {
++AArch64PLT *AArch64LDBackend::createPLT(ELFObjectFile *Obj, ResolveInfo *R,
++                                        bool isIRelative) {
+   // If there is no entries GOTPLT and PLT, we dont have a PLT0.
+   if (R != nullptr && ((config().options().isSymbolTracingRequested() &&
+                         config().options().traceSymbol(*R)) ||
+diff --git a/lib/Target/AArch64/AArch64Relocator.cpp b/lib/Target/AArch64/AArch64Relocator.cpp
+index d1730d16..ce21049d 100644
+--- a/lib/Target/AArch64/AArch64Relocator.cpp
++++ b/lib/Target/AArch64/AArch64Relocator.cpp
+@@ -7,6 +7,7 @@
+ 
+ #include "AArch64Relocator.h"
+ #include "AArch64InsnHelpers.h"
++#include "AArch64PLT.h"
+ #include "AArch64RelocationFunctions.h"
+ #include "AArch64RelocationHelpers.h"
+ #include "eld/Config/LinkerConfig.h"
+@@ -344,13 +345,14 @@ void AArch64Relocator::scanGlobalReloc(InputFile &pInput, Relocation &pReloc,
+   ELFObjectFile *Obj = llvm::dyn_cast<ELFObjectFile>(&pInput);
+   // rsym - The relocation target symbol
+   ResolveInfo *rsym = pReloc.symInfo();
+-
+   switch (pReloc.type()) {
+   case llvm::ELF::R_AARCH64_AUTH_ABS64:
+   case llvm::ELF::R_AARCH64_ABS16:
+   case llvm::ELF::R_AARCH64_ABS32:
+   case llvm::ELF::R_AARCH64_ABS64: {
+     std::lock_guard<std::mutex> relocGuard(m_RelocMutex);
++    if (handleScanForNonPreemptibleIFunc(rsym, Obj))
++      return;
+     bool isAuthAbs = pReloc.type() == llvm::ELF::R_AARCH64_AUTH_ABS64;
+     // Absolute relocation type, symbol may needs PLT entry or
+     // dynamic relocation entry
+@@ -447,18 +449,12 @@ void AArch64Relocator::scanGlobalReloc(InputFile &pInput, Relocation &pReloc,
+   case llvm::ELF::R_AARCH64_JUMP26:
+   case llvm::ELF::R_AARCH64_CALL26: {
+     std::lock_guard<std::mutex> relocGuard(m_RelocMutex);
++    if (handleScanForNonPreemptibleIFunc(rsym, Obj))
++      return;
+     // return if we already create plt for this symbol
+     if (rsym->reserved() & ReservePLT)
+       return;
+ 
+-    // create IRELATIVE for IFUNC symbol
+-    if (rsym->type() == ResolveInfo::IndirectFunc && config().isCodeStatic()) {
+-      m_Target.createPLT(Obj, rsym, true);
+-      rsym->setReserved(rsym->reserved() | ReservePLT);
+-      AArch64LDBackend &backend = getTarget();
+-      backend.defineIRelativeRange(*rsym);
+-      return;
+-    }
+     // if symbol is defined in the output file and it's not
+     // preemptible, no need plt
+     if (!getTarget().isSymbolPreemptible(*rsym)) {
+@@ -477,6 +473,8 @@ void AArch64Relocator::scanGlobalReloc(InputFile &pInput, Relocation &pReloc,
+   case llvm::ELF::R_AARCH64_ADR_PREL_PG_HI21:
+   case R_AARCH64_ADR_PREL_PG_HI21_NC: {
+     std::lock_guard<std::mutex> relocGuard(m_RelocMutex);
++    if (handleScanForNonPreemptibleIFunc(rsym, Obj))
++      return;
+     if (relocNeedsDynRel(pReloc)) {
+       if (getTarget().symbolNeedsCopyReloc(pReloc, *rsym)) {
+         // check if the option -z nocopyreloc is given
+@@ -510,10 +508,13 @@ void AArch64Relocator::scanGlobalReloc(InputFile &pInput, Relocation &pReloc,
+   case llvm::ELF::R_AARCH64_LD64_GOT_LO12_NC:
+   case llvm::ELF::R_AARCH64_LD64_GOTPAGE_LO15: {
+     std::lock_guard<std::mutex> relocGuard(m_RelocMutex);
++    if (handleScanForNonPreemptibleIFunc(rsym, Obj))
++      return;
+     // Symbol needs GOT entry, reserve entry in .got
+     // return if we already create GOT for this symbol
+     if (rsym->reserved() & ReserveGOT)
+       return;
++
+     // if the symbol cannot be fully resolved at link time, then we need a
+     // dynamic relocation
+     CreateGOT(Obj, pReloc, !config().isCodeStatic(), m_Target,
+@@ -686,7 +687,14 @@ Relocator::Result unsupport(Relocation &pReloc, AArch64Relocator &pParent) {
+ Relocator::Result abs(Relocation &pReloc, AArch64Relocator &pParent) {
+   ResolveInfo *rsym = pReloc.symInfo();
+   Relocator::DWord A = pReloc.addend();
+-  Relocator::DWord S = pParent.getSymValue(&pReloc);
++  Relocator::DWord S;
++  if (LLVM_UNLIKELY(rsym && rsym->isIFunc() &&
++                    pParent.config().isCodeStatic())) {
++    AArch64PLT *P = pParent.getTarget().findEntryInPLT(rsym);
++    S = P->getAddr(pParent.config().getDiagEngine());
++    // Create GOT slot for rsym with the fragment reference of P
++  } else
++    S = pParent.getSymValue(&pReloc);
+   Relocator::Address targetVal = S + A;
+ 
+   bool isAuthAbs = pReloc.type() == llvm::ELF::R_AARCH64_AUTH_ABS64;
+@@ -949,13 +957,24 @@ Relocator::Result condbr(Relocation &pReloc, AArch64Relocator &pParent) {
+ 
+ // R_AARCH64_ADR_GOT_PAGE: Page(G(GDAT(S+A))) - Page(P)
+ Relocator::Result adr_got_page(Relocation &pReloc, AArch64Relocator &pParent) {
+-  DiagnosticEngine *DiagEngine = pParent.config().getDiagEngine();
+-  if (!(pReloc.symInfo()->reserved() & Relocator::ReserveGOT)) {
++  LinkerConfig &config = pParent.config();
++  DiagnosticEngine *DiagEngine = config.getDiagEngine();
++  ResolveInfo *symInfo = pReloc.symInfo();
++  bool isStaticIFunc = symInfo->isIFunc() && config.isCodeStatic();
++  if ((!isStaticIFunc && !(symInfo->reserved() & Relocator::ReserveGOT)) ||
++      (isStaticIFunc && !(symInfo->reserved() & Relocator::ReservePLT))) {
+     return Relocator::BadReloc;
+   }
+-
+-  Relocator::Address GOT_S =
+-      pParent.getTarget().findEntryInGOT(pReloc.symInfo())->getAddr(DiagEngine);
++  Relocator::Address GOT_S;
++  if (LLVM_UNLIKELY(isStaticIFunc)) {
++    AArch64PLT *PLT = pParent.getTarget().findEntryInPLT(symInfo);
++    ASSERT(PLT, "Must not be null!");
++    GOT_S = PLT->getGOT()->getAddr(DiagEngine);
++  } else {
++    GOT_S = pParent.getTarget()
++                .findEntryInGOT(pReloc.symInfo())
++                ->getAddr(DiagEngine);
++  }
+   Relocator::DWord A = pReloc.addend();
+   Relocator::Address P = pReloc.place(pParent.module());
+   Relocator::DWord X =
+@@ -969,13 +988,27 @@ Relocator::Result adr_got_page(Relocation &pReloc, AArch64Relocator &pParent) {
+ 
+ // R_AARCH64_LD64_GOT_LO12_NC: G(GDAT(S))
+ Relocator::Result ld64_got_lo12(Relocation &pReloc, AArch64Relocator &pParent) {
+-  if (!(pReloc.symInfo()->reserved() & Relocator::ReserveGOT)) {
++  ResolveInfo *symInfo = pReloc.symInfo();
++  LinkerConfig &config = pParent.config();
++  bool isStaticIFunc = symInfo->isIFunc() && config.isCodeStatic();
++  if ((!isStaticIFunc &&
++       !(pReloc.symInfo()->reserved() & Relocator::ReserveGOT)) ||
++      (isStaticIFunc && !(symInfo->reserved() & Relocator::ReservePLT))) {
+     return Relocator::BadReloc;
+   }
+ 
+-  Relocator::Address GOT_S = pParent.getTarget()
+-                                 .findEntryInGOT(pReloc.symInfo())
+-                                 ->getAddr(pParent.config().getDiagEngine());
++  Relocator::Address GOT_S;
++
++  if (LLVM_UNLIKELY(isStaticIFunc)) {
++    AArch64PLT *PLT = pParent.getTarget().findEntryInPLT(symInfo);
++    ASSERT(PLT, "Must not be null!");
++    GOT_S = PLT->getGOT()->getAddr(pParent.config().getDiagEngine());
++  } else {
++    GOT_S = pParent.getTarget()
++                .findEntryInGOT(pReloc.symInfo())
++                ->getAddr(pParent.config().getDiagEngine());
++  }
++
+   Relocator::DWord A = pReloc.addend();
+   Relocator::DWord X = helper_get_page_offset(GOT_S + A);
+ 
+@@ -1270,3 +1303,15 @@ Relocator::Result copyInstruction(Relocation &pReloc,
+   pReloc.target() = insn;
+   return Relocator::OK;
+ }
++
++bool AArch64Relocator::handleScanForNonPreemptibleIFunc(ResolveInfo *symInfo,
++                                                        ELFObjectFile *Obj) {
++  if (!symInfo || !symInfo->isIFunc() || !config().isCodeStatic())
++    return false;
++  if (symInfo->reserved() & Relocator::ReservePLT)
++    return true;
++  m_Target.createPLT(Obj, symInfo, /*isIRelative=*/true);
++  m_Target.defineIRelativeRange(*symInfo);
++  symInfo->setReserved(symInfo->reserved() | ReservePLT);
++  return true;
++}
+\ No newline at end of file
+diff --git a/lib/Target/AArch64/AArch64Relocator.h b/lib/Target/AArch64/AArch64Relocator.h
+index ddadab50..6389e1ad 100644
+--- a/lib/Target/AArch64/AArch64Relocator.h
++++ b/lib/Target/AArch64/AArch64Relocator.h
+@@ -87,6 +87,9 @@ private:
+                        eld::IRBuilder &pBuilder, ELFSection &pSection,
+                        CopyRelocs &);
+ 
++  bool handleScanForNonPreemptibleIFunc(ResolveInfo *symInfo,
++                                        ELFObjectFile *Obj);
++
+ private:
+   AArch64LDBackend &m_Target;
+ };
+diff --git a/test/AArch64/linux/IFuncs/IFuncs.test b/test/AArch64/linux/IFuncs/IFuncs.test
+new file mode 100644
+index 00000000..fa81dde5
+--- /dev/null
++++ b/test/AArch64/linux/IFuncs/IFuncs.test
+@@ -0,0 +1,51 @@
++#---IFuncs.test--------------------- Exe------------------#
++#BEGIN_COMMENT
++# This test verifies the IFUNC support when building AArch64 static executables.
++#END_COMMENT
++#START_TEST
++RUN: %clang %clangopts --target=aarch64-linux-gnu -o %t1.1.o %p/Inputs/1.c -c
++RUN: %clang %clangopts --target=aarch64-linux-gnu -o %t1.main.1.o %p/Inputs/main.1.c -c
++RUN: %link %linkopts -march aarch64 -o %t1.a.1.out %t1.main.1.o %t1.1.o --image-base 0x1000
++RUN: (%readelf -S %t1.a.1.out; %objdump -d %t1.a.1.out) | %filecheck %s --check-prefix CHECK1
++RUN: %clang %clangopts --target=aarch64-linux-gnu -o %t1.main.2.o %p/Inputs/main.2.c -c
++RUN: %link %linkopts -march aarch64 -o %t1.a.2.out %t1.main.2.o %t1.1.o --image-base 0x1000
++RUN: (%readelf -S %t1.a.2.out; %objdump -d %t1.a.2.out) | %filecheck %s --check-prefix CHECK2
++RUN: %clang %clangopts --target=aarch64-linux-gnu -o %t1.1.no_pic.o %p/Inputs/1.c -c -fno-pic
++RUN: %clang %clangopts --target=aarch64-linux-gnu -o %t1.main.2.no_pic.o %p/Inputs/main.2.c -c -fno-pic
++RUN: %link %linkopts -march aarch64 -o %t1.a.2.no_pic.out %t1.main.2.no_pic.o %t1.1.no_pic.o --image-base 0x1000
++RUN: (%readelf -S %t1.a.2.no_pic.out; %objdump -d %t1.a.2.no_pic.out) | %filecheck %s --check-prefix CHECK2_NOPIC
++RUN: %clang %clangopts --target=aarch64-linux-gnu -o %t1.main.3.o %p/Inputs/main.3.c -c
++RUN: %link %linkopts -march aarch64 -o %t1.a.3.out %t1.main.3.o %t1.1.o --image-base 0x1000
++RUN: (%readelf -S %t1.a.3.out; %objdump -D %t1.a.3.out) | %filecheck %s --check-prefix CHECK3
++RUN: %clang %clangopts --target=aarch64-linux-gnu -o %t1.main.4.o %p/Inputs/main.4.c -c
++RUN: %link %linkopts -march aarch64 -o %t1.a.4.out %t1.main.4.o %t1.1.o --image-base 0x1000
++RUN: (%readelf -S %t1.a.4.out; %objdump -D %t1.a.4.out) | %filecheck %s --check-prefix CHECK4
++#END_TEST
++
++CHECK1: .plt PROGBITS [[#%x,PLT_START:]]
++CHECK1: <main>:
++CHECK1: bl 0x[[#PLT_START+0x20]]
++
++CHECK2: .got.plt PROGBITS {{0+}}[[#%x,GOT_PLT_START:]]
++CHECK2: <main>:
++CHECK2: adrp x8, 0x[[#GOT_PLT_START]]
++CHECK2: ldr	x8, [x8, #0x18]
++
++CHECK2_NOPIC: .plt PROGBITS {{0+}}1020
++CHECK2_NOPIC: <main>:
++CHECK2_NOPIC: adrp x8, 0x1000
++CHECK2_NOPIC: add x8, x8, #0x40
++
++CHECK3: .plt PROGBITS [[#%x,PLT_START:]]
++CHECK3: Disassembly of section .data:
++CHECK3: {{0+}}2000 <foogp>:
++CHECK3: 2000: {{.*}} .word 0x{{0+}}[[#%x,PLT_START+0x20]]
++
++CHECK4: .plt PROGBITS [[#%x,PLT_START:]]
++CHECK4: .got.plt PROGBITS {{0+}}2008
++CHECK4: <main>:
++CHECK4: adrp x8, 0x2000
++CHECK4: ldr	x8, [x8, #0x20]
++CHECK4: Disassembly of section .data:
++CHECK4: {{0+}}2000 <foogp>:
++CHECK4: 2000: {{.*}} .word 0x{{0+}}[[#%x,PLT_START+0x20]]
+\ No newline at end of file
+diff --git a/test/AArch64/linux/IFuncs/Inputs/1.c b/test/AArch64/linux/IFuncs/Inputs/1.c
+new file mode 100644
+index 00000000..b0629da3
+--- /dev/null
++++ b/test/AArch64/linux/IFuncs/Inputs/1.c
+@@ -0,0 +1,7 @@
++int foo1() { return 1; }
++
++int foo2() { return 2; }
++
++static int (*foo_resolver(void))() { return foo1; }
++
++__attribute__((ifunc("foo_resolver"))) int foo();
+diff --git a/test/AArch64/linux/IFuncs/Inputs/main.1.c b/test/AArch64/linux/IFuncs/Inputs/main.1.c
+new file mode 100644
+index 00000000..6322fe93
+--- /dev/null
++++ b/test/AArch64/linux/IFuncs/Inputs/main.1.c
+@@ -0,0 +1,6 @@
++int foo();
++
++int main() {
++  int u = foo();
++  return 0;
++}
+\ No newline at end of file
+diff --git a/test/AArch64/linux/IFuncs/Inputs/main.2.c b/test/AArch64/linux/IFuncs/Inputs/main.2.c
+new file mode 100644
+index 00000000..2b50ef70
+--- /dev/null
++++ b/test/AArch64/linux/IFuncs/Inputs/main.2.c
+@@ -0,0 +1,7 @@
++int foo();
++
++int main() {
++  int (*foop)(void) = foo;
++  int u = foop();
++  return 0;
++}
+\ No newline at end of file
+diff --git a/test/AArch64/linux/IFuncs/Inputs/main.3.c b/test/AArch64/linux/IFuncs/Inputs/main.3.c
+new file mode 100644
+index 00000000..936a734b
+--- /dev/null
++++ b/test/AArch64/linux/IFuncs/Inputs/main.3.c
+@@ -0,0 +1,8 @@
++int foo();
++
++int (*foogp)(void) = foo;
++
++int main() {
++  int u = foogp();
++  return 0;
++}
+\ No newline at end of file
+diff --git a/test/AArch64/linux/IFuncs/Inputs/main.4.c b/test/AArch64/linux/IFuncs/Inputs/main.4.c
+new file mode 100644
+index 00000000..09ecaf0a
+--- /dev/null
++++ b/test/AArch64/linux/IFuncs/Inputs/main.4.c
+@@ -0,0 +1,9 @@
++int foo();
++
++int (*foogp)(void) = foo;
++
++int main() {
++  int (*foop)(void) = foo;
++  int u = foop() + foogp();
++  return 0;
++}
+\ No newline at end of file
+diff --git a/test/AArch64/standalone/IFuncGotAddr/IFuncGotAddr.s b/test/AArch64/standalone/IFuncGotAddr/IFuncGotAddr.s
+new file mode 100644
+index 00000000..28b6c97c
+--- /dev/null
++++ b/test/AArch64/standalone/IFuncGotAddr/IFuncGotAddr.s
+@@ -0,0 +1,79 @@
++#---IFuncGotAddr.s--------------------- Executable --------------------#
++#BEGIN_COMMENT
++# When code takes the address of an IFUNC symbol through the GOT in a static
++# executable (via R_AARCH64_ADR_GOT_PAGE + R_AARCH64_LD64_GOT_LO12_NC), the
++# linker must emit an R_AARCH64_IRELATIVE relocation targeting the regular GOT
++# entry.  At startup the CRT iterates __rela_iplt_start .. __rela_iplt_end,
++# calls each IFUNC resolver, and writes the result into the GOT entry.
++#
++# This is a regression test for a bug where no IRELATIVE relocation was emitted
++# for the regular GOT entry, leaving it permanently set to the resolver address.
++# Code that loaded this address as a function pointer would invoke the resolver
++# instead of the actual implementation, causing silent memory corruption.
++#END_COMMENT
++#START_TEST
++
++# RUN: rm -rf %t && split-file %s %t && cd %t
++# RUN: %llvm-mc -filetype=obj -triple=aarch64 def.s -o def.o
++# RUN: %llvm-mc -filetype=obj -triple=aarch64 use.s -o use.o
++# RUN: %link %linkopts -march aarch64 def.o use.o -o out --section-start .text=0x1000
++
++# RUN: llvm-readobj -r out | %filecheck --check-prefix=RELOCS %s
++
++## Verify relevant sections exist.
++# RUN: %readelf -S -W out | %filecheck --check-prefix=SECTIONS %s
++
++# RELOCS: R_AARCH64_IRELATIVE - 0x1008
++
++# SECTIONS: .rela.plt
++# SECTIONS: .plt
++# SECTIONS: .got.plt
++
++#END_TEST
++
++#--- def.s
++// Define an IFUNC symbol whose resolver returns the address of the
++// actual implementation.
++
++  .text
++
++// The real implementation.
++  .type impl, @function
++impl:
++  add w0, w0, #1
++  ret
++  .size impl, .-impl
++
++// The resolver: returns &impl.
++  .type resolve_myfunc, @function
++resolve_myfunc:
++  adrp x0, impl
++  add  x0, x0, :lo12:impl
++  ret
++  .size resolve_myfunc, .-resolve_myfunc
++
++// Declare myfunc as an IFUNC whose resolver is resolve_myfunc.
++  .globl myfunc
++  .type  myfunc, @gnu_indirect_function
++  .set   myfunc, resolve_myfunc
++
++#--- use.s
++// Take the address of an IFUNC symbol through the GOT
++// (R_AARCH64_ADR_GOT_PAGE + R_AARCH64_LD64_GOT_LO12_NC)
++// and also call it directly (R_AARCH64_CALL26 through PLT).
++
++  .text
++  .globl _start
++  .type  _start, @function
++_start:
++  // Load &myfunc from GOT -- generates R_AARCH64_ADR_GOT_PAGE +
++  // R_AARCH64_LD64_GOT_LO12_NC.  The linker emits an IRELATIVE relocation
++  // on this GOT entry so the CRT resolves it at startup.
++  adrp x8, :got:myfunc
++  ldr  x8, [x8, :got_lo12:myfunc]
++
++  // Call myfunc through PLT -- generates R_AARCH64_CALL26.
++  bl   myfunc
++
++  ret
++  .size _start, .-_start
+-- 
+2.34.1
+
