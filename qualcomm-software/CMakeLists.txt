@@ -242,6 +242,7 @@ set(LLVM_BUILD_RUNTIME OFF CACHE BOOL "")
 set(LIBCLANG_BUILD_STATIC ON CACHE BOOL "")
 set(LLVM_POLLY_LINK_INTO_TOOLS ON CACHE BOOL "")
 set(CLANG_DEFAULT_LINKER lld CACHE STRING "")
+set(LLVM_LIT_ARGS "-sv" CACHE STRING "")
 
 # Default to a release build
 # (CMAKE_BUILD_TYPE is a special CMake variable so if you want to set
@@ -331,8 +332,13 @@ endif()
 set(LLVM_EXTERNAL_PROJECTS eld)
 set(LLVM_EXTERNAL_ELD_SOURCE_DIR "${eld_SOURCE_DIR}")
 
-set(clang_lit_xfails_path "${CMAKE_CURRENT_BINARY_DIR}/clang_lit_xfails.txt")
-set(CLANG_TEST_EXTRA_ARGS "@${clang_lit_xfails_path}")
+# List of LLVM projects to generate xfails for. libc++ and compiler-rt tests
+# should not be handled here.
+set(llvm_xfail_projects clang)
+foreach(project ${llvm_xfail_projects})
+    set(${project}_lit_xfails_path "${CMAKE_CURRENT_BINARY_DIR}/${project}_lit_xfails.txt")
+    string(APPEND LLVM_LIT_ARGS " @${${project}_lit_xfails_path}")
+endforeach()
 
 set(llvmproject_src_dir ${CMAKE_CURRENT_SOURCE_DIR}/..)
 add_subdirectory(
@@ -341,19 +347,21 @@ add_subdirectory(
 
 add_dependencies(check-all check-eld)
 
-# Update the xfail/xfail-not list before running the tests.
-add_custom_target(
-    clang-xfail-lit-args
-    COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/embedded-runtimes/test-support/xfails.py
-        --project clang
-        --clang ${LLVM_BINARY_DIR}/bin/clang
-        --output-args ${clang_lit_xfails_path}
-    DEPENDS
-        clang
-)
-add_dependencies(check-clang clang-xfail-lit-args)
-add_dependencies(check-all clang-xfail-lit-args)
+# Update the xfail/xfail-not lists before running the tests.
+foreach(project ${llvm_xfail_projects})
+    add_custom_target(
+        ${project}-xfail-lit-args
+        COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/embedded-runtimes/test-support/xfails.py
+            --project ${project}
+            --clang ${LLVM_BINARY_DIR}/bin/clang
+            --output-args ${${project}_lit_xfails_path}
+        DEPENDS
+            clang
+    )
+    add_dependencies(check-${project} ${project}-xfail-lit-args)
+    add_dependencies(check-all ${project}-xfail-lit-args)
+endforeach()
 
 get_directory_property(LLVM_VERSION_MAJOR DIRECTORY ${llvmproject_src_dir}/llvm DEFINITION LLVM_VERSION_MAJOR)
 get_directory_property(LLVM_VERSION_MINOR DIRECTORY ${llvmproject_src_dir}/llvm DEFINITION LLVM_VERSION_MINOR)
