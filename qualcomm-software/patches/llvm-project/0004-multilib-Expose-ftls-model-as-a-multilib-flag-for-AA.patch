@@ -1,0 +1,56 @@
+From 5f1ce69e1cbd688424a4b2efb93972f44a5bc8f5 Mon Sep 17 00:00:00 2001
+From: Pengxuan Zheng <pzheng@qti.qualcomm.com>
+Date: Thu, 5 Mar 2026 15:58:03 -0800
+Subject: [PATCH] [multilib] Expose -ftls-model as a multilib flag for
+ AArch64/ARM
+
+This allows multilib selection based on tls model.
+---
+ clang/lib/Driver/ToolChain.cpp                  | 8 ++++++++
+ clang/test/Driver/print-multi-selection-flags.c | 4 ++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/clang/lib/Driver/ToolChain.cpp b/clang/lib/Driver/ToolChain.cpp
+index 703a3f8819cb..d9796e820080 100644
+--- a/clang/lib/Driver/ToolChain.cpp
++++ b/clang/lib/Driver/ToolChain.cpp
+@@ -229,6 +229,10 @@ static void getAArch64MultilibFlags(const Driver &D,
+       break;
+     }
+   }
++
++  const Arg *TLSModel = Args.getLastArgNoClaim(options::OPT_ftlsmodel_EQ);
++  if (TLSModel)
++    Result.push_back(TLSModel->getAsString(Args));
+ }
+ 
+ static void getARMMultilibFlags(const Driver &D, const llvm::Triple &Triple,
+@@ -317,6 +321,10 @@ static void getARMMultilibFlags(const Driver &D, const llvm::Triple &Triple,
+       break;
+     }
+   }
++
++  const Arg *TLSModel = Args.getLastArgNoClaim(options::OPT_ftlsmodel_EQ);
++  if (TLSModel)
++    Result.push_back(TLSModel->getAsString(Args));
+ }
+ 
+ static void getRISCVMultilibFlags(const Driver &D, const llvm::Triple &Triple,
+diff --git a/clang/test/Driver/print-multi-selection-flags.c b/clang/test/Driver/print-multi-selection-flags.c
+index 64efddad878c..4bf03baba2ea 100644
+--- a/clang/test/Driver/print-multi-selection-flags.c
++++ b/clang/test/Driver/print-multi-selection-flags.c
+@@ -68,6 +68,10 @@
+ // RUN: %clang -multi-lib-config=%S/Inputs/multilib/empty.yaml -print-multi-flags-experimental --target=aarch64-none-elf -mbranch-protection=standard | FileCheck --check-prefix=CHECK-BRANCH-PROTECTION %s
+ // CHECK-BRANCH-PROTECTION: -mbranch-protection=standard
+ 
++// RUN: %clang -multi-lib-config=%S/Inputs/multilib/empty.yaml -print-multi-flags-experimental --target=arm-none-eabi -ftls-model=initial-exec    | FileCheck --check-prefix=CHECK-TLS-MODEL %s
++// RUN: %clang -multi-lib-config=%S/Inputs/multilib/empty.yaml -print-multi-flags-experimental --target=aarch64-none-elf -ftls-model=initial-exec | FileCheck --check-prefix=CHECK-TLS-MODEL %s
++// CHECK-TLS-MODEL: -ftls-model=initial-exec
++
+ // RUN: %clang -multi-lib-config=%S/Inputs/multilib/empty.yaml -print-multi-flags-experimental --target=arm-none-eabi -mno-unaligned-access | FileCheck --check-prefix=CHECK-NO-UNALIGNED-ACCESS %s
+ // RUN: %clang -multi-lib-config=%S/Inputs/multilib/empty.yaml -print-multi-flags-experimental --target=arm-none-eabi -mstrict-align | FileCheck --check-prefix=CHECK-NO-UNALIGNED-ACCESS %s
+ // RUN: %clang -multi-lib-config=%S/Inputs/multilib/empty.yaml -print-multi-flags-experimental --target=arm-none-eabi | FileCheck --check-prefix=CHECK-NO-UNALIGNED-ACCESS %s
+-- 
+2.34.1
+
