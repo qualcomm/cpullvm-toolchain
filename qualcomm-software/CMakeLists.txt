@@ -167,8 +167,15 @@ set(LLVM_DISTRIBUTION_COMPONENTS
     clang-scan-deps
     clang-tidy
     clangd
-    lld
     ld.eld
+    liblldb
+    lld
+    lldb
+    lldb-argdumper
+    lldb-dap
+    lldb-instr
+    lldb-mcp
+    lldb-server
     llvm-addr2line
     llvm-ar
     llvm-as
@@ -229,7 +236,7 @@ set(LLVM_TOOLCHAIN_DISTRIBUTION_COMPONENTS
     CACHE STRING "Components defined by this CMakeLists that should be
 installed by the install-llvm-toolchain target"
 )
-set(LLVM_ENABLE_PROJECTS clang;lld;polly;clang-tools-extra CACHE STRING "")
+set(LLVM_ENABLE_PROJECTS clang;lld;polly;clang-tools-extra;lldb CACHE STRING "")
 set(LLVM_TARGETS_TO_BUILD AArch64;ARM;RISCV;X86 CACHE STRING "")
 # There's test failures when enabling x86 support and testing on native
 # AArch64 Linux machines. Just disable x86 in eld until these are
@@ -242,6 +249,18 @@ set(LLVM_BUILD_RUNTIME OFF CACHE BOOL "")
 set(LIBCLANG_BUILD_STATIC ON CACHE BOOL "")
 set(LLVM_POLLY_LINK_INTO_TOOLS ON CACHE BOOL "")
 set(CLANG_DEFAULT_LINKER lld CACHE STRING "")
+# FIXME: We have a few issues integrating lldb:
+#   1. We add LLVM sources via `add_subdirectory` which lldb does not like--it
+#      expects to be the top level project. Currently we see issues with
+#      incorrect symlinks and incorrect paths in `lldb -P` stemming from this.
+#   2. We set the default target triple of the toolchain to a triple that
+#      doesn't necessarily match the host. lldb tries running binaries built
+#      for the default target on the host, which fails.
+# We have workarounds for #2, but #1 is still an open issue. For now, disable
+# python support and turn off testing while we sort out the best way to handle
+# these issues.
+set(LLDB_ENABLE_PYTHON OFF CACHE BOOL "")
+set(LLDB_INCLUDE_TESTS OFF CACHE BOOL "")
 
 # Default to a release build
 # (CMAKE_BUILD_TYPE is a special CMake variable so if you want to set
