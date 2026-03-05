@@ -17,8 +17,8 @@
     },
     "musl-embedded": {
       "url": "https://github.com/qualcomm/musl-embedded",
-      "tagType": "branch",
-      "tag": "main"
+      "tagType": "commithash",
+      "tag": "09177f66d7f893f0470f5610035897338bae6228"
     },
     "eld": {
       "url": "https://github.com/qualcomm/eld",
