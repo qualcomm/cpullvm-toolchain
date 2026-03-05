@@ -11,6 +11,7 @@ config.host_triple = "@LLVM_HOST_TRIPLE@"
 config.target_triple = "@LLVM_DEFAULT_TARGET_TRIPLE@"
 config.python_executable = "@Python3_EXECUTABLE@"
 config.test_exec_root = "@CMAKE_CURRENT_BINARY_DIR@"
+config.substitutions.append(("%llvm_embedded_libs_dir", "@LLVM_BINARY_DIR@/lib/clang-runtimes"))
 
 import lit.llvm
 lit.llvm.initialize(lit_config, config)
