@@ -1,8 +1,8 @@
 {
     "libs": [
         {
-            "variant": "aarch64a",
-            "json": "aarch64a.json",
+            "variant": "aarch64a_tlsie",
+            "json": "aarch64a_tlsie.json",
             "flags": "--target=aarch64-unknown-none-elf"
         },
         {
@@ -16,13 +16,13 @@
             "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+bti"
         },
         {
-            "variant": "aarch64a_pacret_bkey_bti",
-            "json": "aarch64a_pacret_bkey_bti.json",
+            "variant": "aarch64a_pacret_bkey_bti_tlsie",
+            "json": "aarch64a_pacret_bkey_bti_tlsie.json",
             "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti"
         },
         {
-            "variant": "aarch64a_soft_nofp",
-            "json": "aarch64a_soft_nofp.json",
+            "variant": "aarch64a_soft_nofp_tlsie",
+            "json": "aarch64a_soft_nofp_tlsie.json",
             "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft"
         },
         {
