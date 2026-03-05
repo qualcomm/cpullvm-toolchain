@@ -216,10 +216,7 @@ if(ENABLE_LIBC_TESTS OR ENABLE_COMPILER_RT_TESTS OR ENABLE_LIBCXX_TESTS)
     list(JOIN lit_test_executor " " lit_test_executor)
 endif()
 
-# Adding "-isystem ${TEMP_LIB_DIR}/include" to work around a sysroot issue for
-# RISC-V baremetal. We may not need this workaround in the future if the issue
-# is fixed upstream.
-set(compile_arch_flags "--target=${target_triple} ${COMPILE_FLAGS} --sysroot ${TEMP_LIB_DIR} -isystem ${TEMP_LIB_DIR}/include")
+set(compile_arch_flags "--target=${target_triple} ${COMPILE_FLAGS} --sysroot ${TEMP_LIB_DIR}")
 # Compiling the libraries benefits from some extra optimization
 # flags, and requires a sysroot.
 set(lib_compile_flags "${compile_arch_flags} -ffunction-sections -fdata-sections")
@@ -241,6 +238,16 @@ elseif(LIBRARY_BUILD_TYPE STREQUAL releasewithdebuginfo)
     set(LIBRARY_CMAKE_BUILD_TYPE RelWithDebInfo)
     set(LIBRARY_MESON_BUILD_TYPE debugoptimized)
 endif()
+
+# Copy the empty multilib file. The intent here is only to suppress the
+# hardcoded multilibs that are present in the Baremetal toolchain object. This
+# allows us to use `--sysroot` consistently across all variants while building
+# and users to use `--sysroot` to point to any of our library variants.
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/empty-multilib.yaml
+    ${TEMP_LIB_DIR}/multilib.yaml
+    COPYONLY
+)
 
 ###############################################################################
 # compiler-rt
