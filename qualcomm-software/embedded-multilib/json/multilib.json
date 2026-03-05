@@ -6,6 +6,12 @@
             "flags": "--target=aarch64-unknown-none-elf"
         },
         {
+            "variant": "aarch64a_tlsie",
+            "json": "aarch64a_tlsie.json",
+            "flags": "--target=aarch64-unknown-none-elf -ftls-model=initial-exec",
+            "libraries_supported": "picolibc"
+        },
+        {
             "variant": "aarch64a_pacret",
             "json": "aarch64a_pacret.json",
             "flags": "--target=aarch64-unknown-none-elf -march=armv8.3-a -mbranch-protection=pac-ret+leaf"
@@ -21,9 +27,21 @@
             "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti"
         },
         {
+            "variant": "aarch64a_pacret_bkey_bti_tlsie",
+            "json": "aarch64a_pacret_bkey_bti_tlsie.json",
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti -ftls-model=initial-exec",
+            "libraries_supported": "picolibc"
+        },
+        {
             "variant": "aarch64a_soft_nofp",
             "json": "aarch64a_soft_nofp.json",
             "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft"
+        },
+        {
+            "variant": "aarch64a_soft_nofp_tlsie",
+            "json": "aarch64a_soft_nofp_tlsie.json",
+            "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft -ftls-model=initial-exec",
+            "libraries_supported": "picolibc"
         },
         {
             "variant": "aarch64a_soft_nofp_pacret_bti",
