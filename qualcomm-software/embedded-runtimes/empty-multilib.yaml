@@ -1,0 +1,10 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# This file is a minimal multilib configuration that should match any flags and
+# point into "base" directory used for multilib (currently, the sysroot).
+
+MultilibVersion: '1.0'
+Variants:
+- Dir: .
+  Flags: []

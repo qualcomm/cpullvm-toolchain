@@ -1,0 +1,19 @@
+## This file includes tests that ensure we are able to point `--sysroot` at our
+## library variants. This isn't a given as there are hardcoded multilibs in the
+## baremetal toolchain object that can cause issues with this. Test that our
+## empty multilib scheme is working as expected in resolving this.
+
+## Do basic checks to confirm whether the empty multilib scheme is still needed.
+# rm -rf %t && mkdir -p %t/fake_sysroot
+# RUN: %clang --sysroot=%t/fake_sysroot --target=riscv32-unknown-elf -march=rv32imc -mabi=ilp32 %s -### 2>&1 | FileCheck %s --check-prefix=CHECK-RV32-HARDCODED
+# CHECK-RV32-HARDCODED: rv32im{{/|\\}}ilp32
+# RUN: %clang --sysroot=%t/fake_sysroot --target=riscv64-unknown-elf -march=rv64gc -mabi=lp64d %s -### 2>&1 | FileCheck %s --check-prefix=CHECK-RV64-HARDCODED
+# CHECK-RV64-HARDCODED: rv64imafdc{{/|\\}}lp64d
+
+## Check that pointing to our variants (with the empty multilib) works as expected.
+# RUN: %clang --sysroot=%llvm_embedded_libs_dir/riscv32-unknown-elf/riscv32imac_ilp32 --target=riscv32-unknown-elf -march=rv32imc -mabi=ilp32 %s -### 2>&1 | FileCheck %s --check-prefix=CHECK-RV32-SYSROOT
+# CHECK-RV32-SYSROOT: riscv32-unknown-elf{{/|\\}}riscv32imac_ilp32
+# CHECK-RV32-SYSROOT-NOT: rv32im{{/|\\}}ilp32
+# RUN: %clang --sysroot=%llvm_embedded_libs_dir/riscv32-unknown-elf/riscv32imac_ilp32 --target=riscv64-unknown-elf -march=rv64gc -mabi=lp64d %s -### 2>&1 | FileCheck %s --check-prefix=CHECK-RV64-SYSROOT
+# CHECK-RV64-SYSROOT: riscv32-unknown-elf{{/|\\}}riscv32imac_ilp32
+# CHECK-RV64-SYSROOT-NOT: rv64imafdc{{/|\\}}lp64d
