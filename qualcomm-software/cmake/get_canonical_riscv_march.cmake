@@ -15,6 +15,7 @@ function(get_canonical_riscv_march compiler_path build_args march_out)
         ${command_args}
         RESULT_VARIABLE return_val
         OUTPUT_VARIABLE extension_output
+        ERROR_VARIABLE extension_output
     )
     if(NOT return_val EQUAL 0)
         message(FATAL_ERROR "Unable to execute `--print-enabled-extensions` to retreive canonical `-march` string")
