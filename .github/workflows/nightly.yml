@@ -69,7 +69,7 @@ jobs:
         include:
           - build_script: build_copy_runtimes.sh
             test_script: test.sh
-            install_script: ''
+            install_script: install_dependencies.sh
             target_os: Linux-AArch64
             runner: ubuntu-22.04-arm
 
