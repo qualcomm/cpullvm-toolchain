@@ -85,6 +85,15 @@ set(ENABLE_LIBC_TESTS ${ENABLE_LIBC_TESTS_def} CACHE BOOL "Enable libc tests (pi
 set(ENABLE_COMPILER_RT_TESTS ${ENABLE_COMPILER_RT_TESTS_def} CACHE BOOL "Enable compiler-rt tests.")
 set(ENABLE_LIBCXX_TESTS ${ENABLE_LIBCXX_TESTS_def} CACHE BOOL "Enable libcxx tests.")
 set(DISABLE_THREADS ${DISABLE_THREADS_def} CACHE BOOL "Disable threads/atomic/TLS (picolibc only).")
+set(SUPPORTED_TLS_MODELS local-exec initial-exec local-dynamic global-dynamic)
+if(NOT DEFINED TLS_MODEL_def)
+    set(TLS_MODEL_def local-exec)
+elseif(NOT TLS_MODEL_def IN_LIST SUPPORTED_TLS_MODELS)
+    string(REPLACE ";" ", " SUPPORTED_TLS_MODELS_STR "${SUPPORTED_TLS_MODELS}")
+    message(FATAL_ERROR "Unsupported TLS_MODEL value. Supported values are ${SUPPORTED_TLS_MODELS_STR}")
+endif()
+set(TLS_MODEL ${TLS_MODEL_def} CACHE STRING "TLS model to use. Currently only used by picolibc, other projects use the project/toolchain defaults.")
+set_property(CACHE TLS_MODEL PROPERTY STRINGS ${SUPPORTED_TLS_MODELS})
 set(LLVM_BINARY_DIR "" CACHE PATH "Path to LLVM toolchain root to build libraries with")
 
 # Set up a few arbitrary pass-through flags for musl-embedded. This probably
@@ -501,6 +510,7 @@ if(C_LIBRARY STREQUAL picolibc)
             --buildtype=${LIBRARY_MESON_BUILD_TYPE}
             -Dsingle-thread=${single_thread}
             -Dthread-local-storage=${thread_local_storage}
+            -Dtls-model=${TLS_MODEL}
             -Datomic-ungetc=${atomic_ungetc}
             <SOURCE_DIR>
         BUILD_COMMAND ${MESON_EXECUTABLE} compile
