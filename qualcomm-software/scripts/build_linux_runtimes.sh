@@ -98,14 +98,84 @@ pushd "${DOWNLOAD_DIR}" >/dev/null
 # Source kernel headers. This version was chosen as it is the closest, still
 # supported, longterm version compared to what we've used historically.
 KERNEL_SOURCE_BASE="linux-5.10.247"
+if [[ ! -f "${KERNEL_SOURCE_BASE}.tar.xz" ]]; then
+  wget https://cdn.kernel.org/pub/linux/kernel/v5.x/${KERNEL_SOURCE_BASE}.tar.xz
+fi
+# Source gcc sysroot. We really only need glibc headers, but that isn't easy to
+# separate. This is close to what we've used historically. glibc needs to be
+# old enough that the resulting binaries work on our targets.  gcc needs to be
+# at least 5 to support building gtest.
+LINARO_TOOLCHAIN_BASE="gcc-linaro-5.5.0-2017.10-x86_64_aarch64-linux-gnu"
+if [[ ! -f "${LINARO_TOOLCHAIN_BASE}.tar.xz" ]]; then
+  wget https://developer.arm.com/-/cdn-downloads/permalink/legacy-linaro-gnu-toolchains/5.5-2017.10/${LINARO_TOOLCHAIN_BASE}.tar.xz
+fi
+
+# Verify the downloads.
+DOWNLOAD_HASHES_FILE=$( dirname "${BASH_SOURCE[0]}" )/build_linux_runtimes_hashes
+if ! sha256sum --check ${DOWNLOAD_HASHES_FILE} ; then
+  echo "Corrupted download; delete files and try again"; exit 1
+fi
+
 KERNEL_SOURCE_BASE_DIR="${DOWNLOAD_DIR}/${KERNEL_SOURCE_BASE}"
 if [[ ! -d "${KERNEL_SOURCE_BASE_DIR}" ]]; then
-  wget https://cdn.kernel.org/pub/linux/kernel/v5.x/${KERNEL_SOURCE_BASE}.tar.xz
+  if ! grep "${KERNEL_SOURCE_BASE}.tar.xz" ${DOWNLOAD_HASHES_FILE}; then
+    echo "File hash missing"; exit 1
+  fi
   tar xvf "${KERNEL_SOURCE_BASE}.tar.xz"
-  rm "${KERNEL_SOURCE_BASE}.tar.xz"
+fi
+
+LINARO_TOOLCHAIN_BASE_DIR="${DOWNLOAD_DIR}/${LINARO_TOOLCHAIN_BASE}"
+if [[ ! -d "${LINARO_TOOLCHAIN_BASE_DIR}" ]]; then
+  if ! grep "${LINARO_TOOLCHAIN_BASE}.tar.xz" ${DOWNLOAD_HASHES_FILE}; then
+    echo "File hash missing"; exit 1
+  fi
+  tar xvf "${LINARO_TOOLCHAIN_BASE}.tar.xz"
 fi
 
 CLANG_RESOURCE_DIR="$(clang --print-resource-dir)"
+
+# Build glibc-based libraries. This is different enough from the process for
+# musl-based libraries that we do it separately.
+VARIANT=aarch64-glibc
+echo "Installing openmp for ${VARIANT}"
+LIB_BUILD_FLAGS="--gcc-toolchain=${LINARO_TOOLCHAIN_BASE_DIR}/"
+LIB_BUILD_FLAGS="${LIB_BUILD_FLAGS} -ffunction-sections -fdata-sections"
+VARIANT_TARGET="aarch64-unknown-linux-gnu"
+OPENMP_BUILD_DIR="${BASE_BUILD_DIR}/aarch64-unknown-linux-gnu/openmp"
+VARIANT_BASE_BUILD_DIR="${BASE_BUILD_DIR}/${VARIANT}"
+VARIANT_TMP_SYSROOT="${VARIANT_BASE_BUILD_DIR}/sysroot"
+CMAKE_OPT_LEVEL="Release"
+cmake -G Ninja \
+    -DCMAKE_INSTALL_PREFIX="${VARIANT_TMP_SYSROOT}" \
+    -DCMAKE_SYSROOT="${LINARO_TOOLCHAIN_BASE_DIR}/aarch64-linux-gnu/libc" \
+    -DCMAKE_BUILD_TYPE="${CMAKE_OPT_LEVEL}" \
+    -DCMAKE_C_COMPILER="clang" \
+    -DCMAKE_CXX_COMPILER="clang++" \
+    -DCMAKE_SYSTEM_NAME="Linux" \
+    -DCMAKE_TRY_COMPILE_TARGET_TYPE="STATIC_LIBRARY" \
+    -DCMAKE_ASM_COMPILER_TARGET="${VARIANT_TARGET}" \
+    -DCMAKE_C_COMPILER_TARGET="${VARIANT_TARGET}" \
+    -DCMAKE_CXX_COMPILER_TARGET="${VARIANT_TARGET}" \
+    -DCMAKE_ASM_FLAGS="${LIB_BUILD_FLAGS}" \
+    -DCMAKE_C_FLAGS="${LIB_BUILD_FLAGS}" \
+    -DCMAKE_CXX_FLAGS="${LIB_BUILD_FLAGS}" \
+    -DLIBOMP_USE_VERSION_SYMBOLS=OFF \
+    -DLIBOMP_ENABLE_SHARED=OFF \
+    -DOPENMP_ENABLE_LIBOMPTARGET=OFF \
+    -DOPENMP_ENABLE_OMPT_TOOLS=OFF \
+    -DLIBOMP_OMPT_SUPPORT=OFF \
+    -DLIBOMP_INSTALL_ALIASES=OFF \
+    -DLIBOMP_ENABLE_ASSERTIONS=OFF \
+    -DLLVM_ENABLE_RUNTIMES="openmp" \
+    -B "${OPENMP_BUILD_DIR}" \
+    -S "${LLVM_BASE_DIR}/runtimes"
+ninja -C "${OPENMP_BUILD_DIR}" install
+# Copy to final destination.
+mkdir -p "${BASE_INSTALL_DIR}/${VARIANT_TARGET}/${VARIANT}"
+cp -r "${VARIANT_TMP_SYSROOT}"/include \
+      "${VARIANT_TMP_SYSROOT}"/lib \
+      -t "${BASE_INSTALL_DIR}/${VARIANT_TARGET}/${VARIANT}"
+
 
 # Variants to build and the basic set of compile flags to use for each. There's
 # surely more elegant ways of doing this, but this doesn't require any extra

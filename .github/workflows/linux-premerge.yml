@@ -53,6 +53,14 @@ jobs:
           # old build products if the runner doesn't do it itself.
           clean: true
 
+      - name: Cache Linux runtime downloads
+        uses: actions/cache@v5
+        env:
+          cache-name: cache-linux-runtime-downloads
+        with:
+          path: ./build/linux-library-builds/dl/*.xz
+          key: linux-runtime-downloads-${{ hashFiles('./qualcomm-software/scripts/build_linux_runtimes_hashes') }}
+
       - name: Apply llvm-project patches
         run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
 
