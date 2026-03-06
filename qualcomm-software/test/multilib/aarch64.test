@@ -8,6 +8,11 @@
 # CHECK-AARCH64: aarch64-none-elf/aarch64a{{$}}
 # CHECK-AARCH64-EMPTY:
 
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -ftls-model=initial-exec | FileCheck %s --check-prefix=CHECK-TLSIE
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -ftls-model=initial-exec | FileCheck %s --check-prefix=CHECK-TLSIE
+# CHECK-TLSIE: aarch64-none-elf/aarch64a_tlsie{{$}}
+# CHECK-TLSIE-EMPTY:
+
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.3a -mbranch-protection=pac-ret+leaf | FileCheck %s --check-prefix=CHECK-PACRET
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.3a -mbranch-protection=pac-ret+leaf | FileCheck %s --check-prefix=CHECK-PACRET
 # CHECK-PACRET: aarch64-none-elf/aarch64a_pacret{{$}}
@@ -23,11 +28,22 @@
 # CHECK-PACRET-BKEY-BTI: aarch64-none-elf/aarch64a_pacret_bkey_bti{{$}}
 # CHECK-PACRET-BKEY-BTI-EMPTY:
 
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -ftls-model=initial-exec | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI-TLSIE
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -ftls-model=initial-exec | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI-TLSIE
+# CHECK-PACRET-BKEY-BTI-TLSIE: aarch64-none-elf/aarch64a_pacret_bkey_bti_tlsie{{$}}
+# CHECK-PACRET-BKEY-BTI-TLSIE-EMPTY:
+
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8+nofp+nosimd -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53+nofp+nosimd -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
 # CHECK-NOFP: aarch64-none-elf/aarch64a_soft_nofp{{$}}
 # CHECK-NOFP-EMPTY:
+
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8+nofp+nosimd -mabi=aapcs-soft -ftls-model=initial-exec | FileCheck %s --check-prefix=CHECK-NOFP-TLSIE
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53+nofp+nosimd -mabi=aapcs-soft -ftls-model=initial-exec | FileCheck %s --check-prefix=CHECK-NOFP-TLSIE
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mabi=aapcs-soft -ftls-model=initial-exec | FileCheck %s --check-prefix=CHECK-NOFP-TLSIE
+# CHECK-NOFP-TLSIE: aarch64-none-elf/aarch64a_soft_nofp_tlsie{{$}}
+# CHECK-NOFP-TLSIE-EMPTY:
 
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
