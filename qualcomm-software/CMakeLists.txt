@@ -175,6 +175,7 @@ set(LLVM_DISTRIBUTION_COMPONENTS
     lldb-dap
     lldb-instr
     lldb-mcp
+    lldb-python-scripts
     lldb-server
     llvm-addr2line
     llvm-ar
@@ -259,8 +260,8 @@ set(CLANG_DEFAULT_LINKER lld CACHE STRING "")
 # We have workarounds for #2, but #1 is still an open issue. For now, disable
 # python support and turn off testing while we sort out the best way to handle
 # these issues.
-set(LLDB_ENABLE_PYTHON OFF CACHE BOOL "")
-set(LLDB_INCLUDE_TESTS OFF CACHE BOOL "")
+set(LLDB_ENABLE_PYTHON ON CACHE BOOL "")
+set(LLDB_INCLUDE_TESTS ON CACHE BOOL "")
 
 # Default to a release build
 # (CMAKE_BUILD_TYPE is a special CMake variable so if you want to set
