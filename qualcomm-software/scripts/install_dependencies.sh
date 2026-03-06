@@ -3,7 +3,7 @@
 
 sudo apt-get update
 # Used by lldb
-sudo apt-get install swig
+sudo apt-get install swig libedit-dev
 
 # Install meson. eld support was added in v1.9.0, so we need at least that.
 pip install meson==1.10.0
