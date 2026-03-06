@@ -343,6 +343,37 @@ for VARIANT in "${VARIANTS[@]}"; do
       -S "${LLVM_BASE_DIR}/runtimes"
   ninja -C "${LIBCXX_BUILD_DIR}" install
 
+  # Install openmp
+  if [[ ! "${VARIANT_ARCH}" =~ riscv32 ]]; then
+    echo "Installing openmp for ${VARIANT}"
+    OPENMP_BUILD_DIR="${VARIANT_BASE_BUILD_DIR}/openmp"
+    cmake -G Ninja \
+        -DCMAKE_INSTALL_PREFIX="${VARIANT_TMP_SYSROOT}" \
+        -DCMAKE_SYSROOT="${VARIANT_TMP_SYSROOT}" \
+        -DCMAKE_BUILD_TYPE="${CMAKE_OPT_LEVEL}" \
+        -DCMAKE_C_COMPILER="clang" \
+        -DCMAKE_CXX_COMPILER="clang++" \
+        -DCMAKE_SYSTEM_NAME="Linux" \
+        -DCMAKE_TRY_COMPILE_TARGET_TYPE="STATIC_LIBRARY" \
+        -DCMAKE_ASM_COMPILER_TARGET="${VARIANT_TARGET}" \
+        -DCMAKE_C_COMPILER_TARGET="${VARIANT_TARGET}" \
+        -DCMAKE_CXX_COMPILER_TARGET="${VARIANT_TARGET}" \
+        -DCMAKE_ASM_FLAGS="${LIB_BUILD_FLAGS}" \
+        -DCMAKE_C_FLAGS="${LIB_BUILD_FLAGS}" \
+        -DCMAKE_CXX_FLAGS="${LIB_BUILD_FLAGS} -stdlib=libc++ -I${VARIANT_TMP_SYSROOT}/include/c++/v1/" \
+        -DLIBOMP_USE_VERSION_SYMBOLS=OFF \
+        -DLIBOMP_ENABLE_SHARED=OFF \
+        -DOPENMP_ENABLE_LIBOMPTARGET=OFF \
+        -DOPENMP_ENABLE_OMPT_TOOLS=OFF \
+        -DLIBOMP_OMPT_SUPPORT=OFF \
+        -DLIBOMP_INSTALL_ALIASES=OFF \
+        -DLIBOMP_ENABLE_ASSERTIONS=OFF \
+        -DLLVM_ENABLE_RUNTIMES="openmp" \
+        -B "${OPENMP_BUILD_DIR}" \
+        -S "${LLVM_BASE_DIR}/runtimes"
+    ninja -C "${OPENMP_BUILD_DIR}" install
+  fi
+
   # Install the rest of compiler-rt now.
 
   # The goal here is to disable rtsan and gwp_asan:
