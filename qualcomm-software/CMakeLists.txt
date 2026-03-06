@@ -793,7 +793,16 @@ install(
     COMPONENT llvm-toolchain-docs
 )
 
-configure_file(cmake/THIRD-PARTY-LICENSES.txt.in THIRD-PARTY-LICENSES.txt)
+if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc)
+    string(APPEND LIBC_LICENSE_FILES " - Picolibc: third-party-licenses/COPYING.NEWLIB, third-party-licenses/COPYING.picolibc\n")
+endif()
+if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded OR ENABLE_LINUX_LIBRARIES)
+    string(APPEND LIBC_LICENSE_FILES " - musl-embedded: third-party-licenses/musl-embedded-COPYRIGHT.txt\n")
+    if(ENABLE_LINUX_LIBRARIES)
+        string(APPEND LIBC_LICENSE_FILES " - musl: third-party-licenses/musl-COPYRIGHT.txt\n")
+    endif()
+endif()
+configure_file(cmake/THIRD-PARTY-LICENSES.txt.in THIRD-PARTY-LICENSES.txt @ONLY)
 
 if(NOT LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL)
     set(third_party_license_summary_install_dir .)
