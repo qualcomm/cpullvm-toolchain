@@ -181,6 +181,7 @@ set(LLVM_DISTRIBUTION_COMPONENTS
     llvm-as
     llvm-cat
     llvm-cfi-verify
+    llvm-config
     llvm-cov
     llvm-cvtres
     llvm-cxxdump
