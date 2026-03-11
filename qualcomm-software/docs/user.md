@@ -25,3 +25,30 @@ supported include:
 * RTTI
 
 If variants with exceptions and RTTI enabled are required, please file an issue.
+
+## Multilib
+CPULLVM automatically selects a set of headers and runtime libraries to use when compiling and linking based on
+the set of arguments passed on the command line. A warning will be emitted if no appropriate set of headers/libraries
+can be found.
+
+When compiling and linking, you should provide at least the following options on the command line:
+* The target triple (ex: `--target=riscv32-unknown-elf`)
+* `-march`, `-mabi`, and `-mfpu`, if using non-default options and applicable to your target
+* Whether to use position independent code
+* Any additional options like sanitizers or `-mbranch-protection`
+
+Additionally, CPULLVM implements custom multilib flags to allow selecting variants that are not otherwise tied
+to normal compiler flags. These are specified by `-fmultilib-flag=<flag>`. Currently implemented flags include:
+* **`threads`/`nothreads`**: Picolibc only. When `threads` is set, a variant with [`thread-local-storage`](https://github.com/picolibc/picolibc/blob/ce4e736ebef081d13a81a29b6cfb51335f6f890d/doc/build.md#thread-local-storage-options) enabled,
+[`single-thread`](https://github.com/picolibc/picolibc/blob/ce4e736ebef081d13a81a29b6cfb51335f6f890d/doc/build.md#locking-options) disabled,
+and [`atomic-ungetc`](https://github.com/picolibc/picolibc/blob/ce4e736ebef081d13a81a29b6cfb51335f6f890d/doc/build.md#locking-options) enabled is selected. `nothreads` selects a variant with the inverse. `threads` is default.
+
+To display all available multilibs run clang with the flag `-print-multi-lib` and an appropriate target triple.
+
+To display the directory selected by the multilib system, add the flag `-print-multi-directory` to your clang command line options.
+
+> [!WARNING]
+> Using `--sysroot` to select a variant or hardcoding paths to variants should generally not be done.
+> Please file an issue if you find that this is needed.
+>
+> Variant names and paths may change at any time without notice.
