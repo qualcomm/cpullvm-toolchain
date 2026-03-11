@@ -7,9 +7,9 @@ To install it, untar the overlay file at the root of the CPULLVM toolchain insta
 
 To invoke the toolchain using musl-embedded as the C library, use the `--config=musl-embedded.cfg` compiler option.
 
-> [!WARNING]
-> musl Linux variants are used for CPULLVM test infrastructure.
-> musl-embedded will be deprecated in CPULLVM 23.1.0. Please switch to picolibc.
+NOTE:
+musl Linux variants are used for CPULLVM test infrastructure.
+musl-embedded will be deprecated in CPULLVM 23.1.0. Please switch to picolibc.
 
 ## Using ELD
 CPULLVM supports and recommends the [ELD linker](https://github.com/qualcomm/eld) for building embedded images.
@@ -26,7 +26,7 @@ supported include:
 If variants with exceptions and RTTI enabled are required, please file an issue.
 
 ## Multilib
-CPULLVM automatically selects a set of headers and runtimes libraries to use when compiling and linking based on
+CPULLVM automatically selects a set of headers and runtime libraries to use when compiling and linking based on
 the set of arguments passed on the command line. A warning will be emitted if no appropriate set of headers/libraries
 can be found.
 
@@ -48,5 +48,6 @@ To display the directory selected by the multilib system, add the flag `-print-m
 
 > [!WARNING]
 > Using `--sysroot` to select a variant or hardcoding paths to variants should generally not be done.
-> Please file an issue if you find that this is needed. Variant names and paths may change at any time
-> without notice.
+> Please file an issue if you find that this is needed.
+>
+> Variant names and paths may change at any time without notice.
