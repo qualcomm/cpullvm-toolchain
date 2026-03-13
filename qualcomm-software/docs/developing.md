@@ -114,7 +114,7 @@ individual library variant, respectively, without having to rebuild the toolchai
 an existing set of LLVM tools). 
 
 ## Testing the toolchain
-Running `ninja check-all-llvm-toolchain` as described in [building.md](building.md) will test the entire
+Running `ninja check-all-llvm-toolchain` as described in [our build documentation](building.md) will test the entire
 toolchain (LLVM tests like `check-clang`, eld tests, any enabled library tests). But, it is also possible
 to test these components separately. A non-exhaustive list of `check-` targets CPULLVM provides:
 * `check-clang`, `check-llvm`, and the other usual LLVM `check-` targets are all still valid
