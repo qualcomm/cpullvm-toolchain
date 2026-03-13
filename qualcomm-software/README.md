@@ -49,8 +49,8 @@ CPULLVM is built and tested on
 
 Binary releases of CPULLVM are available [here](https://github.com/qualcomm/cpullvm-toolchain/releases).
 
-For tips on getting started with using CPULLVM, please see [user.md](./docs/user.md).
+For tips on getting started with using CPULLVM, please see the [user guide](./docs/user.md).
 
-For instructions on building from source, please see [building.md](./docs/building.md).
+For instructions on building from source, please see the documentation on [building from source](./docs/building.md).
 
-If you are interested in contributing to CPULLVM, please see [CONTRIBUTING.md](/CONTRIBUTING.md).
+If you are interested in contributing to CPULLVM, please see [our contributing guide](/CONTRIBUTING.md).
