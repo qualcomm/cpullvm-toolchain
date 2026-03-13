@@ -1,0 +1,116 @@
+From 9183c33ef92eb54f1709ffee9e06a4e44a174b7e Mon Sep 17 00:00:00 2001
+From: ShikharJain <shikharj@qti.qualcomm.com>
+Date: Wed, 25 Feb 2026 22:55:37 -0800
+Subject: [PATCH] Make tests independent of the default triple
+
+This commit improves a few test so that they pass independent of the
+default triple that was used to configure/build linker.
+
+Co-authored-by: Shikhar Jain <shikharj@qti.qualcomm.com>
+Signed-off-by: Parth Arora <partaror@qti.qualcomm.com>
+---
+ test/ARM/standalone/GCexternList/GCexternList.test            | 2 +-
+ test/ARM/standalone/LTO/Map/Archive/mapfileltoarchive.test    | 2 +-
+ test/ARM/standalone/Map/Archive/mapfilearchive.test           | 2 +-
+ test/ARM/standalone/Map/Objects/mapfileonlyobjects.test       | 2 +-
+ test/ARM/standalone/Map/WholeArchive/mapfilewholearchive.test | 2 +-
+ .../standalone/Relocs/R_ARM_THM_JUMP24/R_ARM_THM_JUMP24.test  | 2 +-
+ test/ARM/standalone/SymDefAddend/SymDefAddend.test            | 4 ++--
+ 7 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/test/ARM/standalone/GCexternList/GCexternList.test b/test/ARM/standalone/GCexternList/GCexternList.test
+index 0cec43b0..19a3a58c 100644
+--- a/test/ARM/standalone/GCexternList/GCexternList.test
++++ b/test/ARM/standalone/GCexternList/GCexternList.test
+@@ -6,5 +6,5 @@ RUN: %link %linkopts -march arm %t1.o %tlib.a --entry main -o %t.out --extern-li
+ RUN: %nm -n %t.out  | %filecheck %s
+ 
+ #CHECK:         U externSym
+-#CHECK:00000014 T foo
++#CHECK: T foo
+ 
+diff --git a/test/ARM/standalone/LTO/Map/Archive/mapfileltoarchive.test b/test/ARM/standalone/LTO/Map/Archive/mapfileltoarchive.test
+index 4b6f9385..345793f5 100644
+--- a/test/ARM/standalone/LTO/Map/Archive/mapfileltoarchive.test
++++ b/test/ARM/standalone/LTO/Map/Archive/mapfileltoarchive.test
+@@ -26,7 +26,7 @@ RUN: %link %linkopts -march arm -flto-options=codegen="-Os -relocation-model=sta
+ #CHECK: common_array	0x50	{{[ -\(\)_A-Za-z0-9.~\\/:]+}}main.o
+ #CHECK: Linker Script and memory map
+ #CHECK: SKIPPED {{[ -\(\)_A-Za-z0-9.\\/:]+}}main.o (ELF)
+-#CHECK: .text	0x0	{{[0-9a-fx]+}}
++#CHECK: .text	{{[0-9a-fx]+}}	{{[0-9a-fx]+}}
+ #CHECK: .text	{{[0-9a-fx]+}}  {{[0-9a-fx]+}}	{{[ -\(\)_A-Za-z0-9.~\\/:]+}}main.o
+ #CHECK: 	{{[0-9a-fx]+}}  	main
+ #CHECK: .text.foo	{{[0-9a-fx]+}}  {{[0-9a-fx]+}}	{{[ -\(\)_A-Za-z0-9.~\\/:]+}}lto
+diff --git a/test/ARM/standalone/Map/Archive/mapfilearchive.test b/test/ARM/standalone/Map/Archive/mapfilearchive.test
+index 7c734ca7..48c603fa 100644
+--- a/test/ARM/standalone/Map/Archive/mapfilearchive.test
++++ b/test/ARM/standalone/Map/Archive/mapfilearchive.test
+@@ -10,7 +10,7 @@ RUN: %link %linkopts -march arm %t1.main.o %t1.library.a -M -o %t2.out 2>&1 | %f
+ #CHECK: Common symbol	size	file
+ #CHECK: common_array	0x50	{{[ -\(\)_A-Za-z0-9.\\/:]+}}main.o
+ #CHECK: Linker Script and memory map
+-#CHECK: .text	0x0	{{[0-9a-fx]+}}
++#CHECK: .text	{{[0-9a-fx]+}}	{{[0-9a-fx]+}}
+ #CHECK: .text	{{[0-9a-fx]+}}  {{[0-9a-fx]+}}	{{[ -\(\)_A-Za-z0-9.\\/:]+}}main.o
+ #CHECK: 	{{[0-9a-fx]+}}  	main
+ #CHECK: .text	{{[0-9a-fx]+}}  {{[0-9a-fx]+}}	{{[ -\(\)_A-Za-z0-9.\\/:]+}}foo.o
+diff --git a/test/ARM/standalone/Map/Objects/mapfileonlyobjects.test b/test/ARM/standalone/Map/Objects/mapfileonlyobjects.test
+index 6a59b538..477b931f 100644
+--- a/test/ARM/standalone/Map/Objects/mapfileonlyobjects.test
++++ b/test/ARM/standalone/Map/Objects/mapfileonlyobjects.test
+@@ -7,7 +7,7 @@ RUN: %link %linkopts -march arm %t1.main.o %t1.foo.o -M -o %t2.out 2>&1 | %filec
+ #CHECK: Common symbol	size	file
+ #CHECK: common_array	0x50	{{[ -\(\)_A-Za-z0-9.\\/:]+}}main.o
+ #CHECK: Linker Script and memory map
+-#CHECK: .text	0x0	{{[0-9a-fx]+}}
++#CHECK: .text	{{[0-9a-fx]+}}	{{[0-9a-fx]+}}
+ #CHECK: .text	{{[0-9a-fx]+}}  {{[0-9a-fx]+}}	{{[ -\(\)_A-Za-z0-9.\\/:]+}}main.o
+ #CHECK: 	{{[0-9a-fx]+}}  	main
+ #CHECK: .text	{{[0-9a-fx]+}}  {{[0-9a-fx]+}}	{{[ -\(\)_A-Za-z0-9.\\/:]+}}foo.o
+diff --git a/test/ARM/standalone/Map/WholeArchive/mapfilewholearchive.test b/test/ARM/standalone/Map/WholeArchive/mapfilewholearchive.test
+index fb1342f5..42ed7181 100644
+--- a/test/ARM/standalone/Map/WholeArchive/mapfilewholearchive.test
++++ b/test/ARM/standalone/Map/WholeArchive/mapfilewholearchive.test
+@@ -16,7 +16,7 @@ RUN: %link %linkopts -march arm %t1.main.o --whole-archive %t1.library.a -M -o %
+ #CHECK: Common symbol	size	file
+ #CHECK: common_array	0x50	{{[ -\(\)_A-Za-z0-9.\\/:]+}}main.o
+ #CHECK: Linker Script and memory map
+-#CHECK: .text	0x0	{{[0-9a-fx]+}}
++#CHECK: .text	{{[0-9a-fx]+}}	{{[0-9a-fx]+}}
+ #CHECK: .text	{{[0-9a-fx]+}}  {{[0-9a-fx]+}}	{{[ -\(\)_A-Za-z0-9.\\/:]+}}main.o
+ #CHECK: 	{{[0-9a-fx]+}}  	main
+ #CHECK: .text	{{[0-9a-fx]+}}  {{[0-9a-fx]+}}	{{[ -\(\)_A-Za-z0-9.\\/:]+}}foo.o
+diff --git a/test/ARM/standalone/Relocs/R_ARM_THM_JUMP24/R_ARM_THM_JUMP24.test b/test/ARM/standalone/Relocs/R_ARM_THM_JUMP24/R_ARM_THM_JUMP24.test
+index 352d57b5..245313d7 100644
+--- a/test/ARM/standalone/Relocs/R_ARM_THM_JUMP24/R_ARM_THM_JUMP24.test
++++ b/test/ARM/standalone/Relocs/R_ARM_THM_JUMP24/R_ARM_THM_JUMP24.test
+@@ -5,7 +5,7 @@
+ #END_COMMENT
+ #START_TEST
+ RUN: %clang -c %p/Inputs/x.s -o %t1.1.o
+-RUN: %link %linkopts -march arm %t1.1.o --defsym arm_callee1=1 -o %t2.out
++RUN: %link %linkopts -march arm %t1.1.o --defsym arm_callee1=1 -o %t2.out --image-base 0x0
+ RUN: %objdump -d %t2.out | %filecheck %s
+ 
+ #CHECK:  0: f7ff bffe
+diff --git a/test/ARM/standalone/SymDefAddend/SymDefAddend.test b/test/ARM/standalone/SymDefAddend/SymDefAddend.test
+index 8ae816fb..5be24148 100644
+--- a/test/ARM/standalone/SymDefAddend/SymDefAddend.test
++++ b/test/ARM/standalone/SymDefAddend/SymDefAddend.test
+@@ -4,10 +4,10 @@
+ #END_COMMENT
+ #START_TEST
+ RUN: %clang -c %p/Inputs/x.s -o %t1.1.o
+-RUN: %link -march arm %t1.1.o --defsym arm_val=1 -o %t2.out
++RUN: %link -march arm %t1.1.o --defsym arm_val=1 -o %t2.out --image-base 0x0
+ RUN: %objdump -s %t2.out | %filecheck %s
+ 
+ #CHECK: Contents of section .data:
+-#CHECK-NEXT: 0000 02000000
++#CHECK-NEXT: {{[0-9a-fA-F]+}} 02000000
+ #END_TEST
+ 
+-- 
+2.34.1
+
