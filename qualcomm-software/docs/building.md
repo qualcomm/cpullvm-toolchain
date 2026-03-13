@@ -54,7 +54,7 @@ python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/p
 ```
 
 Other projects (eld, picolibc, etc.) are checked out and patched automatically. If you prefer, you can check
-out and patch the repos manually and use those, see [developing.md](./developing.md).
+out and patch the repos manually and use those, see [our developer documentation](./developing.md).
 
 ## Building
 
@@ -123,4 +123,4 @@ ninja package-llvm-toolchain
 
 CPULLVM can be configured and built in a variety of ways, including changing the default libc to use for embedded,
 building Linux libraries, and building only a subset of library variants. These (and other) options are
-documented in part in [developing.md](./developing.md).
+documented in part in [our developer documentation](./developing.md).
