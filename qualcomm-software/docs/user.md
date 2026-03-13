@@ -55,7 +55,7 @@ To display the directory selected by the multilib system, add the flag `-print-m
 
 ## Picolibc
 
-Picolib offers [comprehensive documentation](https://github.com/picolibc/picolibc/tree/main/doc) that users are encouraged to review thoroughly.
+Picolibd offers [comprehensive documentation](https://github.com/picolibc/picolibc/tree/main/doc) that users are encouraged to review thoroughly.
 
 In particular, refer to [Using Picolibc in Embedded Systems](https://github.com/picolibc/picolibc/blob/main/doc/using.md)
 for the details of how picolibc handles initialization. Custom linker script changes might be required to
