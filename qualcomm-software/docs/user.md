@@ -63,3 +63,8 @@ for the details of how picolibc handles initialization. Custom linker script cha
 
 See [Picolibc and Operating Systems](https://github.com/picolibc/picolibc/blob/main/doc/os.md)
 for the details on redirecting `stdin`, `stdout` and `stderr`.
+
+## LLDB
+The LLDB build for Linux hosts was configured with Editline, Curses, and LZMA.
+To ensure LLDB runs correctly, users must verify that compatible versions of these libraries are installed on their systems.
+For more details, refer to [LLDB's Optional Dependencies](https://lldb.llvm.org/resources/build.html#optional-dependencies).
