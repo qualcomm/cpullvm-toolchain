@@ -58,6 +58,16 @@ out and patch the repos manually and use those, see [developing.md](./developing
 
 ## Building
 
+The commands below can be used to build a toolchain containing Picolibc libraries for all
+currently-enabled embedded variants.
+
+> [!NOTE]
+> Not all runtimes may be built on all hosts. CPULLVM's musl and musl-embedded libraries
+> are only expected to be built on Linux hosts. Windows runtimes (compiler-rt, profile libraries)
+> are expected to be built on Windows hosts. Please refer to our [workflows](/.github/workflows) and
+> [build scripts](/qualcomm-software/scripts) for examples on how our toolchains are built and packaged
+> on different hosts.
+
 ### Linux
 The commands in the sections below assume you are in the `cpullvm-toolchain/qualcomm-software` directory.
 
