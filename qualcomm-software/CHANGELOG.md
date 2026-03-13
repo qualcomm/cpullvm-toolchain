@@ -46,6 +46,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Installed Linux libraries in `*-linux-musl[eabi]` to reflect use of musl sysroot
 
 ### Removed
-- Removed ELD linker symbolic linksi, e.g., arm-link, aarch64-link and riscv-link
+- Removed ELD linker symbolic links, e.g., arm-link, aarch64-link and riscv-link
 - Removed compiler developer-facing tools from the distributed components
 - Removed musl-embedded standlone and uselocks variants
