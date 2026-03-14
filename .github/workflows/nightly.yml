@@ -86,7 +86,7 @@ jobs:
             test_script: test.ps1
             install_script: install_dependencies.ps1
             target_os: Windows-x86_64
-            runner: windows-latest
+            runner: windows-2025
 
           - build_script: build_copy_runtimes.ps1
             test_script: test.ps1
