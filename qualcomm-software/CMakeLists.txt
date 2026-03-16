@@ -260,8 +260,10 @@ set(CLANG_DEFAULT_LINKER lld CACHE STRING "")
 # We have workarounds for #2, but #1 is still an open issue. For now, disable
 # python support and turn off testing while we sort out the best way to handle
 # these issues.
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(LLDB_ENABLE_PYTHON ON CACHE BOOL "")
 set(LLDB_INCLUDE_TESTS ON CACHE BOOL "")
+set(LLDB_PYTHON_RELATIVE_PATH "lib/python3.${Python3_VERSION_MINOR}/site-packages" CACHE STRING "")
 
 # Default to a release build
 # (CMAKE_BUILD_TYPE is a special CMake variable so if you want to set
@@ -270,7 +272,6 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE BOOL "" FORCE)
 endif()
 
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 if(NOT CMAKE_C_COMPILER_LAUNCHER AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
     # If ccache is available then use it by default.
