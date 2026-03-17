@@ -19,4 +19,6 @@ llvm::DenseMap<const SectionChunk *, int>
 computeCallGraphProfileOrder(COFFLinkerContext &ctx);
 } // namespace lld::coff
 
+// this shouldn't be allowed!
+
 #endif
