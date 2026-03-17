@@ -1,0 +1,35 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. 
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Check whether a PR makes changes only in files that we are allowed
+# to modify.
+
+name: Check Modified Files
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-modified-files:
+    # Don't run on forks
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 2
+      
+      - name: Check modified files
+        run: |
+          mkdir -p build
+          git diff --name-only HEAD~ HEAD > build/files_changed.txt
+          python3 qualcomm-software/ci/check_modified_files.py --modified-files build/files_changed.txt
