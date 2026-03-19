@@ -1,0 +1,146 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Zephyr Twister Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/zephyr-twister-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-Linux-x86-toolchain:
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    name: Build toolchain
+    runs-on: self-hosted
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          # We build in the repository and rely on clean to cleanup possible
+          # old build products if the runner doesn't do it itself.
+          clean: true
+
+      - name: Apply llvm-project patches
+        run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
+
+      - name: Build
+        run: ./qualcomm-software/scripts/build.sh
+
+      - name: Upload built packages
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: success()
+        with:
+          name: cpullvm-packages-build.sh-Linux-x86
+          path: build*/cpullvm-*.tar.xz
+          if-no-files-found: error
+          retention-days: 1
+
+  run-twister-tests:
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    name: Twister tests for ${{ matrix.platform }} (${{ matrix.subset }}/2)
+    needs: build-Linux-x86-toolchain
+    # Zephyr's tests take a relatively long time to complete but can be split to
+    # run in parallel on different machines fairly easily (by platform/arch,
+    # using `--subset`, etc.). So let's use Github's runners to avoid tying up
+    # our (limited in number) self-hosted runners for hours at a time.
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/zephyrproject-rtos/ci:main
+      # Work around a mismatch between UIDs, see https://github.com/actions/checkout/issues/956
+      options: '--user 0'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [qemu_riscv32, qemu_riscv64, qemu_cortex_a53, qemu_cortex_m3]
+        subset: [1, 2]
+
+    steps:
+      - name: Clone Zephyr
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          repository: zephyrproject-rtos/zephyr
+
+      # We must also add the repository as a safe.directory, otherwise we get
+      # errors about "dubious ownership". See https://github.com/actions/checkout/issues/2031
+      - name: Set safe.directory
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # FIXME: Once this has been merged upstream, this step should be removed.
+      - name: Apply eld patch to Zephyr
+        run: |
+          wget https://github.com/zephyrproject-rtos/zephyr/pull/103778.patch
+          git apply 103778.patch
+
+      - name: Download toolchain package
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: cpullvm-packages-build.sh-Linux-x86
+
+      - name: Unpack toolchain
+        run: |
+          tar -xvf build/cpullvm-*-Linux-x86_64.tar.xz
+          mv cpullvm-*-Linux-x86_64 /opt/cpullvm
+
+      - name: West setup
+        run: |
+          west init -l .
+          west update
+
+      - name: Run Twister tests
+        shell: bash
+        run: |
+          source zephyr-env.sh
+          export ZEPHYR_SDK_INSTALL_DIR=/opt/toolchains/
+          export ZEPHYR_TOOLCHAIN_VARIANT=host/llvm
+          export LLVM_TOOLCHAIN_PATH=/opt/cpullvm/
+
+          west twister -W \
+            -p ${{ matrix.platform }} \
+            -j 3 \
+            --inline-logs \
+            --force-toolchain \
+            --subset ${{ matrix.subset }}/2 \
+            -x=CONFIG_LLVM_USE_ELD=y \
+            -x=CONFIG_COMPILER_RT_RTLIB=y
+
+      - name: Upload Twister results
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: zephyr-twister-test-results-${{ matrix.platform }}-subset-${{ matrix.subset }}
+          path: |
+            twister-out/twister.log
+            twister-out/twister.xml
+            twister-out/twister.json
+
+  merge-twister-results:
+    if: always() && github.repository == 'qualcomm/cpullvm-toolchain'
+    name: Merge Twister XML results
+    needs: run-twister-tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download split XML results
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          path: split_xml
+
+      - name: Install junitparser
+        run: |
+          pip install junitparser
+
+      - name: Merge split XML results
+        run: |
+          junitparser merge --glob "split_xml/**/twister.xml" merged_twister.xml
+
+      - name: Upload merged XML results
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: zephyr-merged-twister-test-results
+          path: merged_twister.xml
