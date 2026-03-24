@@ -789,7 +789,7 @@ if(ENABLE_WINDOWS_LIBRARIES)
 endif()
 
 install(
-    FILES CHANGELOG.md LICENSE.txt README.md
+    FILES CHANGELOG.md LICENSE.txt README.md ReleaseNotes.md
     DESTINATION .
     COMPONENT llvm-toolchain-docs
 )
