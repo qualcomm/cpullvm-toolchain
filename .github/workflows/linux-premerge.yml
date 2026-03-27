@@ -28,7 +28,9 @@ jobs:
     # Don't run on forks
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: ${{ matrix.build_script }} on ${{ matrix.target_os }}
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}    
+    container:
+      image: ubuntu:24.04
 
     strategy:
       fail-fast: false
