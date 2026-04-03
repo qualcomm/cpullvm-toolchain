@@ -20,7 +20,7 @@
             "ENABLE_LIBC_TESTS": "ON",
             "ENABLE_COMPILER_RT_TESTS": "OFF",
             "ENABLE_LIBCXX_TESTS": "OFF",
-            "TLS_MODEL": "initial-exec"
+            "TLS_MODEL": "local-exec"
         },
         "musl-embedded": {
             "ENABLE_CXX_LIBS": "OFF",
