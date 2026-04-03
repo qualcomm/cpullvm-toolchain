@@ -107,7 +107,7 @@ jobs:
             --inline-logs \
             --force-toolchain \
             --subset ${{ matrix.subset }}/2 \
-            -x=CONFIG_LLVM_USE_ELD=y \
+            -x=CONFIG_LLVM_USE_LLD=y \
             -x=CONFIG_COMPILER_RT_RTLIB=y
 
       - name: Upload Twister results
