@@ -50,7 +50,7 @@ jobs:
     # our (limited in number) self-hosted runners for hours at a time.
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/zephyrproject-rtos/ci:main
+      image: ghcr.io/zephyrproject-rtos/ci-base:main
       # Work around a mismatch between UIDs, see https://github.com/actions/checkout/issues/956
       options: '--user 0'
 
@@ -92,6 +92,11 @@ jobs:
         run: |
           west init -l .
           west update
+
+      # Source hosttools (including qemu) from the Zephyr SDK.
+      - name: Install Zephyr SDK hosttools
+        run: |
+          west sdk install --no-gnu-toolchains --install-base /opt/toolchains
 
       - name: Run Twister tests
         shell: bash
