@@ -21,6 +21,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/native-runtime-nightly.yml'
+  schedule:
+    - cron: '0 3 * * *'  # 7:00 PM PST (03:00 UTC)
 
 permissions:
   contents: read
