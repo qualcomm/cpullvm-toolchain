@@ -5,6 +5,8 @@ name: Zephyr Twister Tests
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 5 * * 1' # Sunday 21:00 PST (Monday 05:00 UTC)
   pull_request:
     paths:
       - '.github/workflows/zephyr-twister-tests.yml'
