@@ -56,6 +56,12 @@
             "flags": "--target=thumbv7m-unknown-none-eabi -mfpu=none"
         },
         {
+            "variant": "armv7m_soft_nofp_nopic",
+            "json": "armv7m_soft_nofp_nopic.json",
+            "flags": "--target=thumbv7m-unknown-none-eabi -mfpu=none -fno-pic",
+            "libraries_supported": "picolibc"
+        },
+        {
             "variant": "riscv32imc_ilp32_nothreads_nopic",
             "json": "riscv32imc_ilp32_nothreads_nopic.json",
             "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imc -mabi=ilp32 -fmultilib-flag=no-threads -fno-pic",
@@ -121,7 +127,7 @@
             "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zcb_zcmp_zba_zbb -mabi=ilp32 -fno-pic",
             "libraries_supported": "picolibc"
         },
-	{
+        {
             "variant": "riscv32imafc_ilp32f",
             "json": "riscv32imafc_ilp32f.json",
             "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imafc -mabi=ilp32f",
@@ -137,6 +143,12 @@
             "variant": "riscv32imafc_zcb_zcmp_zba_zbb_ilp32f",
             "json": "riscv32imafc_zcb_zcmp_zba_zbb_ilp32f.json",
             "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imafc_zcb_zcmp_zba_zbb -mabi=ilp32f",
+            "libraries_supported": "picolibc"
+        },
+        {
+            "variant": "riscv32gc_ilp32d",
+            "json": "riscv32gc_ilp32d.json",
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32gc -mabi=ilp32d",
             "libraries_supported": "picolibc"
         },
         {
