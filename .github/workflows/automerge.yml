@@ -42,7 +42,7 @@ jobs:
       - name: Configure Git Identity
         run: |
           git config --local user.name "cpullvm bot"
-          git config --local user.email "cpullvmbot@qti.qualcomm.com"
+          git config --local user.email "nshanmug@qti.qualcomm.com"
       - name: Fetch Branches
         run: |
           git remote set-branches --add origin ${{ matrix.branches.from_branch }}

@@ -34,6 +34,6 @@ jobs:
       - name: Configure Git Identity
         run: |
           git config --local user.name "CPULLVM BOT"
-          git config --local user.email "cpullvmbot@qti.qualcomm.com"
+          git config --local user.email "nshanmug@qti.qualcomm.com"
       - name: Push Changes
         run: git push origin ${{ matrix.branch }}
