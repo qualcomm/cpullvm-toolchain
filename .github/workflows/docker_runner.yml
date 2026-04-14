@@ -1,0 +1,16 @@
+name: Run cpullvm-toolchain22.x image and upload to GitHub Artifacts
+
+on:
+  workflow_dispatch:
+
+jobs:
+  execute-docker:
+    runs-on: ubuntu-latest
+    steps:
+      -name: Log into GHCE
+       run: echo "$ {{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stin
+
+      -name: pull and Run cpullvm-toolchain image
+       run: | 
+            docker pull ghcr.io/pranav4330/cpullvmtoolchain22.x:ubuntu24.04
+            docker run ghcr.io/pranav4330/cpullvmtoolchain22.x:ubuntu24.04
