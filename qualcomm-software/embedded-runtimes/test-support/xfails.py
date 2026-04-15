@@ -119,7 +119,7 @@ def main():
             description="If the installed default multilib does not have a library available for -mcpu=cortex-r52, this test will fail.",
         ),
         XFail(
-            name="picolibc_rv64gc",
+            name="picolibc rv32/64gc",
             testnames=[
                 "math_errhandling.test",
                 "test-fma.test",
@@ -127,6 +127,7 @@ def main():
             result=NewResult.XFAILED,
             project="picolibc",
             variants=[
+                "riscv32gc_ilp32d",
                 "riscv64gc_lp64d_nopic",
                 "riscv64gc_zba_zbb_lp64d_nopic",
                 "riscv64gc_lp64_nopic",
