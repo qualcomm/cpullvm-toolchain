@@ -22,9 +22,9 @@ CPULLVM requires the following software to be installed:
 Library testing requires:
 * [QEMU](https://www.qemu.org/download/)
 
-Testing with QEMU is enabled by default, but can be disabled using the 
-`-DENABLE_QEMU_TESTING=OFF` CMake option if testing is not required or QEMU is
-not installed.
+Testing with QEMU (using QEMU's [system emulation](https://www.qemu.org/docs/master/system/introduction.html))
+is enabled by default, but can be disabled using the `-DENABLE_QEMU_TESTING=OFF` CMake
+option if testing is not required or QEMU is not installed.
 
 A relatively recent version of QEMU is required to support the latest RISC-V extensions.
 CPULLVM currently builds and tests with QEMU v10.1.3.
