@@ -40,4 +40,4 @@ jobs:
 
       - name: Run the image
         run: |
-          docker run --rm ghcr.io/pranav4330/cpullvmtoolchain22.x:ubuntu24.04
+          docker run --rm ghcr.io/pranav4330/cpullvm-toolchain-dockerimage:ubuntu24.04
