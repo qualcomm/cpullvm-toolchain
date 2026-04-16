@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 MERGE_CONFLICT_LABEL = "automerge_conflict"
 AUTOMERGE_BRANCH = "automerge"
 REMOTE_NAME = "origin"
-MERGE_IGNORE_PATHSPEC_FILE = Path(__file__).parent / ".automerge_ignore"
+MERGE_IGNORE_PATHSPEC_FILE = Path(__file__).parent / "cpullvm_modified_files"
 
 class MergeConflictError(Exception):
     """
