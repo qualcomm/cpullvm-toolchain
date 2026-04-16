@@ -1,5 +1,5 @@
 
-# Qualcomm LLVM Toolchain Docker Setup and Image
+# CPU LLVM Toolchain Docker Setup and Image
 
 ## Overview
 
@@ -14,9 +14,9 @@ The Image is available on **GitHub Container Registry (GHCR)**:
   
 ---
 
-## Qualcomm LLVM Toolchain
+## CPU LLVM Toolchain
 
-The Docker image is for  Qualcomm LLVM toolchain.
+The Docker image is for  Qualcomm CPU LLVM toolchain.
 
 - **Repository:**  
   https://github.com/qualcomm/cpullvm-toolchain.git
