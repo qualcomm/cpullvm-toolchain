@@ -3,12 +3,13 @@
 
 ## Overview
 
-This Docker image provides a **build-ready Ubuntu 24.04 environment** for working with the **Qualcomm LLVM (cpullvm) toolchain**.  
+This Docker file creates a **build-ready Ubuntu 24.04 environment Docker Image** for working with the **Qualcomm LLVM (cpullvm) toolchain**.  
 It installs all required system dependencies, cross-compilers, build tools, and Python utilities, then **clones and sets up the Qualcomm LLVM toolchain from GitHub**.
 
 This image is intended for developers building or experimenting with Qualcomm software using LLVM and related cross-compilation toolchains.
+The Image is available on **GitHub Container Registry (GHCR)**:
 
-
+** ghcr.io/pranav4330/cpullvmtoolchain22.x:ubuntu24.04 **
 ---
 
 ## Qualcomm LLVM Toolchain
@@ -22,9 +23,6 @@ The Docker image automatically clones and initializes the Qualcomm LLVM toolchai
   `release/qualcomm-software/22.x`
 
 These values can be overridden at build time using Docker build arguments.
-
----
-
 
 ---
 
