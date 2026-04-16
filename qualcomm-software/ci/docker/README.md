@@ -1,5 +1,5 @@
 
-# Qualcomm LLVM Toolchain Docker Image
+# Qualcomm LLVM Toolchain Docker Setup and Image
 
 ## Overview
 
