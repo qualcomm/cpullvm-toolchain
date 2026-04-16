@@ -1,27 +1,11 @@
-# name: LLVM Toolchain Install
-
-# on:
-#   push:
-#     branches: [main]
-
-# jobs:
-#   build:
-#     runs-opn: ubuntu-latest
-#     container:
-#       image: ghcr.io/pranav4330/cpullvmtoolchain22.x:ubuntu24.04
-
-#     steps:
-#       - uses: actions/checkout@v4
-#       - name: Eun ninja Install
-#         run: | 
-#           ninja llvm-Toolchain
-#           ninja install llvm-toolchain
-
-
 name: Pull cpullvm-toolchain image
 
 on:
   workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read   # REQUIRED for pulling from GHCR
 
 jobs:
   pull_image:
@@ -38,6 +22,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run the image
+      - name: Run the image and print uname
         run: |
-          docker run --rm ghcr.io/pranav4330/cpullvm-toolchain-dockerimage:ubuntu24.04
+          docker run --rm ghcr.io/pranav4330/cpullvm-toolchain-dockerimage:ubuntu24.04 uname -a
