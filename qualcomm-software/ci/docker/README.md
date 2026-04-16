@@ -3,20 +3,20 @@
 
 ## Overview
 
-This Docker file creates a **build-ready Ubuntu 24.04 environment Docker Image** for working with the **Qualcomm LLVM (cpullvm) toolchain**.  
-It installs all required system dependencies, cross-compilers, build tools, and Python utilities, then **clones and sets up the Qualcomm LLVM toolchain from GitHub**.
+This Docker file provides a **build-ready Ubuntu 24.04 environment Docker Image** for working with the **Qualcomm LLVM (cpullvm) toolchain**.  
+it comes preinstalled with common build tools, LLVM tooling, ARM cross-compilers, and Python utilities.
 
 This image is intended for developers building or experimenting with Qualcomm software using LLVM and related cross-compilation toolchains.
 The Image is available on **GitHub Container Registry (GHCR)**:
 
 - **Image:**  
-  https://ghcr.io/pranav4330/cpullvmtoolchain22.x:ubuntu24.04
+  https://ghcr.io/pranav4330/cpullvm-toolchain-dockerimage:ubuntu24.04
   
 ---
 
 ## Qualcomm LLVM Toolchain
 
-The Docker image automatically clones and initializes the Qualcomm LLVM toolchain.
+The Docker image is for  Qualcomm LLVM toolchain.
 
 - **Repository:**  
   https://github.com/qualcomm/cpullvm-toolchain.git
@@ -36,32 +36,51 @@ These values can be overridden at build time using Docker build arguments.
 
 ## Installed Tool Versions
 
-### System Toolchain & Build Tools
+# Installed Tools & Packages
 
-- **Clang / Clang++** (Ubuntu 24.04 package version)
-- **LLD**
-- **GCC ARM Cross Compiler:** `gcc-arm-linux-gnueabi`
-- **Make**
-- **CMake**
-- **Ninja**
-- **Git**
-- **build-essential**
+### Build & Development Tools
+- `build-essential`
+- `make`
+- `cmake`
+- `ninja-build`
+- `git`
 
-### C / C++ Libraries
+### LLVM Toolchain
+- `clang`
+- `clang++`
+- `lld`
 
-- `zlib1g-dev`
+### Cross Compilation
+- `gcc-arm-linux-gnueabi`
 - `libc6-dev-i386`
-- **libstdc++**
-  - Version 11 (native)
-  - Version 12 (native)
-  - Version 11 (ARM64 cross)
-  - Version 12 (ARM64 cross)
+- `libstdc++-11-dev`
+- `libstdc++-12-dev`
+- `libstdc++-11-dev-arm64-cross`
+- `libstdc++-12-dev-arm64-cross`
 
 ### Python Environment
-
-- **Python:** 3.x (Ubuntu default for 24.04)
-- **pip**
-- **python3-yaml**
+- `python3`
+- `python3-pip`
+- `python3-yaml`
 - **Meson:** `1.10.1`
 
-> Meson is installed using `pip` with `--break-system-packages` to ensure compatibility inside the container.
+> Meson is installed via `pip` using `--break-system-packages` for compatibility inside the container.
+
+### Additional Libraries
+- `zlib1g-dev`
+
+---
+
+## Image Configuration
+
+- **Working Directory:** `/workspace`
+- **Default Command:** `/bin/bash`
+- **Non-interactive APT mode** enabled to support automated builds
+
+---
+
+## Directory Structure
+
+```text
+/workspace
+
