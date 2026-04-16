@@ -120,5 +120,10 @@ to test these components separately. A non-exhaustive list of `check-` targets C
 * `check-clang`, `check-llvm`, and the other usual LLVM `check-` targets are all still valid
 * `check-eld` works as usual
 * `check-llvm-toolchain-lit` runs only the built-in [multilib tests](../test/multilib/)
-* `check-<component>` targets (where component is ex: picolibc) will run any enabled tests for that component across all variants
+* `check-<component>` targets will run any enabled tests for that component across all variants
 * `check-<component>-<variant>` targets will run the given component tests for the specified variant
+
+Example (non-exhaustive) components that can be used in the commands above:
+* `compiler-rt`
+* `picolibc` (or the name of the C library selected if different)
+* `cxx`/`cxxabi`/`unwind`

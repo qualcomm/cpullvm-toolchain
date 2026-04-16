@@ -105,6 +105,8 @@ To run all LLVM, eld, and library tests together, the below command may be used:
 ```
 ninja check-all-llvm-toolchain
 ```
+Tests can also be run in smaller subsets, please refer to our [developer documentation](./developing.md#testing-the-toolchain)
+for more information.
 
 ### Installing the toolchain
 
