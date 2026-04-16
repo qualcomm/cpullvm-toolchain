@@ -8,6 +8,24 @@ It installs all required system dependencies, cross-compilers, build tools, and 
 
 This image is intended for developers building or experimenting with Qualcomm software using LLVM and related cross-compilation toolchains.
 
+
+---
+
+## Qualcomm LLVM Toolchain
+
+The Docker image automatically clones and initializes the Qualcomm LLVM toolchain.
+
+- **Repository:**  
+  https://github.com/qualcomm/cpullvm-toolchain.git
+
+- **Branch:**  
+  `release/qualcomm-software/22.x`
+
+These values can be overridden at build time using Docker build arguments.
+
+---
+
+
 ---
 
 ## Base Image
