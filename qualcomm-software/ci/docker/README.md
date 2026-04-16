@@ -9,7 +9,9 @@ It installs all required system dependencies, cross-compilers, build tools, and 
 This image is intended for developers building or experimenting with Qualcomm software using LLVM and related cross-compilation toolchains.
 The Image is available on **GitHub Container Registry (GHCR)**:
 
-** ghcr.io/pranav4330/cpullvmtoolchain22.x:ubuntu24.04 **
+- **Image:**  
+  https://ghcr.io/pranav4330/cpullvmtoolchain22.x:ubuntu24.04
+  
 ---
 
 ## Qualcomm LLVM Toolchain
