@@ -10,11 +10,9 @@ on:
   workflow_dispatch:
 jobs:
   Run-Automerge:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
-      contents: write
       pull-requests: write
-      issues: write
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     strategy:
       matrix:
@@ -22,32 +20,26 @@ jobs:
           - from_branch: main
             to_branch: qualcomm-software
     steps:
-      - name: Generate GitHub App token
-        uses: actions/create-github-app-token@v1
+      - name: Configure Access Token
+        uses: actions/create-github-app-token@f45685208fd9b88321d74015b5996fc8c3e43d18 # v1.0.0
         id: generate-token
         with:
-          app-id: ${{ secrets.SYNC_APP_ID }}
-          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
-      - name: Authenticate GitHub CLI
-        run: |
-          gh auth logout --hostname github.com || true
-          echo "${{ steps.generate-token.outputs.token }}" | gh auth login --with-token
-          gh auth setup-git
-      - name: Checkout target branch
-        uses: actions/checkout@v4
+          app_id: ${{ secrets.SYNC_APP_ID }}
+          private_key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           ref: ${{ matrix.branches.to_branch }}
-          fetch-depth: 0
           token: ${{ steps.generate-token.outputs.token }}
       - name: Configure Git Identity
         run: |
-          git config --local user.name "cpullvmbot"
-          git config --local user.email "cpullvmbot@qti.qualcomm.com"
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - name: Fetch Branches
         run: |
           git remote set-branches --add origin ${{ matrix.branches.from_branch }}
           git fetch origin ${{ matrix.branches.from_branch }}:${{ matrix.branches.from_branch }}
-          git pull --ff-only origin ${{ matrix.branches.to_branch }}
+          git pull --unshallow --ff-only origin ${{ matrix.branches.to_branch }}
       - name: Run automerge
         run: python3 qualcomm-software/ci/automerge.py --project-name ${{ github.repository }} --from-branch ${{ matrix.branches.from_branch }} --to-branch ${{ matrix.branches.to_branch }} --verbose
         env:
