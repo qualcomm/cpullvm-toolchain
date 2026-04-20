@@ -11,7 +11,6 @@ import logging
 import shlex
 import subprocess
 import sys
-from typing import Optional, List, Iterable, Dict
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -22,6 +21,7 @@ MERGE_CONFLICT_LABEL = "automerge_conflict"
 AUTOMERGE_BRANCH = "automerge"
 REMOTE_NAME = "origin"
 MERGE_IGNORE_PATHSPEC_FILE = Path(__file__).parent / ".automerge_ignore"
+
 
 class MergeConflictError(Exception):
     """
@@ -92,6 +92,7 @@ def prefix_current_commit_message(git_repo: Git) -> None:
     commit_msg = f"Automerge: {log_output}"
     git_repo.run_cmd(["commit", "--amend", "--message=" + commit_msg])
 
+
 def merge_commit(
     git_repo: Git,
     to_branch: str,
@@ -112,7 +113,6 @@ def merge_commit(
     # that by not checking the exist status and validating that a merge is in
     # progress after `git merge` runs.
     git_repo.run_cmd(["merge", commit_hash, "--no-commit", "--no-ff"], check=False)
-  
     if not is_merge_in_progress(git_repo):
         raise RuntimeError("Unexpected error occurred when running git merge")
     restore_changes_to_ignored_files(git_repo, ignored_paths)
@@ -149,7 +149,7 @@ def create_pull_request(git_repo: Git, to_branch: str) -> None:
             AUTOMERGE_BRANCH,
             "--base",
             to_branch,
-            "--body", "Automerge hit a merge conflict. Please check the CI logs for details.",
+            "--fill",
             "--title",
             pr_title,
             "--label",
@@ -177,7 +177,6 @@ def get_merge_commit_list(git_repo: Git, from_branch: str, to_branch: str) -> li
     logger.info(
         "Calculating list of commits to be merged from %s to %s", from_branch, to_branch
     )
-    
     merge_base_output = git_repo.run_cmd(["merge-base", from_branch, to_branch])
     merge_base_commit = merge_base_output.strip()
     log_output = git_repo.run_cmd(
@@ -190,8 +189,6 @@ def get_merge_commit_list(git_repo: Git, from_branch: str, to_branch: str) -> li
     commit_list = commit_list.split("\n")
     commit_list.reverse()
     logger.info("Found %d commits to be merged", len(commit_list))
-    logger.info("First commit getting synced : %s", commit_list[0])
-    logger.info("Last  commit getting synced : %s", commit_list[-1])
     return commit_list
 
 
@@ -251,6 +248,7 @@ def main():
         action="store_true",
         help="Print verbose log messages during automerge run",
     )
+
     args = arg_parser.parse_args()
 
     if args.verbose:
@@ -272,7 +270,8 @@ def main():
             ignored_paths = ignored_paths_file.read().splitlines()
 
         merge_commits = get_merge_commit_list(
-            git_repo, args.from_branch, args.to_branch)
+            git_repo, args.from_branch, args.to_branch
+        )
         for commit_hash in merge_commits:
             merge_commit(
                 git_repo,
