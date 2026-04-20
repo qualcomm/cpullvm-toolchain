@@ -794,6 +794,12 @@ install(
     COMPONENT llvm-toolchain-docs
 )
 
+install(
+    DIRECTORY docs
+    DESTINATION .
+    COMPONENT llvm-toolchain-docs
+)
+
 if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc)
     string(APPEND LIBC_LICENSE_FILES " - Picolibc: third-party-licenses/COPYING.NEWLIB, third-party-licenses/COPYING.picolibc\n")
 endif()
