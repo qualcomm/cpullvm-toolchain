@@ -39,9 +39,9 @@ When compiling and linking, you should provide at least the following options on
 
 Additionally, CPULLVM implements custom multilib flags to allow selecting variants that are not otherwise tied
 to normal compiler flags. These are specified by `-fmultilib-flag=<flag>`. Currently implemented flags include:
-* **`threads`/`nothreads`**: Picolibc only. When `threads` is set, a variant with [`thread-local-storage`](https://github.com/picolibc/picolibc/blob/ce4e736ebef081d13a81a29b6cfb51335f6f890d/doc/build.md#thread-local-storage-options) enabled,
+* **`threads`/`no-threads`**: Picolibc only. When `threads` is set, a variant with [`thread-local-storage`](https://github.com/picolibc/picolibc/blob/ce4e736ebef081d13a81a29b6cfb51335f6f890d/doc/build.md#thread-local-storage-options) enabled,
 [`single-thread`](https://github.com/picolibc/picolibc/blob/ce4e736ebef081d13a81a29b6cfb51335f6f890d/doc/build.md#locking-options) disabled,
-and [`atomic-ungetc`](https://github.com/picolibc/picolibc/blob/ce4e736ebef081d13a81a29b6cfb51335f6f890d/doc/build.md#locking-options) enabled is selected. `nothreads` selects a variant with the inverse. `threads` is default.
+and [`atomic-ungetc`](https://github.com/picolibc/picolibc/blob/ce4e736ebef081d13a81a29b6cfb51335f6f890d/doc/build.md#locking-options) enabled is selected. `no-threads` selects a variant with the inverse. `threads` is default.
 
 To display all available multilibs run clang with the flag `-print-multi-lib` and an appropriate target triple.
 
