@@ -60,7 +60,7 @@ def main():
     lib_dir = os.path.join(args.build_dir, "llvm", "lib")
     os.makedirs(lib_dir, exist_ok=True)
 
-    destination = os.path.join(lib_dir, "clang-runtimes")
+    destination = os.path.join(lib_dir)
 
     if os.path.isdir(destination):
         shutil.rmtree(destination)
@@ -84,7 +84,7 @@ def main():
         # position. The rest of the files in the distribution folder
         # will be deleted automatically when the tmp object goes out of
         # scope.
-        move_folder(os.path.join(tmp, "*", "lib", "clang-runtimes"), lib_dir)
+        move_folder(os.path.join(tmp, "*", "lib"), lib_dir)
 
         if args.include_linux_libraries:
             # Move the entire resource directory
