@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 jobs:
   Fetch-Upstream:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     strategy:
       matrix:
@@ -17,13 +17,13 @@ jobs:
       UPSTREAM_REMOTE: https://github.com/llvm/llvm-project.git
     steps:
       - name: Configure Access Token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@f45685208fd9b88321d74015b5996fc8c3e43d18 # v1.0.0
         id: generate-token
         with:
-          app-id: ${{ secrets.SYNC_APP_ID }}
-          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          app_id: ${{ secrets.SYNC_APP_ID }}
+          private_key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           ref: ${{ matrix.branch }}
           token: ${{ steps.generate-token.outputs.token }}
@@ -33,7 +33,7 @@ jobs:
         run: git pull --ff-only upstream ${{ matrix.branch }}
       - name: Configure Git Identity
         run: |
-          git config --local user.name "cpullvmbot"
-          git config --local user.email "cpullvmbot@qti.qualcomm.com"
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - name: Push Changes
         run: git push origin ${{ matrix.branch }}
