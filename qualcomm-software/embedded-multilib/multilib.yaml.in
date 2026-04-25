@@ -45,6 +45,11 @@ Flags:
   - Name: no-threads
   - Name: threads
   Default: threads
+- Name: musl-subvariant
+  Values:
+  - Name: standalone
+  - Name: no-subvariant
+  Default: no-subvariant
 
 # The list of library variants is substituted in by CMakeLists.txt, so
 # that it can respect the LLVM_TOOLCHAIN_LIBRARY_VARIANTS setting and
