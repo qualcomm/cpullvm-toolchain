@@ -1,0 +1,818 @@
+From e74d2d3be07c72f13a54684b223bb7447b1ef5f6 Mon Sep 17 00:00:00 2001
+From: Venkata Ramanaiah Nalamothu <vnalamot@qti.qualcomm.com>
+Date: Mon, 16 Mar 2026 03:31:04 -0700
+Subject: [PATCH] [RISCV] Add optimized memset/memcpy/strcpy/strcmp for Xqci
+
+The optimized implementations for Xqci will override the other
+existing corresponding varients when Xqci extenions are enabled.
+
+The orverriding happens using the interface implemented in the
+upstream Picolibc pull requests 1090, 1092 and 1098.
+---
+ newlib/libc/machine/riscv/CMakeLists.txt |   4 +
+ newlib/libc/machine/riscv/memcpy-xqci.S  | 283 +++++++++++++++++++++++
+ newlib/libc/machine/riscv/memset-xqci.S  | 161 +++++++++++++
+ newlib/libc/machine/riscv/memset.S       |   6 +-
+ newlib/libc/machine/riscv/meson.build    |   4 +
+ newlib/libc/machine/riscv/rv_string.h    |  26 ++-
+ newlib/libc/machine/riscv/strcmp-xqci.S  |  83 +++++++
+ newlib/libc/machine/riscv/strcmp.S       |   6 +-
+ newlib/libc/machine/riscv/strcpy-xqci.S  |  87 +++++++
+ newlib/libc/machine/riscv/strcpy.c       |   5 +
+ 10 files changed, 660 insertions(+), 5 deletions(-)
+ create mode 100644 newlib/libc/machine/riscv/memcpy-xqci.S
+ create mode 100644 newlib/libc/machine/riscv/memset-xqci.S
+ create mode 100644 newlib/libc/machine/riscv/strcmp-xqci.S
+ create mode 100644 newlib/libc/machine/riscv/strcpy-xqci.S
+
+diff --git a/newlib/libc/machine/riscv/CMakeLists.txt b/newlib/libc/machine/riscv/CMakeLists.txt
+index 1ccfaad01..82a8b9ec5 100644
+--- a/newlib/libc/machine/riscv/CMakeLists.txt
++++ b/newlib/libc/machine/riscv/CMakeLists.txt
+@@ -38,13 +38,17 @@ add_subdirectory(machine)
+ picolibc_sources_flags("-fno-builtin"
+   ieeefp.c
+   memcpy-asm.S
++  memcpy-xqci.S
+   memcpy.c
+   memmove.S
+   memmove.c
+   memset.S
++  memset-xqci.S
+   setjmp.S
+   stpcpy.c
++  strcmp-xqci.S
+   strcmp.S
++  strcpy-xqci.S
+   strcpy.c
+   strlen.c
+   )
+diff --git a/newlib/libc/machine/riscv/memcpy-xqci.S b/newlib/libc/machine/riscv/memcpy-xqci.S
+new file mode 100644
+index 000000000..c3bb96743
+--- /dev/null
++++ b/newlib/libc/machine/riscv/memcpy-xqci.S
+@@ -0,0 +1,283 @@
++/*****************************************************************
++Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++SPDX-License-Identifier: BSD-3-Clause-Clear
++*****************************************************************/
++
++#include "rv_string.h"
++
++#ifdef _MACHINE_RISCV_MEMCPY_ASM_XQCI_
++
++.text
++
++/*===========================================================================
++
++  void *memcpy(void *dest, const void *src, size_t n)
++
++  void __xqci_memcpy(void *dest, const void *src, size_t n)
++
++  void __xqci_memcpy_aligned(void *dest, void *src, size_t n)
++
++  void __xqci_memcpy_words(void *dest, void *src, size_t nwords)
++
++===========================================================================*/
++/*!
++    @brief
++    memcpy() is standard libc memcpy().
++    It returns the "dest" argument.
++
++    __xqci_memcpy is called by the compiler memcpy() builtin if it can't
++    inline. It is identical to standard memcpy(), except it does not
++    return a value.
++
++    __xqci_memcpy_aligned assumes that dest/src are 32-bit word aligned,
++    and n is a multiple of words (n==0 is allowed).
++    Alignment is not checked, behavior is undefined if not satisfied.
++
++    __xqci_memcpy_words is like __xqci_memcpy_aligned, except that length
++    is in units of 32-bit words instead of bytes.
++
++    For word-aligned src/dest/size, these functions are guaranteed to
++    do only word accesses, in sequential order, so they are safe to use
++    for HW peripherals.
++    For byte alignment on src/dest/size, access order may be non-sequential,
++    and some locations may be read/written multiple times.
++    In all cases, only bytes strictly within the src/dest regions will be
++    accessed, with no over-read.
++*/
++/*=========================================================================*/
++
++// Inputs:
++#define dest          a0
++#define src           a1
++#define n             a2
++#define nwords        n
++
++#define BUFSZ         4
++
++// Locals:
++#define dst           a3
++#define buf00         a4
++#define buf01         a5
++#define buf02         a6
++#define buf03         a7
++#define buf10         t3
++#define buf11         t4
++#define buf12         t5
++#define buf13         t6
++#define buf_size      t0
++#define len0          t1
++#define len1          t2
++#define tmp           buf00
++#define src_end       len0
++#define dst_end       len1
++
++#ifndef MEMSET_TEST
++.global       memcpy
++.type         memcpy, @function
++memcpy:
++#endif
++
++.global       __xqci_memcpy
++.type         __xqci_memcpy, @function
++__xqci_memcpy:
++    // Check for src/dest/size alignment
++    or        tmp, dest, src
++    or        tmp, tmp, n
++    andi      tmp, tmp, 0x3                           # LSB of dest, src, and n are 0
++    bnez      tmp,.Lunaligned                         # Unaligned, take slow path
++
++.size         memcpy, . - memcpy
++
++.global       __xqci_memcpy_aligned
++.type         __xqci_memcpy_aligned, @function
++__xqci_memcpy_aligned:
++
++    srli      nwords, n, 2                            # Number of words
++
++.global       __xqci_memcpy_words
++.type         __xqci_memcpy_words, @function
++__xqci_memcpy_words:
++    mv        dst, dest
++
++.Lmemcpy_words_cont:
++    qc.bgeui  nwords, (BUFSZ*2+1), .Lmemcpy_words_long
++
++.Lmemcpy_words_short:
++    li        buf_size, BUFSZ
++    minu      len0, nwords, buf_size                  # Limit to nwords or bufsize (can be 0)
++    qc.lwm    buf00, len0, 0(src)                     # Load first buffer (can be 0 size)
++    sub       nwords, nwords, len0                    # adjust remind words number
++    minu      len1, nwords, buf_size                  # Second buffer size (can be 0)
++    qc.lwm    buf10, len1, (BUFSZ*4)(src)             # Load second buffer (can be 0 size)
++    qc.swm    buf00, len0, 0(dst)                     # Store first buffer (can be 0 size)
++    qc.swm    buf10, len1, (BUFSZ*4)(dst)             # Store second buffer (can be 0 size)
++    ret
++
++.Lmemcpy_words_long:
++    addi      dst, dst, -(BUFSZ*4*2)                  # pre-decrement destination pointer
++
++.Lmemcpy_words_loop:
++    qc.lwmi   buf00, BUFSZ, 0(src)                    # Load first buffer (can be 0 size)
++    qc.lwmi   buf10, BUFSZ, (BUFSZ*4)(src)            # Load second buffer (can be 0 size)
++    addi      src, src, (BUFSZ*4*2)                   # Increment source pointer
++    addi      dst, dst, (BUFSZ*4*2)                   # increment destination pointer
++    qc.swmi   buf00, BUFSZ, 0(dst)                    # Store first buffer (can be 0 size)
++    qc.swmi   buf10, BUFSZ, (BUFSZ*4)(dst)            # Store second buffer (can be 0 size)
++    addi      nwords, nwords, -(BUFSZ*2)              # adjust remind words number
++    qc.bgeui  nwords, (BUFSZ*2), .Lmemcpy_words_loop
++
++    addi      dst, dst, (BUFSZ*4*2)                   # increment destination pointer
++    bnez      nwords, .Lmemcpy_words_short
++    ret
++
++// src and/or dest and/or size are not word aligned.
++.Lunaligned:
++    mv        dst, dest
++    qc.bltui  n, 16, .Lbytecopy                       # Buffer is <= 15 bytes, copy directly
++
++    // Copy 3 bytes from the beginning and end of the buffer to handle
++    // realignment and over-read prevention. These will never overlap.
++    // Some of these may be re-copied after realignment.
++
++    lbu       buf00, 0(src)                           # Start of buffer
++    lbu       buf01, 1(src)
++    lbu       buf02, 2(src)
++    add       src_end, src, n                         # doing this add here to avoid bubble
++    sb        buf00, 0(dst)
++    sb        buf01, 1(dst)
++    sb        buf02, 2(dst)
++
++    lbu       buf00, -3(src_end)
++    lbu       buf01, -2(src_end)
++    lbu       buf02, -1(src_end)
++    add       dst_end, dst, n                         # doing this add here to avoid bubble
++    sb        buf00, -3(dst_end)
++    sb        buf01, -2(dst_end)
++    sb        buf02, -1(dst_end)
++
++    // Add 4 to avoid over-read in src, and +3 to round up dest to word boundary.
++    // Subtract 4 to avoid over-read in src_end, and round down to word boundary.
++    addi      dst, dst, 3
++    andi      dst, dst, -4                            # dest+7, rounded down
++    sub       tmp, dst, dest                          # Offset from original dest
++    add       src, src, tmp                           # Offset src by same amount (may not align)
++    andi      dst_end, dst_end, -4                    # -4 and round down on end of dest
++    sub       n, dst_end, dst                         # Updated n. Word multiple, >= 4
++
++    // dest and n are now word aligned.
++    // If src is also aligned, do remainder, as word aligned copy.
++    srli      nwords, n, 2                            # Number of words
++    andi      tmp, src, 0x3
++    beqz      tmp, .Lmemcpy_words_cont                # we are ready to branch to aligned word loop
++
++#define buf04         s2
++#define buf05         s3
++#define buf06         s4
++#define buf07         s5
++#define desc          s0
++#define len           s1
++#define limit         buf_size
++#define LIMIT_WORDS   (BUFSZ*2-1)
++#define LIMIT_BYTES   (LIMIT_WORDS*4)
++
++    // src is not aligned to dest. Realign src data.
++    qc.cm.push {ra,s0-s5}, -32
++    li        desc, 0x200000                          # Width=32 in upper halfword
++    qc.insb   desc, src, 2, 3                         # Byte offset*8 in lower halfword
++    andi      src, src, -4                            # Word align src
++    lw        buf07, 0(src)                           # Load first word
++    addi      dst, dst, -LIMIT_BYTES                  # Pre-subtract dest
++
++    // We don't expect to be doing unaligned access to cache.
++    // Pipeline less aggressively to save code, do bookkeeping
++    // between load and access which should hide memory latency.
++    // This loop copies <= 7 words per iteration.
++
++    li        limit, LIMIT_WORDS
++.Lunaligned_word_loop:
++    mv        buf00, buf07                            # Copy last word from previous buf
++    minu      len, nwords, limit                      # Maximum 7 words per iteration
++    qc.lwm    buf01, len, 4(src)                      # Load next buffer, offset by 1 word
++    addi      src, src, LIMIT_BYTES                   # Inc src for next iteration
++    addi      dst, dst, LIMIT_BYTES                   # Pre-inc dest
++    qc.extdur buf00, buf00, desc                      # Realign each word
++    qc.extdur buf01, buf01, desc
++    qc.extdur buf02, buf02, desc
++    qc.extdur buf03, buf03, desc
++    qc.extdur buf04, buf04, desc
++    qc.extdur buf05, buf05, desc
++    qc.extdur buf06, buf06, desc
++    qc.swm    buf00, len, 0(dst)                      # Store realigned data
++    sub       nwords, nwords, len
++    bnez      nwords, .Lunaligned_word_loop
++    qc.cm.popret {ra,s0-s5}, 32
++
++#undef buf04
++#undef buf05
++#undef buf06
++#undef buf07
++#undef limit
++#undef desc
++#undef LIMIT_WORDS
++#undef LIMIT_BYTES
++
++// Copy buffer directly, size is <= 15 bytes
++// Try to hide load latency, within reason.
++.Lbytecopy:
++    qc.bltui  n, 4, .Lbytecopy_2
++
++.Lbytecopy_4:
++    // Copy 4 bytes per iteration
++    lbu       buf00, 0(src)
++    lbu       buf01, 1(src)
++    lbu       buf02, 2(src)
++    lbu       buf03, 3(src)
++    addi      src, src, 4
++    sb        buf00, 0(dst)
++    sb        buf01, 1(dst)
++    sb        buf02, 2(dst)
++    sb        buf03, 3(dst)
++    addi      dst, dst, 4
++    addi      n, n, -4
++    qc.bgeui  n, 4, .Lbytecopy_4                    # Repeat until < 4 bytes remaining
++
++.Lbytecopy_2:
++    qc.bltui  n, 2, .Lbytecopy_1_check
++    // Copy 2 bytes.
++    lbu       buf00, 0(src)
++    lbu       buf01, 1(src)
++    addi      src, src, 2
++    addi      n, n, -2
++    sb        buf00, 0(dst)
++    sb        buf01, 1(dst)
++    addi      dst, dst, 2
++
++.Lbytecopy_1_check:
++    bnez      n, .Lbytecopy_1
++    ret
++
++.Lbytecopy_1:
++    lbu       buf00, 0(src)
++    sb        buf00, 0(dst)
++    ret
++
++#undef BUFSZ
++#undef src_end
++#undef dst_end
++#undef tmp
++#undef dst
++#undef len0
++#undef len1
++#undef buf_size
++#undef buf00
++#undef buf01
++#undef buf02
++#undef buf03
++#undef buf10
++#undef buf11
++#undef buf12
++#undef buf13
++
++.size         __xqci_memcpy, . - __xqci_memcpy
++
++#endif /*_MACHINE_RISCV_MEMCPY_ASM_XQCI_ */
+diff --git a/newlib/libc/machine/riscv/memset-xqci.S b/newlib/libc/machine/riscv/memset-xqci.S
+new file mode 100644
+index 000000000..361fdb7b3
+--- /dev/null
++++ b/newlib/libc/machine/riscv/memset-xqci.S
+@@ -0,0 +1,161 @@
++/*****************************************************************
++Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++SPDX-License-Identifier: BSD-3-Clause-Clear
++*****************************************************************/
++
++#include "rv_string.h"
++
++#ifdef _MACHINE_RISCV_MEMSET_ASM_XQCI_
++
++.text
++
++/*===========================================================================
++
++  void *memset(void *s, int c, size_t n)
++
++  void __xqci_memset(void *s, int c, size_t n)
++
++  void __xqci_memset_aligned(unsigned *s, int c, size_t n)
++
++  void __xqci_memset_words(unsigned *s, unsigned w, size_t nwords)
++
++===========================================================================*/
++/*!
++    @brief
++    memset() is the standard libc implementation.
++    It returns the "s" argument.
++
++    __xqci_memset() is called by the compiler memset() builtin if it can't
++    inline. It is identical to standard memset(), except it does not
++    return a value.
++
++    __xqci_memset_aligned() works similarly to __xqci_memset(), except it assumes
++    s is 32-bit aligned, and n is a multiple of 32 bits (n==0 is allowed).
++    Alignment is not checked, behavior is undefined if not satisfied.
++
++    __xqci_memset_words() also requires s to be 32-bit aligned.
++    w has the value replicated in each byte, and nwords is the length
++    in units of 32-bit words.
++
++    For word aligned address/length, these functions are guaranteed to do
++    only word access, in sequential order, so they are safe to use for
++    HW peripherals.
++    If address or length have byte alignment, then sequential access
++    is not guaranteed, and some locations may be written multiple times.
++*/
++/*=========================================================================*/
++
++#ifndef MEMSET_TEST
++.global     memset
++.type       memset, @function
++memset:
++#endif
++
++.global     __xqci_memset
++.type       __xqci_memset, @function
++__xqci_memset:
++// Inputs:
++#define s               a0
++#define c               a1
++#define w               c
++#define n               a2
++#define nwords          n
++// Locals:
++#define len             a3
++#define end             a5
++
++#define BLOCK_WORDS     (28)
++#define BLOCK_BYTES     (BLOCK_WORDS*4)
++
++    // Common case: if s and n are word aligned, use aligned function.
++#define a               a4
++    or       a, s, n
++    andi     a, a, 0x3
++    bnez     a, .Lunaligned                          # Skip if unaligned
++#undef a
++    // Fallthrough to aligned memset
++
++#define p               a4
++// External entry for __xqci_memset_aligned
++.global     __xqci_memset_aligned
++.type       __xqci_memset_aligned, @function
++__xqci_memset_aligned:
++    mv       p, s                                    # keep s value since it is return value
++.L__xqci_memset_aligned:
++
++    srli     nwords, n, 2                            # Convert to nwords
++    qc.insb  w, c, 8, 8                              # Splat c over all 4 bytes
++    qc.insb  w, w, 16, 16
++    qc.e.bgeui nwords, 32, .Llong                    # Long memset if >= 32 words
++    qc.setwm w, nwords, 0(p)                         # Short memset (1..31 words) is fast path
++    ret
++
++.Llong:
++    // Long memset, 32 or more words.
++    // Align the address to a 128-bit PDMEM boundary so block stores
++    // are more efficient.
++    qc.extu  len, p, 2, 2                            # Word address mod 4
++    not      len, len
++    addi     len, len, 5                             # Residual to next 4-word multiple
++    qc.setwm w, len, 0(p)                            # Store 1..4 words for alignment
++    sh2add   p, len, p                               # p += alignment words*4
++    sub      nwords, nwords, len                     # nwords -= alignment words
++    qc.e.bltui nwords, 32, .Ltail
++
++    // Store in blocks of 28 words, except for last block.
++.Lblocks:
++    qc.setwmi w, BLOCK_WORDS, 0(p)                   # Store block size words
++    addi     p, p, BLOCK_BYTES                       # Increment ptr, may overflow but not used in
++    addi     nwords, nwords, -BLOCK_WORDS            # nwords -= length
++    qc.bgeui nwords, BLOCK_WORDS, .Lblocks
++
++.Ltail:
++    qc.setwm w, nwords, 0(p)                         # Store reminder of words, if any
++    ret
++
++    // Unaligned start address and/or length.
++.Lunaligned:
++    // Do byte stores at start/end of buffer.
++    // Some locations may be written multiple times for small buffers.
++    mv       p, s                                     # keep s value since it is return value
++    add      end, p, n                                # End of buffer
++    beqz     n, .Lroundup
++    sb       c, 0(p)
++    sb       c, -1(end)
++    addi     n, n, -1
++    beqz     n, .Lroundup
++    sb       c, 1(p)
++    sb       c, -2(end)
++    addi     n, n, -1
++    beqz     n, .Lroundup
++    sb       c, 2(p)
++    sb       c, -3(end)
++
++    // Any residual bytes at start/end of buffer have been set.
++    // Round up starting address and round down size to word boundaries and
++    // continue with alignment memset.
++    // Some bytes may be written again by word writes.
++.Lroundup:
++    addi     p, p, 3
++    andi     p, p, -4                                # Round up p
++    sub      n, end, p                               # n = end - p  (may be negative)
++                                                     # __xqci_memset_aligned will round down n
++    qc.bgei  n, 4, .L__xqci_memset_aligned           # Set middle of buffer as words
++
++    // Short buffer, return immediately
++    ret
++
++// External entry for __xqci_memset_words
++.global     __xqci_memset_words
++.type       __xqci_memset_words, @function
++__xqci_memset_words:
++    mv       p, s                                    # keep s value since it is return value
++    qc.e.bgeui nwords, 32, .Llong                    # Long memset if >= 32 words
++    qc.setwm w, nwords, 0(s)                         # Short memset (1..31 words) is fast path
++    ret
++
++#undef p
++
++.size       __xqci_memset, . - __xqci_memset
++
++#endif /* _MACHINE_RISCV_MEMSET_ASM_XQCI_ */
+diff --git a/newlib/libc/machine/riscv/memset.S b/newlib/libc/machine/riscv/memset.S
+index 3f09fc067..5355d6898 100644
+--- a/newlib/libc/machine/riscv/memset.S
++++ b/newlib/libc/machine/riscv/memset.S
+@@ -9,7 +9,9 @@
+    http://www.opensource.org/licenses.
+ */
+ 
+-#include <picolibc.h>
++#include "rv_string.h"
++
++#ifdef _MACHINE_RISCV_MEMSET_ASM_
+ 
+ .section .text.memset
+ .global memset
+@@ -113,3 +115,5 @@ memset:
+   j .Laligned
+ #endif
+   .size	memset, .-memset
++
++#endif /* _MACHINE_RISCV_MEMSET_ASM_ */
+diff --git a/newlib/libc/machine/riscv/meson.build b/newlib/libc/machine/riscv/meson.build
+index bf5a279d6..af2060e3c 100644
+--- a/newlib/libc/machine/riscv/meson.build
++++ b/newlib/libc/machine/riscv/meson.build
+@@ -35,13 +35,17 @@
+ srcs_machine = [
+   'ieeefp.c',
+   'memcpy-asm.S',
++  'memcpy-xqci.S',
+   'memcpy.c',
+   'memmove.S',
+   'memmove.c',
+   'memset.S',
++  'memset-xqci.S',
+   'setjmp.S',
+   'stpcpy.c',
++  'strcmp-xqci.S',
+   'strcmp.S',
++  'strcpy-xqci.S',
+   'strcpy.c',
+   'strlen.c',
+ ]
+diff --git a/newlib/libc/machine/riscv/rv_string.h b/newlib/libc/machine/riscv/rv_string.h
+index 4f40ab690..92e59f997 100644
+--- a/newlib/libc/machine/riscv/rv_string.h
++++ b/newlib/libc/machine/riscv/rv_string.h
+@@ -23,16 +23,36 @@
+ 
+ #include <picolibc.h>
+ 
+-#if defined(__PREFER_SIZE_OVER_SPEED) || defined(__OPTIMIZE_SIZE__)
++#ifdef __riscv_xqci
++# define _MACHINE_RISCV_MEMCPY_ASM_XQCI_
++#elif defined(__PREFER_SIZE_OVER_SPEED) || defined(__OPTIMIZE_SIZE__)
+ # define _MACHINE_RISCV_MEMCPY_ASM_
+ #else
+ # define _MACHINE_RISCV_MEMCPY_C_
+-# endif
++#endif
+ 
+ #if !defined(__PREFER_SIZE_OVER_SPEED) && !defined(__OPTIMIZE_SIZE__)
+ # define _MACHINE_RISCV_MEMMOVE_GENERIC_
+ #else
+ # define _MACHINE_RISCV_MEMMOVE_ASM_
+-# endif
++#endif
++
++#if defined(__riscv_xqci)
++# define _MACHINE_RISCV_MEMSET_ASM_XQCI_
++#else
++# define _MACHINE_RISCV_MEMSET_ASM_
++#endif
++
++#if defined(__riscv_xqci)
++# define _MACHINE_RISCV_STRCMP_ASM_XQCI_
++#else
++# define _MACHINE_RISCV_STRCMP_ASM_
++#endif
++
++#if defined(__riscv_xqci)
++# define _MACHINE_RISCV_STRCPY_ASM_XQCI_
++#else
++# define _MACHINE_RISCV_STRCPY_ASM_
++#endif
+ 
+ #endif /* _RV_STRING_H_ */
+diff --git a/newlib/libc/machine/riscv/strcmp-xqci.S b/newlib/libc/machine/riscv/strcmp-xqci.S
+new file mode 100644
+index 000000000..1a7fdda89
+--- /dev/null
++++ b/newlib/libc/machine/riscv/strcmp-xqci.S
+@@ -0,0 +1,83 @@
++/*****************************************************************
++Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++SPDX-License-Identifier: BSD-3-Clause-Clear
++*****************************************************************/
++
++#include "rv_string.h"
++
++#ifdef _MACHINE_RISCV_STRCMP_ASM_XQCI_
++
++.text
++
++/*===========================================================================
++
++  int strcmp(const char *s1, const char *s2)
++
++===========================================================================*/
++
++    /*
++     * Returns
++     *   a0 - comparison result, value like strcmp
++     *
++     * Parameters
++     *   a0 - string1
++     *   a1 - string2
++     *
++     * Clobbers
++     *   a2, a3, a4, a5, a6
++     */
++.global strcmp
++.type strcmp, @function
++strcmp:
++    mv      a6, a0
++    or      a5, a6, a1
++    and     a5, a5, 3
++    li      a4, 0
++    bnez    a5, 3f
++
++    /* Main loop for aligned string.  */
++1:
++    qc.lrw  a2, a6, a4, 0
++    qc.lrw  a3, a1, a4, 0
++    orc.b   a5, a2
++    qc.bnei a5, -1, 2f
++    addi    a4, a4, 4
++    beq     a2, a3, 1b
++
++    /*
++     * Words don't match, and no null byte in the first word.
++     * Compute the first differing byte and return unsigned difference.
++     */
++    xor     a5, a2, a3
++    ctz     a5, a5          # bit offset to first differing bit
++    andi    a5, a5, -0x8    # bit offset to first differing byte
++    srl     a0, a2, a5
++    andi    a0, a0, 0xFF
++    srl     a3, a3, a5
++    andi    a3, a3, 0xFF
++    sub     a0, a0, a3
++    ret
++
++2:
++    /*
++     * Found a null byte.
++     * If words don't match, fall back to simple loop.
++     */
++    xor     a0, a2, a3
++    bnez    a0, 3f
++    /* Otherwise, strings are equal. */
++    ret
++
++    /* Simple loop for misaligned strings. */
++3:
++    qc.lrbu a2, a6, a4, 0
++    qc.lrbu a3, a1, a4, 0
++    addi    a4, a4, 1
++    bne     a2, a3, 4f
++    bnez    a2, 3b
++
++4:
++    sub     a0, a2, a3
++    ret
++
++#endif /* _MACHINE_RISCV_STRCMP_ASM_XQCI_ */
+diff --git a/newlib/libc/machine/riscv/strcmp.S b/newlib/libc/machine/riscv/strcmp.S
+index 1b9869e72..ffb7f2215 100644
+--- a/newlib/libc/machine/riscv/strcmp.S
++++ b/newlib/libc/machine/riscv/strcmp.S
+@@ -9,7 +9,9 @@
+    http://www.opensource.org/licenses.
+ */
+ 
+-#include <picolibc.h>
++#include "rv_string.h"
++
++#ifdef _MACHINE_RISCV_STRCMP_ASM_
+ 
+ #include "asm.h"
+ 
+@@ -202,3 +204,5 @@ mask:
+ .size	strcmp, .-strcmp
+ 
+ #endif
++
++#endif /* _MACHINE_RISCV_STRCMP_ASM_ */
+diff --git a/newlib/libc/machine/riscv/strcpy-xqci.S b/newlib/libc/machine/riscv/strcpy-xqci.S
+new file mode 100644
+index 000000000..56d82fe85
+--- /dev/null
++++ b/newlib/libc/machine/riscv/strcpy-xqci.S
+@@ -0,0 +1,87 @@
++/*****************************************************************
++Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++SPDX-License-Identifier: BSD-3-Clause-Clear
++*****************************************************************/
++
++#include "rv_string.h"
++
++#ifdef _MACHINE_RISCV_STRCPY_ASM_XQCI_
++
++.text
++
++/*===========================================================================
++
++  char * strcpy(char *dst, const char *src)
++
++===========================================================================*/
++
++    /*
++     * Returns
++     *   a0 - destination string
++     *
++     * Parameters
++     *   a0 - destination
++     *   a1 - source
++     *
++     * Clobbers
++     *   a2, a3, a4, a5, a6, a7, t3, t4, t5, t6
++     */
++.global strcpy
++.type strcpy, @function
++strcpy:
++    mv      a7, a0
++    or      a2, a0, a1
++    and     a2, a1, 3
++    bnez    a2, 4f
++1:
++    qc.lwmi t3, 4, 0(a1)
++    add     a1, a1, 16
++    li      a2, -1
++    orc.b   a3, t3
++    and     a2, a2, a3
++    orc.b   a4, t4
++    and     a2, a2, a4
++    orc.b   a5, t5
++    and     a2, a2, a5
++    orc.b   a6, t6
++    and     a2, a2, a6
++    qc.bnei a2, -1, 2f
++    qc.swmi t3, 4, 0(a7)
++    add     a7, a7, 16
++    j       1b
++
++2:
++    add     a1, a1, -16
++    li      a2, 0
++    qc.bnei a3, -1, 3f
++    qc.srw  t3, a7, a2, 0
++    add     a2, a2, 4
++    qc.bnei a4, -1, 3f
++    qc.srw  t4, a7, a2, 0
++    add     a2, a2, 4
++    qc.bnei a5, -1, 3f
++    qc.srw  t5, a7, a2, 0
++    add     a2, a2, 4
++
++3:
++    add     a7, a7, a2
++    add     a1, a1, a2
++4:
++    lbu     a2, 0(a1)
++    lbu     a3, 1(a1)
++    lbu     a4, 2(a1)
++    lbu     a5, 3(a1)
++    sb      a2, 0(a7)
++    beqz    a2, 5f
++    sb      a3, 1(a7)
++    beqz    a3, 5f
++    sb      a4, 2(a7)
++    beqz    a4, 5f
++    sb      a5, 3(a7)
++    beqz    a5, 5f
++    li      a2,    4
++    j       3b
++5:
++    ret
++
++#endif /* _MACHINE_RISCV_STRCPY_ASM_XQCI_ */
+diff --git a/newlib/libc/machine/riscv/strcpy.c b/newlib/libc/machine/riscv/strcpy.c
+index ad4658f55..f1791c602 100644
+--- a/newlib/libc/machine/riscv/strcpy.c
++++ b/newlib/libc/machine/riscv/strcpy.c
+@@ -11,6 +11,9 @@
+ 
+ #include <stdbool.h>
+ #include "rv_strcpy.h"
++#include "rv_string.h"
++
++#ifdef _MACHINE_RISCV_STRCPY_ASM_
+ 
+ #undef strcpy
+ 
+@@ -18,3 +21,5 @@ char *strcpy(char *dst, const char *src)
+ {
+   return __libc_strcpy(dst, src, true);
+ }
++
++#endif /* _MACHINE_RISCV_STRCPY_ASM_ */
+-- 
+2.34.1
+
