@@ -71,7 +71,7 @@ option(
     "Target libraries are prebuilt so no need to build them"
 )
 set(TARGET_LIBRARIES_DIR
-    "lib/clang-runtimes" CACHE STRING
+    "lib" CACHE STRING
     "Directory containing the target libraries."
 )
 set(LLVM_TOOLCHAIN_MULTILIB_JSON
@@ -571,7 +571,7 @@ if(NOT PREBUILT_TARGET_LIBRARIES)
         # If we're building a non-default libc with the intention of
         # installing it as an overlay on the main package archive, then
         # all of its includes, libraries and multilib.yaml go in a
-        # subdirectory of lib/clang-runtimes. Configuration files in the
+        # subdirectory of lib. Configuration files in the
         # bin directory will make it easy to reset the sysroot to point at
         # that subdir.
         set(library_subdir "/${LLVM_TOOLCHAIN_C_LIBRARY}")
