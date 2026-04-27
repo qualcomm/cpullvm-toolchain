@@ -163,26 +163,6 @@ def main():
             ],
             description="This test times out for some reason and we will most probably need a fix in QEMU. Disable until we have one.",
         ),
-        XFail(
-            name="math_errhandling rv32 no f",
-            project="picolibc",
-            testnames=[
-                "math_errhandling.test"
-            ],
-            result=NewResult.XFAILED,
-            variants=[
-                "riscv32imc_ilp32_nothreads_nopic",
-                "riscv32imc_zba_zbb_zbc_zbs_ilp32_nothreads_nopic",
-                "riscv32im_xqci_ilp32_nothreads_nopic",
-                "riscv32imac_ilp32",
-                "riscv32imac_ilp32_nopic",
-                "riscv32imac_zba_zbb_ilp32",
-                "riscv32imac_zba_zbb_ilp32_nopic",
-                "riscv32imac_zcb_zcmp_ilp32_nopic",
-                "riscv32imac_zcb_zcmp_zba_zbb_ilp32_nopic",
-            ],
-            description="This test is now failing for these additional variants, xfail it while we investigate",
-        ),
     ]
 
     tests_to_xfail = []
