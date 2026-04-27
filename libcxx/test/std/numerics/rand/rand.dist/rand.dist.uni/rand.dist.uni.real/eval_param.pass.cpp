@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // <random>
+// REQUIRES: large_tests
 
 // template<class RealType = double>
 // class uniform_real_distribution

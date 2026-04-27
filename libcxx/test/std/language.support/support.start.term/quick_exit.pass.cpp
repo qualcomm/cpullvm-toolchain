@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03
+// UNSUPPORTED: LIBCXX-PICOLIBC-FIXME
 
 // ::quick_exit and ::at_quick_exit were not implemented in older versions of macOS
 // TODO: We should never be using `darwin` as the triple, but LLVM's config.guess script

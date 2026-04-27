@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+// XFAIL: LIBCXX-PICOLIBC-FIXME && target={{aarch64|arm.*|riscv.*}}-{{.*}}
 
 // <ostream>
 

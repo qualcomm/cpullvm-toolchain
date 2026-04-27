@@ -6,6 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// XFAIL: LIBCXX-PICOLIBC-FIXME && target={{aarch64|arm.*|riscv.*}}-{{.*}}
+
 // <locale>
 
 // class money_get<charT, InputIterator>

@@ -6,6 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// XFAIL: LIBCXX-PICOLIBC-FIXME && target={{aarch64|arm.*|riscv.*}}-{{.*}}
+
 // <string>
 
 // long double stold(const string& str, size_t *idx = 0);
