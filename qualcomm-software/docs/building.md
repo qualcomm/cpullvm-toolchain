@@ -68,34 +68,30 @@ currently-enabled embedded variants.
 > [build scripts](/qualcomm-software/scripts) for examples on how our toolchains are built and packaged
 > on different hosts.
 
-### Linux
-The commands in the sections below assume you are in the `cpullvm-toolchain/qualcomm-software` directory.
+### Configuring and building the toolchain
 
-The toolchain can be built directly with CMake.
+The commands in the sections below assume you are in the `cpullvm-toolchain/qualcomm-software` directory.
 
 All dependencies are assumed to be present in your `PATH`.
 
+First, populate the `CC` and `CXX` environment variables to tell CMake which toolchain to use:
+
+Linux:
 ```
-# Alternatively, CMAKE_C_COMPILER/CMAKE_CXX_COMPILER may be set directly
 export CC=clang
 export CXX=clang++
+```
+Windows:
+```
+$env:CC = 'clang-cl'
+$env:CXX = 'clang-cl'
+```
+
+Then, the toolchain can be configured directly with CMake and built:
+```
 mkdir build
 cd build
 cmake .. -GNinja -DFETCHCONTENT_QUIET=OFF
-ninja llvm-toolchain
-```
-
-### Windows
-The commands in the sections below assume you are in the `cpullvm-toolchain/qualcomm-software` directory.
-
-The toolchain can be built directly with CMake.
-
-All dependencies are assumed to be present in your `PATH`.
-
-```
-mkdir build
-cd build
-cmake .. -GNinja -DFETCHCONTENT_QUIET=OFF -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl
 ninja llvm-toolchain
 ```
 
