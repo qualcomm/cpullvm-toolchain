@@ -183,6 +183,121 @@ def main():
             ],
             description="This test is now failing for these additional variants, xfail it while we investigate",
         ),
+        XFail(
+            name="no-c8rtomb-mbrtoc8-picolibc",
+            testnames=[
+                "std/strings/c.strings/no_c8rtomb_mbrtoc8.verify.cpp",
+            ],
+            result=NewResult.EXCLUDE,
+            project="libcxx",
+            description="picolibc unconditionally declares c8rtomb() and mbrtoc8() in uchar.h, "
+                        "but _LIBCPP_HAS_C8RTOMB_MBRTOC8 is 0 (no source change to __config). "
+                        "The test expects these symbols to be absent, which is false for picolibc. "
+                        "Exclude rather than patching upstream libcxx headers.",
+        ),
+        XFail(
+            name="no-atomic-builtins riscv nothreads",
+            testnames=[
+                "std/atomics/",
+                "extensions/libcxx/atomics/",
+                "libcxx/thread/thread.stoptoken/intrusive_shared_ptr.pass.cpp",
+            ],
+            result=NewResult.EXCLUDE,
+            project="libcxx",
+            variants=[
+                # These variants use -march without the 'a' (atomic) extension.
+                # libclang_rt.builtins.a is built with COMPILER_RT_EXCLUDE_ATOMIC_BUILTIN=ON
+                # so __atomic_* libcalls emitted by Clang are unresolved at link time.
+                # riscv32imac_ilp32_scs_nothreads_nopic is intentionally excluded here
+                # as it uses -march=rv32imac which includes the atomic extension.
+                "riscv32imc_ilp32_nothreads_nopic",
+                "riscv32imc_ilp32_scs_nothreads_nopic",
+                "riscv32imc_zba_zbb_zbc_zbs_ilp32_nothreads_nopic",
+                "riscv32im_xqci_ilp32_nothreads_nopic",
+                "riscv64imc_lp64_nothreads_nopic",
+                "riscv64imc_lp64_scs_nothreads_nopic",
+            ],
+            description="Exclude atomics tests for RISC-V variants without the A (atomic) extension. "
+                        "These targets have no hardware atomics and libclang_rt.builtins.a does not "
+                        "provide software __atomic_* fallbacks (COMPILER_RT_EXCLUDE_ATOMIC_BUILTIN=ON).",
+        ),
+        XFail(
+            name="long-double-simd riscv32 nothreads",
+            testnames=[
+                "std/experimental/simd/",
+            ],
+            result=NewResult.EXCLUDE,
+            project="libcxx",
+            variants=[
+                # riscv32 has 16-byte long double but the experimental simd
+                # __choose_mask_type<long double> has no specialization for it,
+                # causing a static_assert failure at compile time.
+                "riscv32imc_ilp32_nothreads_nopic",
+                "riscv32imc_ilp32_scs_nothreads_nopic",
+                "riscv32imc_zba_zbb_zbc_zbs_ilp32_nothreads_nopic",
+                "riscv32im_xqci_ilp32_nothreads_nopic",
+            ],
+            description="experimental::simd does not support long double on riscv32 (16-byte long double "
+                        "has no __choose_mask_type specialization). Exclude until upstream adds support.",
+        ),
+        XFail(
+            name="cmath-hypot3-riscv32imc-nothreads",
+            testnames=[
+                "std/numerics/c.math/cmath.pass.cpp",
+            ],
+            result=NewResult.EXCLUDE,
+            project="libcxx",
+            variants=[
+                "riscv32imc_ilp32_nothreads_nopic",
+                "riscv32imc_ilp32_scs_nothreads_nopic",
+                "riscv32imc_zba_zbb_zbc_zbs_ilp32_nothreads_nopic",
+                "riscv32im_xqci_ilp32_nothreads_nopic",
+            ],
+            description="std::hypot 3-argument form fails a precision assertion on riscv32imc "
+                        "(no F extension, software float). Exclude until the math library is fixed.",
+        ),
+        XFail(
+            name="mem-res-no-atomic-builtins riscv nothreads",
+            testnames=[
+                # All mem.res tests: these link against memory_resource.o which calls
+                # __atomic_load_4/__atomic_exchange_4 (because _LIBCPP_HAS_ATOMIC_HEADER=1
+                # for Clang regardless of _LIBCPP_HAS_THREADS). On targets without the
+                # 'A' extension, these libcalls are unresolved at link time.
+                "std/utilities/utility/mem.res/",
+                "libcxx/mem/mem.res/",
+                "libcxx/utilities/utility/mem.res/",
+                # Container/stream tests that construct pmr objects (e.g. monotonic_buffer_resource),
+                # which call get_default_resource() / set_default_resource() internally,
+                # pulling in memory_resource.o at link time.
+                "std/containers/container.adaptors/flat.map/flat.map.cons/deduct_pmr.pass.cpp",
+                "std/containers/container.adaptors/flat.map/flat.map.cons/pmr.pass.cpp",
+                "std/containers/container.adaptors/flat.multimap/flat.multimap.cons/deduct_pmr.pass.cpp",
+                "std/containers/container.adaptors/flat.multimap/flat.multimap.cons/pmr.pass.cpp",
+                "std/containers/container.adaptors/flat.multiset/flat.multiset.cons/deduct_pmr.pass.cpp",
+                "std/containers/container.adaptors/flat.multiset/flat.multiset.cons/pmr.pass.cpp",
+                "std/containers/container.adaptors/flat.set/flat.set.cons/deduct_pmr.pass.cpp",
+                "std/containers/container.adaptors/flat.set/flat.set.cons/pmr.pass.cpp",
+                "std/input.output/string.streams/istringstream/istringstream.members/str.allocator_propagation.pass.cpp",
+                "std/input.output/string.streams/ostringstream/ostringstream.members/str.allocator_propagation.pass.cpp",
+                "std/input.output/string.streams/stringstream/stringstream.members/str.allocator_propagation.pass.cpp",
+            ],
+            result=NewResult.EXCLUDE,
+            project="libcxx",
+            variants=[
+                # Same set as no-atomic-builtins: RISC-V variants without the 'A' extension.
+                "riscv32imc_ilp32_nothreads_nopic",
+                "riscv32imc_ilp32_scs_nothreads_nopic",
+                "riscv32imc_zba_zbb_zbc_zbs_ilp32_nothreads_nopic",
+                "riscv32im_xqci_ilp32_nothreads_nopic",
+                "riscv64imc_lp64_nothreads_nopic",
+                "riscv64imc_lp64_scs_nothreads_nopic",
+            ],
+            description="memory_resource.cpp includes <atomic> unconditionally when "
+                        "_LIBCPP_HAS_ATOMIC_HEADER=1 (always true for Clang), causing "
+                        "__atomic_load_4/__atomic_exchange_4 libcalls that are unresolved "
+                        "on targets without the 'A' extension (COMPILER_RT_EXCLUDE_ATOMIC_BUILTIN=ON). "
+                        "Exclude all tests that link against memory_resource.o.",
+        ),
     ]
 
     tests_to_xfail = []
