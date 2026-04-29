@@ -100,11 +100,12 @@ Then build as usual.
 
 ### Building subsets of library variants
 When building the toolchain, specific subsets of embedded library variants to build can be selected by
-setting `LLVM_TOOLCHAIN_LIBRARY_VARIANTS`.
+setting `LLVM_TOOLCHAIN_LIBRARY_VARIANTS`. The name of the variant should be from [multilib.json](../embedded-multilib/json/multilib.json)
+file.
 
-For example, the command below would build only the 'aarch64a' and 'riscv32imac_ilp32' variants:
+For example, the command below would build only the 'aarch64a_pacret' and 'riscv32imac_ilp32' variants:
 ```
-cmake .. -GNinja -DLLVM_TOOLCHAIN_LIBRARY_VARIANTS="aarch64a;riscv32imac_ilp32"
+cmake .. -GNinja -DLLVM_TOOLCHAIN_LIBRARY_VARIANTS="aarch64a_pacret;riscv32imac_ilp32"
 ninja llvm-toolchain
 ```
 
