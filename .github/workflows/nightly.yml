@@ -30,7 +30,7 @@ jobs:
     # Don't run on forks
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: build.sh on Linux-x86_64
-    runs-on: ubuntu-24.04
+    runs-on: cpullvm-ubuntu24-x86_64
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
