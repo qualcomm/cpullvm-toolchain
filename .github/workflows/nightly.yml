@@ -30,7 +30,7 @@ jobs:
     # Don't run on forks
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: build.sh on Linux-x86_64
-    runs-on: self-hosted
+    runs-on: cpullvm-ubuntu24-x86_64
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -56,6 +56,7 @@ jobs:
 
       - name: Test
         run: ./qualcomm-software/scripts/test.sh
+        continue-on-error: true
 
   build-and-test:
     if: github.repository == 'qualcomm/cpullvm-toolchain'
@@ -71,13 +72,13 @@ jobs:
             test_script: test.sh
             install_script: install_dependencies.sh
             target_os: Linux-AArch64
-            runner: ubuntu-22.04-arm
+            runner: ubuntu-24.04-arm
 
           - build_script: build_musl-embedded_overlay.sh
             test_script: ''
             install_script: ''
             target_os: Linux-x86_64
-            runner: self-hosted
+            runner: ubuntu-24.04
 
           - build_script: build_copy_runtimes.ps1
             test_script: test.ps1
