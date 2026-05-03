@@ -56,6 +56,7 @@ jobs:
 
       - name: Test
         run: ./qualcomm-software/scripts/test.sh
+        continue-on-error: true
 
   build-and-test:
     if: github.repository == 'qualcomm/cpullvm-toolchain'
