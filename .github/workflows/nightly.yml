@@ -35,7 +35,7 @@ jobs:
     # Don't run on forks
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: build.sh on Linux-x86_64
-    runs-on: self-hosted
+    runs-on: cpullvm-ubuntu24-x86_64
     steps:
       - name: Checkout source
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -82,7 +82,7 @@ jobs:
             test_script: ''
             install_script: ''
             target_os: Linux-x86_64
-            runner: self-hosted
+            runner: cpullvm-ubuntu24-x86_64
 
           - build_script: build_copy_runtimes.ps1
             test_script: test.ps1
