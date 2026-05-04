@@ -175,6 +175,7 @@ set(LLVM_DISTRIBUTION_COMPONENTS
     lldb-dap
     lldb-instr
     lldb-mcp
+    lldb-python-scripts
     lldb-server
     llvm-addr2line
     llvm-ar
@@ -250,18 +251,13 @@ set(LLVM_BUILD_RUNTIME OFF CACHE BOOL "")
 set(LIBCLANG_BUILD_STATIC ON CACHE BOOL "")
 set(LLVM_POLLY_LINK_INTO_TOOLS ON CACHE BOOL "")
 set(CLANG_DEFAULT_LINKER lld CACHE STRING "")
-# FIXME: We have a few issues integrating lldb:
-#   1. We add LLVM sources via `add_subdirectory` which lldb does not like--it
-#      expects to be the top level project. Currently we see issues with
-#      incorrect symlinks and incorrect paths in `lldb -P` stemming from this.
-#   2. We set the default target triple of the toolchain to a triple that
-#      doesn't necessarily match the host. lldb tries running binaries built
-#      for the default target on the host, which fails.
-# We have workarounds for #2, but #1 is still an open issue. For now, disable
-# python support and turn off testing while we sort out the best way to handle
-# these issues.
-set(LLDB_ENABLE_PYTHON OFF CACHE BOOL "")
-set(LLDB_INCLUDE_TESTS OFF CACHE BOOL "")
+set(LLDB_ENABLE_PYTHON ON CACHE BOOL "")
+set(LLDB_INCLUDE_TESTS ON CACHE BOOL "")
+
+# Disable libedit dependency; the library is not installed in some
+# environments.
+set(LLVM_ENABLE_LIBEDIT OFF CACHE BOOL "")
+set(LLDB_ENABLE_LIBEDIT OFF CACHE BOOL "")
 
 # Default to a release build
 # (CMAKE_BUILD_TYPE is a special CMake variable so if you want to set
