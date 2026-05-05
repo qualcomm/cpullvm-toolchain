@@ -75,13 +75,12 @@ and libc++/libc++abi/libunwind libraries for the variant.
 ### Re-running CMake
 Unless you have manually checked out and patched CPULLVM's various dependencies (see "Manually checking out
 and patching dependencies" below), CPULLVM's CMake will automatically checkout and patch the dependencies'
-Git repositories. Note that it will *always* try to patch these repos, even if the patches have already been
-applied. So, if you rerun CMake (either by manually invoking it or by modifying a file in some way that CMake
-automatically reruns when rebuilding), you'll likely encounter errors.
+Git repositories. The patching script uses `git am` and will skip patches that have already been applied,
+so re-running CMake is safe in the common case.
 
-To work around this, after the first time you invoke CMake, you can include `-DFETCHCONTENT_FULLY_DISCONNECTED=ON`
-in your CMake command to tell it to stop updating and patching. Worst case, you can also manually remove the
-cloned repostories (located in `<build>/_deps`).
+If you encounter issues with re-running CMake (for example, after a failed or partial patch application),
+you can include `-DFETCHCONTENT_FULLY_DISCONNECTED=ON` in your CMake command to tell it to stop updating
+and patching. Worst case, you can also manually remove the cloned repositories (located in `<build>/_deps`).
 
 ### Manually checking out and patching dependencies
 It is also possible to manually checkout CPULLVM's dependencies. If you do so, you must ensure the

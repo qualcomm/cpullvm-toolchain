@@ -50,7 +50,7 @@ Generally, these patches are automatically applied, except for llvm-project whic
 patched manually. The below command assumes you are in the `cpullvm-toolchain` directory:
 
 ```
-python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
+python3 qualcomm-software/cmake/patch_repo.py qualcomm-software/patches/llvm-project
 ```
 
 Other projects (eld, picolibc, etc.) are checked out and patched automatically. If you prefer, you can check
