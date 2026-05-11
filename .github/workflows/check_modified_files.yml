@@ -27,3 +27,14 @@ jobs:
         run: |
           which qemu-system-riscv32
           qemu-system-riscv32 --version
+
+  check-modified-files2:
+    # Don't run on forks
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    runs-on: self-hosted
+
+    steps:
+      - name: Check qemu
+        run: |
+          which qemu-system-riscv32
+          qemu-system-riscv32 --version
