@@ -18,7 +18,7 @@ jobs:
   build-Linux-x86-toolchain:
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: Build toolchain
-    runs-on: self-hosted
+    runs-on: cpullvm-ubuntu24-x86_64
     steps:
       - name: Checkout source
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1

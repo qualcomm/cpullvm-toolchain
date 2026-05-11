@@ -20,7 +20,7 @@ jobs:
   check-modified-files:
     # Don't run on forks
     if: github.repository == 'qualcomm/cpullvm-toolchain'
-    runs-on: self-hosted
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout source
