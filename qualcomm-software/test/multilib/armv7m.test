@@ -1,4 +1,7 @@
-# RUN: %clang -print-multi-directory --target=armv7m-none-eabihf -mfloat-abi=hard -mfpu=fpv5-d16 | FileCheck %s --check-prefix=CHECK-HARD-FPV5-D16
-# RUN: %clang -print-multi-directory --target=armv7em-none-eabihf -mfloat-abi=hard -mfpu=fpv5-d16 | FileCheck %s --check-prefix=CHECK-HARD-FPV5-D16
-# CHECK-HARD-FPV5-D16: arm-none-eabi/armv7m_hard_fpv5_d16_nopic{{$}}
-# CHECK-HARD-FPV5-D16-EMPTY:
+# RUN: %clang -print-multi-directory --target=armv7m-none-eabihf -mfloat-abi=hard -mfpu=fpv5-d16 -fno-pic | FileCheck %s --check-prefix=CHECK-HARD-FPV5-D16-NOPIC
+# RUN: %clang -print-multi-directory --target=armv7em-none-eabihf -mfloat-abi=hard -mfpu=fpv5-d16 -fno-pic | FileCheck %s --check-prefix=CHECK-HARD-FPV5-D16-NOPIC
+# CHECK-HARD-FPV5-D16-NOPIC: arm-none-eabi/armv7m_hard_fpv5_d16_nopic{{$}}
+# CHECK-HARD-FPV5-D16-NOPIC-EMPTY:
+
+# RUN: %clang -print-multi-directory --target=armv7m-none-eabihf -mfloat-abi=hard -mfpu=fpv5-d16 -fPIC | FileCheck %s --check-prefix=NOT-FOUND
+# NOT-FOUND: warning: no multilib found matching flags
