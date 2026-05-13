@@ -1,0 +1,4 @@
+# RUN: %clang -print-multi-directory --target=armv7m-none-eabihf -mfloat-abi=hard -mfpu=fpv5-d16 | FileCheck %s --check-prefix=CHECK-HARD-FPV5-D16
+# RUN: %clang -print-multi-directory --target=armv7em-none-eabihf -mfloat-abi=hard -mfpu=fpv5-d16 | FileCheck %s --check-prefix=CHECK-HARD-FPV5-D16
+# CHECK-HARD-FPV5-D16: arm-none-eabi/armv7m_hard_fpv5_d16_nopic{{$}}
+# CHECK-HARD-FPV5-D16-EMPTY:
