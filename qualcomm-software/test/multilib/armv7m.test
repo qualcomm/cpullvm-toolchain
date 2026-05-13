@@ -1,3 +1,7 @@
+# RUN: %clang -print-multi-directory --target=armv7m-none-eabi -mfpu=none -fPIC | FileCheck %s --check-prefix=CHECK-SOFT-NOFP
+# CHECK-SOFT-NOFP: arm-none-eabi/armv7m_soft_nofp{{$}}
+# CHECK-SOFT-NOFP-EMPTY:
+
 # RUN: %clang -print-multi-directory --target=armv7m-none-eabihf -mfloat-abi=hard -mfpu=fpv5-d16 -fno-pic | FileCheck %s --check-prefix=CHECK-HARD-FPV5-D16-NOPIC
 # RUN: %clang -print-multi-directory --target=armv7em-none-eabihf -mfloat-abi=hard -mfpu=fpv5-d16 -fno-pic | FileCheck %s --check-prefix=CHECK-HARD-FPV5-D16-NOPIC
 # CHECK-HARD-FPV5-D16-NOPIC: arm-none-eabi/armv7m_hard_fpv5_d16_nopic{{$}}
