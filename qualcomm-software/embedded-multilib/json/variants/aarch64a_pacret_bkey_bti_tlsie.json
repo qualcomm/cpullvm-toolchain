@@ -4,6 +4,7 @@
             "TARGET_ARCH": "aarch64a",
             "VARIANT": "aarch64a_pacret_bkey_bti_tlsie",
             "COMPILE_FLAGS": "-march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -fPIC",
+            "TLS_MODEL": "initial-exec",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",
@@ -19,8 +20,7 @@
             "ENABLE_CXX_LIBS": "ON",
             "ENABLE_LIBC_TESTS": "OFF",
             "ENABLE_COMPILER_RT_TESTS": "OFF",
-            "ENABLE_LIBCXX_TESTS": "OFF",
-            "TLS_MODEL": "initial-exec"
+            "ENABLE_LIBCXX_TESTS": "OFF"
         },
         "musl-embedded": {
             "ENABLE_CXX_LIBS": "ON",
