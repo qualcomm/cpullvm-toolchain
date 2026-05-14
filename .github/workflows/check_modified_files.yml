@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check-modified-files:
+  check-qemu-24:
     # Don't run on forks
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     runs-on: cpullvm-ubuntu24-x86_64
@@ -25,10 +25,12 @@ jobs:
     steps:
       - name: Check qemu
         run: |
+          which qemu-system-aarch64
+          qemu-system-aarch64
           which qemu-system-riscv32
           qemu-system-riscv32 --version
 
-  check-modified-files2:
+  check-qemu-22:
     # Don't run on forks
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     runs-on: self-hosted
