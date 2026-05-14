@@ -88,11 +88,13 @@ set(DISABLE_THREADS ${DISABLE_THREADS_def} CACHE BOOL "Disable threads/atomic/TL
 set(SUPPORTED_TLS_MODELS local-exec initial-exec local-dynamic global-dynamic)
 if(NOT DEFINED TLS_MODEL_def)
     set(TLS_MODEL_def local-exec)
+elseif(C_LIBRARY STREQUAL musl-embedded)
+    message(FATAL_ERROR "TLS_MODEL is currently unsupported when using musl-embedded.")
 elseif(NOT TLS_MODEL_def IN_LIST SUPPORTED_TLS_MODELS)
     string(REPLACE ";" ", " SUPPORTED_TLS_MODELS_STR "${SUPPORTED_TLS_MODELS}")
     message(FATAL_ERROR "Unsupported TLS_MODEL value. Supported values are ${SUPPORTED_TLS_MODELS_STR}")
 endif()
-set(TLS_MODEL ${TLS_MODEL_def} CACHE STRING "TLS model to use. Currently only used by picolibc, other projects use the project/toolchain defaults.")
+set(TLS_MODEL ${TLS_MODEL_def} CACHE STRING "TLS model to use when building libraries. Unsupported for variants using musl-embedded.")
 set_property(CACHE TLS_MODEL PROPERTY STRINGS ${SUPPORTED_TLS_MODELS})
 set(LLVM_BINARY_DIR "" CACHE PATH "Path to LLVM toolchain root to build libraries with")
 
@@ -229,6 +231,9 @@ set(compile_arch_flags "--target=${target_triple} ${COMPILE_FLAGS} --sysroot ${T
 # Compiling the libraries benefits from some extra optimization
 # flags, and requires a sysroot.
 set(lib_compile_flags "${compile_arch_flags} -ffunction-sections -fdata-sections")
+if(NOT C_LIBRARY STREQUAL musl-embedded)
+    string(APPEND lib_compile_flags " -ftls-model=${TLS_MODEL}")
+endif()
 
 # Generic target names for the C library.
 # Declare these now, since compiler-rt requires the 'install' dependency.
