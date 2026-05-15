@@ -37,5 +37,5 @@ jobs:
         run: |
           which clang++
           clang++ --version
-          echo "#include <cstdint> int main() {}" > test.cpp
+          echo -e "#include <cstdint>\nint main() {}" > test.cpp
           clang++ -stdlib=libc++ -fuse-ld=lld test.cpp
