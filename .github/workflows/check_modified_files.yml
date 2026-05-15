@@ -25,10 +25,11 @@ jobs:
     steps:
       - name: Check qemu
         run: |
-          which qemu-system-aarch64
-          qemu-system-aarch64
-          which qemu-system-riscv32
+          qemu-system-arm --version
+          qemu-system-aarch64 --version
           qemu-system-riscv32 --version
+          qemu-system-riscv64 --version
+          qemu-system-riscv32-xqci --version
 
   check-qemu-22:
     # Don't run on forks
@@ -38,5 +39,8 @@ jobs:
     steps:
       - name: Check qemu
         run: |
-          which qemu-system-riscv32
+          qemu-system-arm --version
+          qemu-system-aarch64 --version
           qemu-system-riscv32 --version
+          qemu-system-riscv64 --version
+          qemu-system-riscv32-xqci --version
