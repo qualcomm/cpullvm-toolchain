@@ -20,16 +20,22 @@ jobs:
   check-modified-files:
     # Don't run on forks
     if: github.repository == 'qualcomm/cpullvm-toolchain'
-    runs-on: ubuntu-24.04
+    name: ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04-arm
+
+          - runner: ubuntu-22.04-arm
 
     steps:
-      - name: Checkout source
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          fetch-depth: 2
-      
-      - name: Check modified files
+      - name: Preconfigure git
+        shell: bash
         run: |
-          mkdir -p build
-          git diff --name-only HEAD~ HEAD > build/files_changed.txt
-          python3 qualcomm-software/ci/check_modified_files.py --modified-files build/files_changed.txt
+          which clang++
+          clang++ --version
+          echo "int main() {}" > test.cpp
+          clang++ -stdlib=libc++ -fuse-ld=lld test.cpp
