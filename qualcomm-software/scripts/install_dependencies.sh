@@ -5,8 +5,8 @@ sudo apt-get update
 # Used by lldb
 sudo apt-get install -y swig libedit-dev
 
-# Install clang, libc++ and libc++abi
-sudo apt-get install -y clang libc++-dev libc++abi-dev libclang-rt-20-dev
+# Install libc++ and libc++abi required for eld tests
+sudo apt-get install -y libc++-dev libc++abi-dev
 
 # Install meson. eld support was added in v1.9.0, so we need at least that.
 pip install meson==1.10.0
