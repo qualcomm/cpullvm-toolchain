@@ -38,7 +38,7 @@
         {
             "variant": "armv8_soft_neon",
             "json": "armv8_soft_neon.json",
-            "flags": "--target=thumbv8-unknown-none-eabi -mfpu=neon-fp-armv8"
+            "flags": "--target=thumbv8a-unknown-none-eabi -mfpu=neon-fp-armv8"
         },
         {
             "variant": "armv7a_soft_neon",
