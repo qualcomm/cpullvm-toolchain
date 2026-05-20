@@ -4,7 +4,6 @@
             "TARGET_ARCH": "aarch64a",
             "VARIANT": "aarch64a_soft_nofp_tlsie",
             "COMPILE_FLAGS": "-march=armv8-a+nofp+nosimd -mabi=aapcs-soft -fPIC",
-            "TLS_MODEL": "initial-exec",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",
@@ -20,7 +19,8 @@
             "ENABLE_CXX_LIBS": "OFF",
             "ENABLE_LIBC_TESTS": "ON",
             "ENABLE_COMPILER_RT_TESTS": "OFF",
-            "ENABLE_LIBCXX_TESTS": "OFF"
+            "ENABLE_LIBCXX_TESTS": "OFF",
+            "TLS_MODEL": "initial-exec"
         },
         "musl-embedded": {
             "ENABLE_CXX_LIBS": "OFF",
