@@ -25,6 +25,7 @@ config.substitutions.append(('%{compile_flags}',
 ))
 config.substitutions.append(('%{link_flags}',
     ' -nostdlib++ -L %{lib-dir}'
+    ' -nostdlib -L %{libc-lib}'
     ' -Wl,--start-group'
     ' -lc++ -lc++abi'
     ' -lc -lm -lclang_rt.builtins'

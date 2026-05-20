@@ -46,9 +46,6 @@ def run_qemu(
     # interfere with semihosting.
     qemu_params += ["-monitor", "none", "-serial", "none", "-nographic"]
 
-    # Disable the default NIC to avoid "failed to find romfile efi-virtio.rom"
-    # errors on QEMU >= 7 with the virt machine.
-    qemu_params += ["-nic", "none"]
     # Load the image to machine's memory and set the PC.
     # "virt" machine cannot be used with load, as QEMU will try to put
     # device tree blob at start of RAM conflicting with our code

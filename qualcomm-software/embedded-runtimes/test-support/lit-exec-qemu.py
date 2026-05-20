@@ -71,10 +71,13 @@ def main():
         help="optional arguments for the image",
     )
     args = parser.parse_args()
+    # --qemu-cpu is encoded with colons instead of commas to survive CMake list
+    # separator substitution (LIST_SEPARATOR ,).  Decode it back here.
+    qemu_cpu = args.qemu_cpu.replace(":", ",") if args.qemu_cpu else None
     ret_code = run_qemu(
         args.qemu_command,
         args.qemu_machine,
-        args.qemu_cpu,
+        qemu_cpu,
         args.qemu_params.split(":") if args.qemu_params else [],
         args.image,
         [args.image] + args.arguments,
