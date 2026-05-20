@@ -2,7 +2,7 @@
     "args": {
         "common": {
             "TARGET_ARCH": "aarch64a",
-            "VARIANT": "aarch64a_tlsie",
+            "VARIANT": "aarch64a",
             "COMPILE_FLAGS": "-march=armv8-a -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "OFF",
@@ -15,12 +15,12 @@
             "RAM_SIZE": "0x00200000",
             "LIBRARY_BUILD_TYPE": "minsizerelease"
         },
-        "picolibc": {
+        "musl-embedded": {
             "ENABLE_CXX_LIBS": "ON",
-            "ENABLE_LIBC_TESTS": "ON",
+            "ENABLE_LIBC_TESTS": "OFF",
             "ENABLE_COMPILER_RT_TESTS": "OFF",
             "ENABLE_LIBCXX_TESTS": "OFF",
-            "TLS_MODEL": "initial-exec"
+            "EXTRA_MUSL-EMBEDDED_CFLAGS": "-mstrict-align"
         }
     }
 }
