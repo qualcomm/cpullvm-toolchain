@@ -596,13 +596,6 @@ if(NOT PREBUILT_TARGET_LIBRARIES)
 
     set(multilib_prefix ${CMAKE_BINARY_DIR}/multilib-builds)
 
-    # eld linker support in Meson was added in v1.9.0. Find a suitable Meson
-    # and pass it explicitly down the ExternalProject chain so every variant
-    # uses the same Meson regardless of what is on PATH at configure time.
-    find_program(MESON_EXECUTABLE meson
-        REQUIRED
-    )
-
     ExternalProject_Add(
         multilib-${LLVM_TOOLCHAIN_C_LIBRARY}
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/embedded-multilib
@@ -627,7 +620,6 @@ if(NOT PREBUILT_TARGET_LIBRARIES)
         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
         -DPROJECT_PREFIX=${multilib_prefix}
         -DNUMERICAL_BUILD_NAMES=${SHORT_BUILD_PATHS}
-        -DMESON_EXECUTABLE=${MESON_EXECUTABLE}
         USES_TERMINAL_CONFIGURE TRUE
         USES_TERMINAL_BUILD TRUE
         LIST_SEPARATOR ,

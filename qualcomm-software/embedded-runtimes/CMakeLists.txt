@@ -92,7 +92,7 @@ elseif(NOT TLS_MODEL_def IN_LIST SUPPORTED_TLS_MODELS)
     string(REPLACE ";" ", " SUPPORTED_TLS_MODELS_STR "${SUPPORTED_TLS_MODELS}")
     message(FATAL_ERROR "Unsupported TLS_MODEL value. Supported values are ${SUPPORTED_TLS_MODELS_STR}")
 endif()
-set(TLS_MODEL ${TLS_MODEL_def} CACHE STRING "TLS model to use. Passed to picolibc via Meson and to all other libraries via -ftls-model compile flag.")
+set(TLS_MODEL ${TLS_MODEL_def} CACHE STRING "TLS model to use. Currently only used by picolibc, other projects use the project/toolchain defaults.")
 set_property(CACHE TLS_MODEL PROPERTY STRINGS ${SUPPORTED_TLS_MODELS})
 set(LLVM_BINARY_DIR "" CACHE PATH "Path to LLVM toolchain root to build libraries with")
 
@@ -205,17 +205,12 @@ if(ENABLE_LIBC_TESTS OR ENABLE_COMPILER_RT_TESTS OR ENABLE_LIBCXX_TESTS)
 
         if(QEMU_EXECUTABLE)
             # Use colon as a separator because comma and semicolon are used for
-            # other purposes in CMake.  QEMU_CPU may contain commas (QEMU CPU
-            # feature syntax, e.g. "rv32,zcd=false,zcb=true") and QEMU_PARAMS
-            # may contain spaces; both are encoded with colons here so they
-            # survive the ExternalProject LIST_SEPARATOR , substitution and
-            # CMake list splitting.  lit-exec-qemu.py decodes them back.
+            # other purposes in CMake.
             string(REPLACE " " ":" qemu_params_list "${QEMU_PARAMS}")
-            string(REPLACE "," ":" qemu_cpu_encoded "${QEMU_CPU}")
 
             set(test_executor_params --qemu-command ${QEMU_EXECUTABLE} --qemu-machine ${QEMU_MACHINE})
             if(QEMU_CPU)
-                list(APPEND test_executor_params "--qemu-cpu=${qemu_cpu_encoded}")
+                list(APPEND test_executor_params --qemu-cpu ${QEMU_CPU})
             endif()
             if(qemu_params_list)
                 list(APPEND test_executor_params "--qemu-params=${qemu_params_list}")
@@ -230,7 +225,7 @@ if(ENABLE_LIBC_TESTS OR ENABLE_COMPILER_RT_TESTS OR ENABLE_LIBCXX_TESTS)
     list(JOIN lit_test_executor " " lit_test_executor)
 endif()
 
-set(compile_arch_flags "--target=${target_triple} ${COMPILE_FLAGS} --sysroot ${TEMP_LIB_DIR} -ftls-model=${TLS_MODEL}")
+set(compile_arch_flags "--target=${target_triple} ${COMPILE_FLAGS} --sysroot ${TEMP_LIB_DIR}")
 # Compiling the libraries benefits from some extra optimization
 # flags, and requires a sysroot.
 set(lib_compile_flags "${compile_arch_flags} -ffunction-sections -fdata-sections")
@@ -445,9 +440,7 @@ if(C_LIBRARY STREQUAL picolibc)
     # For building picolibc use Meson.
     # Although picolibc has support for building with CMake, the Meson code
     # is more mature and works better with LLVM.
-    if(NOT MESON_EXECUTABLE)
-        find_program(MESON_EXECUTABLE meson REQUIRED)
-    endif()
+    find_program(MESON_EXECUTABLE meson REQUIRED)
 
     if(CMAKE_INSTALL_MESSAGE STREQUAL NEVER)
         set(MESON_INSTALL_QUIET "--quiet")
