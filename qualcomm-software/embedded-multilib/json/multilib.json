@@ -58,7 +58,7 @@
         {
             "variant": "armv7m_hard_fpv5_d16_nopic",
             "json": "armv7m_hard_fpv5_d16_nopic.json",
-            "flags": "--target=thumbv7m-unknown-none-eabihf -mfpu=fpv5-d16 -fno-pic",
+            "flags": "--target=thumbv7m-unknown-none-eabihf -mfpu=fpv5-d16 -munaligned-access -fno-pic",
             "libraries_supported": "picolibc"
         },
         {

@@ -4,4 +4,5 @@
 # CHECK-HARD-FPV5-D16-NOPIC-EMPTY:
 
 # RUN: %clang -print-multi-directory --target=armv7m-none-eabihf -mfloat-abi=hard -mfpu=fpv5-d16 -fPIC 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
+# RUN: %clang -print-multi-directory --target=armv7m-none-eabihf -mfloat-abi=hard -mfpu=fpv5-d16 -mno-unaligned-access 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # NOT-FOUND: warning: no multilib found matching flags
