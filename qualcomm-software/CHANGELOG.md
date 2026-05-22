@@ -13,6 +13,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 ### Security
 
+## [22.1.1]
+### Added
+- Added armv7m -mfpu=fpv5-d16 hard float runtime variant
+- Added missing basic multilib tests for armv8_soft_neon and armv7m_soft_nofp runtime variants
+### Changed
+- Cherry-picked LLVM commit 57fcde7 - [AArch64] Make width of stack protector guard value load configurable
+- Advanced ELD 22.1.0 to commit 5f28fc2 - Fix ELFObjectWriter::emitRelocation function
+### Fixed
+- Updated multilib triple for armv8_soft_neon variant to use Clang's normalized target triple
+- Forced a consistent TLS model for all library builds using picolibc
+
 ## [22.1.0]
 
 ### Added
