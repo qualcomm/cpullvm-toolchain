@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 sudo apt-get update
-# Install swig and libedit-dev required for lldb and
+# Install swig and libedit-dev used by lldb and
 # libc++-dev required for eld tests
 sudo apt-get install -y swig libedit-dev clang-19 libc++-19-dev
 
-# Ensure system uses clang-19
+# Set default clang version to clang-19
 sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100
 sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
 
