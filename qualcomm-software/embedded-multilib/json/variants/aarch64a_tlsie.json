@@ -3,7 +3,7 @@
         "common": {
             "TARGET_ARCH": "aarch64a",
             "VARIANT": "aarch64a_tlsie",
-            "COMPILE_FLAGS": "-march=armv8-a -fPIC",
+            "COMPILE_FLAGS": "-march=armv8-a -munaligned-access -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",
