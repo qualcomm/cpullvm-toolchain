@@ -39,13 +39,13 @@ jobs:
             test_script: test.sh
             install_script: install_dependencies.sh
             target_os: Linux-AArch64
-            runner: ubuntu-22.04-arm
+            runner: ubuntu-24.04-arm
 
           - build_script: build_musl-embedded_overlay.sh
             test_script: ''
             install_script: ''
             target_os: Linux-AArch64
-            runner: ubuntu-22.04-arm
+            runner: ubuntu-24.04-arm
 
           - build_script: build.ps1
             test_script: test.ps1
