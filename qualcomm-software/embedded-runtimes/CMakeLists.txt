@@ -205,12 +205,17 @@ if(ENABLE_LIBC_TESTS OR ENABLE_COMPILER_RT_TESTS OR ENABLE_LIBCXX_TESTS)
 
         if(QEMU_EXECUTABLE)
             # Use colon as a separator because comma and semicolon are used for
-            # other purposes in CMake.
+            # other purposes in CMake.  QEMU_CPU may contain commas (QEMU CPU
+            # feature syntax, e.g. "rv32,zcd=false,zcb=true") and QEMU_PARAMS
+            # may contain spaces; both are encoded with colons here so they
+            # survive the ExternalProject LIST_SEPARATOR , substitution and
+            # CMake list splitting.  lit-exec-qemu.py decodes them back.
             string(REPLACE " " ":" qemu_params_list "${QEMU_PARAMS}")
+            string(REPLACE "," ":" qemu_cpu_encoded "${QEMU_CPU}")
 
             set(test_executor_params --qemu-command ${QEMU_EXECUTABLE} --qemu-machine ${QEMU_MACHINE})
             if(QEMU_CPU)
-                list(APPEND test_executor_params --qemu-cpu ${QEMU_CPU})
+                list(APPEND test_executor_params --qemu-cpu ${qemu_cpu_encoded})
             endif()
             if(qemu_params_list)
                 list(APPEND test_executor_params "--qemu-params=${qemu_params_list}")
