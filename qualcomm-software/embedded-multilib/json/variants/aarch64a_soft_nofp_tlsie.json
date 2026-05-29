@@ -21,14 +21,6 @@
             "ENABLE_COMPILER_RT_TESTS": "OFF",
             "ENABLE_LIBCXX_TESTS": "OFF",
             "TLS_MODEL": "initial-exec"
-        },
-        "musl-embedded": {
-            "ENABLE_CXX_LIBS": "OFF",
-            "ENABLE_LIBC_TESTS": "OFF",
-            "ENABLE_COMPILER_RT_TESTS": "OFF",
-            "ENABLE_LIBCXX_TESTS": "OFF",
-            "EXTRA_MUSL-EMBEDDED_CONFIG_FLAGS": "--quic-aarch64-nofp",
-            "EXTRA_MUSL-EMBEDDED_CFLAGS": "-mstrict-align"
         }
     }
 }

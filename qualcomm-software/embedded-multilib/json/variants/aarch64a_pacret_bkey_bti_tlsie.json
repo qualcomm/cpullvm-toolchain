@@ -21,13 +21,6 @@
             "ENABLE_COMPILER_RT_TESTS": "OFF",
             "ENABLE_LIBCXX_TESTS": "OFF",
             "TLS_MODEL": "initial-exec"
-        },
-        "musl-embedded": {
-            "ENABLE_CXX_LIBS": "ON",
-            "ENABLE_LIBC_TESTS": "OFF",
-            "ENABLE_COMPILER_RT_TESTS": "OFF",
-            "ENABLE_LIBCXX_TESTS": "OFF",
-            "EXTRA_MUSL-EMBEDDED_CFLAGS": "-mstrict-align"
         }
     }
 }

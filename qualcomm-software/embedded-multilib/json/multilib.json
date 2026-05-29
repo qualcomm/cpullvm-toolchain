@@ -1,9 +1,16 @@
 {
     "libs": [
         {
+            "variant": "aarch64a",
+            "json": "aarch64a.json",
+            "flags": "--target=aarch64-unknown-none-elf",
+            "libraries_supported": "musl-embedded"
+        },
+        {
             "variant": "aarch64a_tlsie",
             "json": "aarch64a_tlsie.json",
-            "flags": "--target=aarch64-unknown-none-elf"
+            "flags": "--target=aarch64-unknown-none-elf",
+            "libraries_supported": "picolibc"
         },
         {
             "variant": "aarch64a_pacret",
@@ -16,14 +23,28 @@
             "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+bti"
         },
         {
+            "variant": "aarch64a_pacret_bkey_bti",
+            "json": "aarch64a_pacret_bkey_bti.json",
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti",
+            "libraries_supported": "musl-embedded"
+        },
+        {
             "variant": "aarch64a_pacret_bkey_bti_tlsie",
             "json": "aarch64a_pacret_bkey_bti_tlsie.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti"
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti",
+            "libraries_supported": "picolibc"
+        },
+        {
+            "variant": "aarch64a_soft_nofp",
+            "json": "aarch64a_soft_nofp.json",
+            "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft",
+            "libraries_supported": "musl-embedded"
         },
         {
             "variant": "aarch64a_soft_nofp_tlsie",
             "json": "aarch64a_soft_nofp_tlsie.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft"
+            "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft",
+            "libraries_supported": "picolibc"
         },
         {
             "variant": "aarch64a_soft_nofp_pacret_bti",
@@ -38,7 +59,7 @@
         {
             "variant": "armv8_soft_neon",
             "json": "armv8_soft_neon.json",
-            "flags": "--target=thumbv8-unknown-none-eabi -mfpu=neon-fp-armv8"
+            "flags": "--target=thumbv8a-unknown-none-eabi -mfpu=neon-fp-armv8"
         },
         {
             "variant": "armv7a_soft_neon",
@@ -59,6 +80,12 @@
             "variant": "armv7m_soft_nofp_nopic",
             "json": "armv7m_soft_nofp_nopic.json",
             "flags": "--target=thumbv7m-unknown-none-eabi -mfpu=none -fno-pic",
+            "libraries_supported": "picolibc"
+        },
+        {
+            "variant": "armv7m_hard_fpv5_d16_nopic",
+            "json": "armv7m_hard_fpv5_d16_nopic.json",
+            "flags": "--target=thumbv7m-unknown-none-eabihf -mfpu=fpv5-d16 -munaligned-access -fno-pic",
             "libraries_supported": "picolibc"
         },
         {
