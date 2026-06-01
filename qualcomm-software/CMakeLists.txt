@@ -263,12 +263,15 @@ set(CLANG_DEFAULT_LINKER lld CACHE STRING "")
 set(LLDB_ENABLE_PYTHON OFF CACHE BOOL "")
 set(LLDB_INCLUDE_TESTS OFF CACHE BOOL "")
 
-# Default to a release build
+# Default to Release, and enable assertions for Release+Asserts
 # (CMAKE_BUILD_TYPE is a special CMake variable so if you want to set
 # it then you have to FORCE it).
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE BOOL "" FORCE)
 endif()
+
+#Enable assertions for Release+Asserts builds
+set(LLVM_ENABLE_ASSERTIONS ON CACHE BOOL "" FORCE)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
