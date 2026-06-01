@@ -41,7 +41,7 @@ CPULLVM relies on the following upstream components:
 
 ## Host Platforms
 CPULLVM is built and tested on
-- Linux Ubuntu 22.04 LTS on x86_64 and AArch64
+- Linux Ubuntu 24.04 LTS on x86_64 and AArch64
 - Windows Server 2025 on x86_64
 - Windows 11 Desktop on Arm64
 
