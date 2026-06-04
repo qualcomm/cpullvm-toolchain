@@ -163,6 +163,38 @@ def main():
             ],
             description="This test times out for some reason and we will most probably need a fix in QEMU. Disable until we have one.",
         ),
+        XFail(
+            name="emulated crash signals",
+            testnames=[
+                "aarch64/emupac.c",
+            ],
+            result=NewResult.XFAILED,
+            project="compiler-rt",
+            variants=[
+                "aarch64a_tlsie",
+                "aarch64a_soft_nofp_tlsie",
+            ],
+            description="QEMU does not deliver crash signals. The emupac test uses "
+                "%expect_crash which requires the OS to deliver a signal back to the "
+                "test runner when PAC authentication fails. QEMU semihosting does not "
+                "support this capability. This test is also xfailed in the ATfE "
+                "toolchain (arm/arm-toolchain) for the same reason.",
+        ),
+        XFail(
+            name="sme-string-test missing cxx headers",
+            testnames=[
+                "sme-string-test.cpp",
+            ],
+            result=NewResult.XFAILED,
+            project="compiler-rt",
+            variants=[
+                "aarch64a_soft_nofp_tlsie",
+            ],
+            description="The test fails to compile because the 'cassert' header is not "
+                "found. This variant has ENABLE_CXX_LIBS=OFF so libcxx headers are not "
+                "installed in the sysroot. ATfE does not encounter this failure because "
+                "their aarch64a_soft_nofp variant has ENABLE_CXX_LIBS=ON.",
+        ),
     ]
 
     tests_to_xfail = []

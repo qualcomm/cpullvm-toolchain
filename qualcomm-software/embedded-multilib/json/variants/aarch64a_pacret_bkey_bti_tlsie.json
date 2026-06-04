@@ -3,7 +3,7 @@
         "common": {
             "TARGET_ARCH": "aarch64a",
             "VARIANT": "aarch64a_pacret_bkey_bti_tlsie",
-            "COMPILE_FLAGS": "-march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -fPIC",
+            "COMPILE_FLAGS": "-march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -munaligned-access -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",

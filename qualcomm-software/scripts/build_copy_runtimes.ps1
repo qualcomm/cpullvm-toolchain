@@ -21,6 +21,9 @@ Set-VS-Env
 $repoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
 $buildDir = (Join-Path $repoRoot build)
 
+$env:CC = 'clang-cl'
+$env:CXX = 'clang-cl'
+
 mkdir $buildDir -Force
 cd $buildDir
 
@@ -30,8 +33,6 @@ cmake ..\qualcomm-software `
   -GNinja `
   -DFETCHCONTENT_QUIET=OFF `
   -DPREBUILT_TARGET_LIBRARIES=ON `
-  -DENABLE_LINUX_LIBRARIES=ON `
-  -DCMAKE_C_COMPILER=clang-cl `
-  -DCMAKE_CXX_COMPILER=clang-cl
+  -DENABLE_LINUX_LIBRARIES=ON
 
 ninja package-llvm-toolchain
