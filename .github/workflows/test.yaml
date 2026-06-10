@@ -1,0 +1,28 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. 
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Check whether a PR makes changes only in files that we are allowed
+# to modify.
+
+name: Test
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-modified-files:
+    # Don't run on forks
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    runs-on: ubuntu-24.04
+
+    steps:      
+      - name: Testing
+        run: |
+          echo "hi"
