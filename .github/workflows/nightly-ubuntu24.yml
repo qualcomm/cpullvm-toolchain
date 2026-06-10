@@ -1,0 +1,141 @@
+# Copyright (c) 2025, Arm Limited and affiliates.
+# Part of the Arm Toolchain project, under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# This workflow runs our common build scripts in parallel for multiple operating
+# systems and architectures. All runtimes are built on Linux x86_64 and copied to
+# other build hosts.
+#
+# It is intended to be triggered as part of a **nightly build** to
+# validate our typical build configurations and test them automatically.
+#
+# Other build configurations such as building the runtimes on non-Linux
+# x86_64 platforms are built and tested separately.
+
+name: Nightly Build and Test on Ubuntu 24.04
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test-Linux-x86:
+    # Don't run on forks
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    name: build.sh on Linux-x86_64
+    runs-on: cpullvm-ubuntu24-x86_64
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          # We build in the repository and rely on clean to cleanup possible
+          # old build products if the runner doesn't do it itself.
+          clean: true
+
+      - name: Apply llvm-project patches
+        run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
+
+      - name: Detect OS version
+        id: osinfo
+        run: |
+          source /etc/os-release
+          OS_TAG="Ubuntu${VERSION_ID%%.*}"
+          ARCH=$(uname -m)
+          echo "Build is running on $OS_TAG (${ARCH})"
+          echo "OS_TAG=$OS_TAG" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          export EXTRA_CMAKE_ARGS="-DPACKAGE_SYSTEM_NAME=$OS_TAG"
+          ./qualcomm-software/scripts/build.sh
+
+      - name: Upload built packages
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: success()
+        with:
+          name: cpullvm-packages-build.sh-Linux-x86-${{ env.OS_TAG }}
+          path: build*/cpullvm-*.tar.xz
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Test
+        run: ./qualcomm-software/scripts/test.sh
+
+  build-and-test:
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    name: ${{ matrix.build_script }} on ${{ matrix.target_os }}
+    needs: build-and-test-Linux-x86
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - build_script: build_copy_runtimes.sh
+            test_script: test.sh
+            install_script: install_dependencies_ubuntu24.sh
+            target_os: Linux-AArch64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      # Not setting these can cause lit test failures on Windows machines when
+      # files with ex: different line endings are compared.
+      - name: Preconfigure git
+        shell: bash
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+          git config --global core.longpaths true
+
+      - name: Checkout source
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          # We build in the repository and rely on clean to cleanup possible
+          # old build products if the runner doesn't do it itself.
+          clean: true
+
+      - name: Detect OS version
+        id: osinfo
+        run: |
+          source /etc/os-release
+          OS_TAG="Ubuntu${VERSION_ID%%.*}"
+          ARCH=$(uname -m)
+          echo "Build is running on $OS_TAG (${ARCH})"
+          echo "OS_TAG=$OS_TAG" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"
+
+      - name: Download Linux-x86 package
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: cpullvm-packages-build.sh-Linux-x86-${{ env.OS_TAG }}
+
+      - name: Install dependencies
+        if: matrix.install_script != ''
+        run: ./qualcomm-software/scripts/${{ matrix.install_script }}
+
+      - name: Apply llvm-project patches
+        run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
+
+      - name: Build
+        run: ./qualcomm-software/scripts/${{ matrix.build_script }}
+        env:
+          EXTRA_CMAKE_ARGS: "-DPACKAGE_SYSTEM_NAME=${{ env.OS_TAG }}"
+
+      - name: Upload built packages
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: success()
+        with:
+          name: cpullvm-packages-${{ matrix.build_script }}-${{ matrix.target_os }}-${{ env.OS_TAG }}
+          path: |
+            build*/cpullvm-*-AArch64*.tar.xz
+          retention-days: 7
+
+      - name: Test
+        if: matrix.test_script != ''
+        run: ./qualcomm-software/scripts/${{ matrix.test_script }}

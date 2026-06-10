@@ -440,7 +440,7 @@ endif()
 
 # If a specific system name is supplied, use that instead.
 if (PACKAGE_SYSTEM_NAME)
-    set(CPACK_SYSTEM_NAME "${PACKAGE_SYSTEM_NAME}-${processor_name}")
+    set(CPACK_SYSTEM_NAME "${CMAKE_SYSTEM_NAME}-${processor_name}-${PACKAGE_SYSTEM_NAME}")
 else()
     set(CPACK_SYSTEM_NAME "${CMAKE_SYSTEM_NAME}-${processor_name}")
 endif()
