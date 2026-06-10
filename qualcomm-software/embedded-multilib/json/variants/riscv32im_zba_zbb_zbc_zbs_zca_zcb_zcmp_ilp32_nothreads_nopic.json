@@ -8,12 +8,12 @@
             "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",
             "QEMU_MACHINE": "virt",
-            "QEMU_CPU": "rv32,zcd=false,zba=true,zbb=true,zbc=true,zbs=true,zca=true,zcb=true,zcmp=true",
+            "QEMU_CPU": "rv32,zcd=false,zca=true,zcb=true,zcmp=true",
             "QEMU_PARAMS": "-bios none",
             "FLASH_ADDRESS": "0x80000000",
             "FLASH_SIZE": "0x00400000",
             "RAM_ADDRESS": "0x80400000",
-            "RAM_SIZE": "0x00200000",
+            "RAM_SIZE": "0x00a00000",
             "LIBRARY_BUILD_TYPE": "minsizerelease"
         },
         "picolibc": {
