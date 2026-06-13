@@ -13,5 +13,12 @@
 # CHECK-ARMV7-NOFP: arm-none-eabi/armv7a_soft_nofp{{$}}
 # CHECK-ARMV7-NOFP-EMPTY:
 
+# RUN: %clang -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=hard -mfpu=vfpv3 | FileCheck %s --check-prefix=CHECK-ARMV7-HARD-VFPV3
+# RUN: %clang -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=hard -marm -mfpu=vfpv3 | FileCheck %s --check-prefix=CHECK-ARMV7-HARD-VFPV3
+# RUN: %clang -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=hard -mthumb -mfpu=vfpv3 | FileCheck %s --check-prefix=CHECK-ARMV7-HARD-VFPV3
+# RUN: %clang -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=hard -mfpu=neon | FileCheck %s --check-prefix=CHECK-ARMV7-HARD-VFPV3
+# CHECK-ARMV7-HARD-VFPV3: arm-none-eabi/armv7a_hard_vfpv3{{$}}
+# CHECK-ARMV7-HARD-VFPV3-EMPTY:
+
 # RUN: %clang -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=softfp -mthumb -mfpu=neon -mno-unaligned-access 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # NOT-FOUND: warning: no multilib found matching flags
