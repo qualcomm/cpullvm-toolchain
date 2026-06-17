@@ -1,9 +1,9 @@
-From 71af4b609538f0682f042371e9d4cfec87080ce6 Mon Sep 17 00:00:00 2001
+From 607a862a9ba32630ca475de27df30d5f8af37011 Mon Sep 17 00:00:00 2001
 From: syalamar <syalamar@qti.qualcomm.com>
-Date: Wed, 20 May 2026 11:30:41 -0700
-Subject: [PATCH] [cpullvm] Bump version to 22.1.1
+Date: Tue, 16 Jun 2026 23:01:11 -0700
+Subject: [PATCH] [cpullvm] Bump LLVM version to 22.1.2
 
-Update LLVM version to 22.1.1.
+Change-Id: I6222a7c6ad11f9ba885544a072fbcb8f24b42b9e
 ---
  cmake/Modules/LLVMVersion.cmake          | 2 +-
  libcxx/include/__config                  | 2 +-
@@ -13,7 +13,7 @@ Update LLVM version to 22.1.1.
  5 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/cmake/Modules/LLVMVersion.cmake b/cmake/Modules/LLVMVersion.cmake
-index 5fd7a03cb7cd..4a9b19785e5e 100644
+index 5fd7a03cb7cd..4c1a0115cb80 100644
 --- a/cmake/Modules/LLVMVersion.cmake
 +++ b/cmake/Modules/LLVMVersion.cmake
 @@ -7,7 +7,7 @@ if(NOT DEFINED LLVM_VERSION_MINOR)
@@ -21,12 +21,12 @@ index 5fd7a03cb7cd..4a9b19785e5e 100644
  endif()
  if(NOT DEFINED LLVM_VERSION_PATCH)
 -  set(LLVM_VERSION_PATCH 0)
-+  set(LLVM_VERSION_PATCH 1)
++  set(LLVM_VERSION_PATCH 2)
  endif()
  if(NOT DEFINED LLVM_VERSION_SUFFIX)
    set(LLVM_VERSION_SUFFIX)
 diff --git a/libcxx/include/__config b/libcxx/include/__config
-index 30bc8c808fce..962f0c881308 100644
+index 30bc8c808fce..1286103020f4 100644
 --- a/libcxx/include/__config
 +++ b/libcxx/include/__config
 @@ -30,7 +30,7 @@
@@ -34,22 +34,22 @@ index 30bc8c808fce..962f0c881308 100644
  // Given a LLVM release LLVM XX.YY.ZZ (e.g. LLVM 17.0.1 == 17.00.01), _LIBCPP_VERSION is
  // defined to XXYYZZ.
 -#  define _LIBCPP_VERSION 220100
-+#  define _LIBCPP_VERSION 220101
++#  define _LIBCPP_VERSION 220102
  
  #  define _LIBCPP_CONCAT_IMPL(_X, _Y) _X##_Y
  #  define _LIBCPP_CONCAT(_X, _Y) _LIBCPP_CONCAT_IMPL(_X, _Y)
 diff --git a/llvm/utils/gn/secondary/llvm/version.gni b/llvm/utils/gn/secondary/llvm/version.gni
-index eb34b1d95308..6f6300c529f3 100644
+index eb34b1d95308..732b3944a572 100644
 --- a/llvm/utils/gn/secondary/llvm/version.gni
 +++ b/llvm/utils/gn/secondary/llvm/version.gni
 @@ -1,4 +1,4 @@
  llvm_version_major = 22
  llvm_version_minor = 1
 -llvm_version_patch = 0
-+llvm_version_patch = 1
++llvm_version_patch = 2
  llvm_version = "$llvm_version_major.$llvm_version_minor.$llvm_version_patch"
 diff --git a/llvm/utils/lit/lit/__init__.py b/llvm/utils/lit/lit/__init__.py
-index fe8817e9048d..af1e2a2972c4 100644
+index fe8817e9048d..e9d653b1d40a 100644
 --- a/llvm/utils/lit/lit/__init__.py
 +++ b/llvm/utils/lit/lit/__init__.py
 @@ -2,7 +2,7 @@
@@ -57,12 +57,12 @@ index fe8817e9048d..af1e2a2972c4 100644
  __author__ = "Daniel Dunbar"
  __email__ = "daniel@minormatter.com"
 -__versioninfo__ = (22, 1, 0)
-+__versioninfo__ = (22, 1, 1)
++__versioninfo__ = (22, 1, 2)
  __version__ = ".".join(str(v) for v in __versioninfo__) + "dev"
  
  __all__ = []
 diff --git a/llvm/utils/mlgo-utils/mlgo/__init__.py b/llvm/utils/mlgo-utils/mlgo/__init__.py
-index 3e01c7155143..2064cf4f9830 100644
+index 3e01c7155143..0377f06369e3 100644
 --- a/llvm/utils/mlgo-utils/mlgo/__init__.py
 +++ b/llvm/utils/mlgo-utils/mlgo/__init__.py
 @@ -4,7 +4,7 @@
@@ -70,7 +70,7 @@ index 3e01c7155143..2064cf4f9830 100644
  from datetime import timezone, datetime
  
 -__versioninfo__ = (22, 1, 0)
-+__versioninfo__ = (22, 1, 1)
++__versioninfo__ = (22, 1, 2)
  __version__ = (
      ".".join(str(v) for v in __versioninfo__)
      + "dev"
