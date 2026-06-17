@@ -8,6 +8,7 @@
 
 ## [22.1.2]
 - Patch release built with [LLVM 22.1.0](https://releases.llvm.org/22.1.0/docs/ReleaseNotes.html), [Clang 22.1.0](https://releases.llvm.org/22.1.0/tools/clang/docs/ReleaseNotes.html), [ELD 22.1.0](https://github.com/qualcomm/eld/tags), [picolibc 1.8.10](https://github.com/picolibc/picolibc/releases/tag/1.8.10), and [musl-embedded](https://github.com/qualcomm/musl-embedded) derived from [musl 1.2.5 source](https://musl.libc.org/)
+- Changes since 22.1.1 are described in the [CHANGELOG](CHANGELOG.md#2212)
 
 ## [22.1.1]
 - Patch release built with [LLVM 22.1.0](https://releases.llvm.org/22.1.0/docs/ReleaseNotes.html), [Clang 22.1.0](https://releases.llvm.org/22.1.0/tools/clang/docs/ReleaseNotes.html), [ELD 22.1.0](https://github.com/qualcomm/eld/tags), [picolibc 1.8.10](https://github.com/picolibc/picolibc/releases/tag/1.8.10), and [musl-embedded](https://github.com/qualcomm/musl-embedded) derived from [musl 1.2.5 source](https://musl.libc.org/)
