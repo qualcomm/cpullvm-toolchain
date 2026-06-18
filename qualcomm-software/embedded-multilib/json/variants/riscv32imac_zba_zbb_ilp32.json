@@ -13,7 +13,7 @@
             "FLASH_ADDRESS": "0x80000000",
             "FLASH_SIZE": "0x00400000",
             "RAM_ADDRESS": "0x80400000",
-            "RAM_SIZE": "0x00200000",
+            "RAM_SIZE": "0x00a00000",
             "LIBRARY_BUILD_TYPE": "minsizerelease"
         },
         "picolibc": {

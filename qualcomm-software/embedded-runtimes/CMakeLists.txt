@@ -172,7 +172,9 @@ if(ENABLE_LIBC_TESTS OR ENABLE_COMPILER_RT_TESTS OR ENABLE_LIBCXX_TESTS)
         if(TEST_EXECUTOR STREQUAL qemu)
             set(picocrt "crt0-semihost")
         endif()
-        set(test_link_flags "-fuse-ld=eld -nostartfiles -l${picocrt} -lsemihost -T picolibcpp.ld")
+        # To run compiler-rt tests on qemu, libc must be linked before
+        #  libsemihost to resolve semihost's references into libc.
+        set(test_link_flags "-fuse-ld=eld -nostartfiles -l${picocrt} -lc -lsemihost -T picolibcpp.ld")
     else()
         message(FATAL_ERROR "Tests can only be enabled using picolibc.")
     endif()
