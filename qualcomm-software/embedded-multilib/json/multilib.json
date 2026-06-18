@@ -36,19 +36,19 @@
             "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft"
         },
         {
-            "variant": "armv8_soft_neon",
-            "json": "armv8_soft_neon.json",
-            "flags": "--target=thumbv8-unknown-none-eabi -mfpu=neon-fp-armv8"
-        },
-        {
             "variant": "armv7a_soft_neon",
             "json": "armv7a_soft_neon.json",
-            "flags": "--target=thumbv7-unknown-none-eabi -mfpu=neon"
+            "flags": "--target=armv7-unknown-none-eabi -mfpu=neon"
         },
         {
             "variant": "armv7a_soft_nofp",
             "json": "armv7a_soft_nofp.json",
-            "flags": "--target=thumbv7-unknown-none-eabi -mfpu=none"
+            "flags": "--target=armv7-unknown-none-eabi -mfpu=none"
+        },
+        {
+            "variant": "armv8_soft_neon",
+            "json": "armv8_soft_neon.json",
+            "flags": "--target=armv8a-unknown-none-eabi -mfpu=neon-fp-armv8"
         },
         {
             "variant": "armv7m_soft_nofp",
@@ -56,9 +56,9 @@
             "flags": "--target=thumbv7m-unknown-none-eabi -mfpu=none"
         },
         {
-            "variant": "armv7m_soft_nofp_nopic",
-            "json": "armv7m_soft_nofp_nopic.json",
-            "flags": "--target=thumbv7m-unknown-none-eabi -mfpu=none -fno-pic",
+            "variant": "armv7m_hard_fpv5_d16_nopic",
+            "json": "armv7m_hard_fpv5_d16_nopic.json",
+            "flags": "--target=thumbv7m-unknown-none-eabihf -mfpu=fpv5-d16 -munaligned-access -fno-pic",
             "libraries_supported": "picolibc"
         },
         {
@@ -127,7 +127,7 @@
             "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zcb_zcmp_zba_zbb -mabi=ilp32 -fno-pic",
             "libraries_supported": "picolibc"
         },
-        {
+	{
             "variant": "riscv32imafc_ilp32f",
             "json": "riscv32imafc_ilp32f.json",
             "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imafc -mabi=ilp32f",
@@ -146,9 +146,9 @@
             "libraries_supported": "picolibc"
         },
         {
-            "variant": "riscv32gc_ilp32d",
-            "json": "riscv32gc_ilp32d.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32gc -mabi=ilp32d",
+            "variant": "riscv32imaf_x160_ilp32f",
+            "json": "riscv32imaf_x160_ilp32f.json",
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imaf_zic64b_zicbom_zicbop_zicboz_ziccamoa_ziccif_ziccrse_zicond_zifencei_zihintntl_zihintpause_zihpm_zimop_za64rs_zawrs_zfa_zfbfmin_zfh_zce_zcmop_zba_zbb_zbs_zkt_zvbb_zve32f_zvfbfmin_zvfbfwma_zvfh_zvkt_smaia_smcsrind_smrnmi_sscofpmf_xsfvfexpa_zvqdotq0p0_zicfilp1p0 -menable-experimental-extensions -mabi=ilp32f",
             "libraries_supported": "picolibc"
         },
         {
