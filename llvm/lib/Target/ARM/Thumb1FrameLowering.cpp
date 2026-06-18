@@ -668,10 +668,13 @@ bool Thumb1FrameLowering::emitPopSpecialFixUp(MachineBasicBlock &MBB,
   if (MBBI != MBB.end()) {
     dl = MBBI->getDebugLoc();
     auto InstUpToMBBI = MBB.end();
-    while (InstUpToMBBI != MBBI)
+    while (InstUpToMBBI != MBBI) {
       // The pre-decrement is on purpose here.
       // We want to have the liveness right before MBBI.
-      UsedRegs.stepBackward(*--InstUpToMBBI);
+      --InstUpToMBBI;
+      if (!InstUpToMBBI->isDebugInstr())
+        UsedRegs.stepBackward(*InstUpToMBBI);
+    }
   }
 
   // Look for a register that can be directly use in the POP.
