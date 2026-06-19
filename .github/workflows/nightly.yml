@@ -52,7 +52,7 @@ jobs:
           name: cpullvm-packages-build.sh-Linux-x86
           path: build*/cpullvm-*.tar.xz
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 2
 
       - name: Test
         run: ./qualcomm-software/scripts/test.sh
