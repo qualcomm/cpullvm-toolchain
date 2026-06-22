@@ -483,6 +483,7 @@ add_custom_target(
     -DCPULLVMToolchain_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
     -Dllvmproject_src_dir=${llvmproject_src_dir}
     -Deld_SOURCE_DIR=${eld_SOURCE_DIR}
+    -Deld_URL=${eld_URL}
     # at most one of picolibc and musl options is needed, but easiest to
     # specify both definitions
     -Dpicolibc_SOURCE_DIR=${picolibc_SOURCE_DIR}
