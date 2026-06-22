@@ -187,6 +187,23 @@ def main():
                 "since compiler-rt's atomic.c requires lock-free hardware CAS to compile.",
         ),
         XFail(
+            name="Insufficient RAM",
+            testnames=[
+                "dynamic_cast14.pass.cpp",
+            ],
+            result=NewResult.XFAILED,
+            project="libcxx",
+            variants=[
+                "armv7m_hard_fpv5_d16_nopic",
+                "armv7m_soft_nofp",
+                "armv7m_soft_nofp_nopic",
+            ],
+            description="dynamic_cast14.pass.cpp (cxxabi test) fails due to"
+                "insufficient memory. It requires at-least 10MB RAM. Increasing the"
+                "RAM_SIZE from current 8MB to 10MB in"
+                "armv7m_hard_fpv5_d16_nopic.json leads to QTOOL-141735",
+        ),
+        XFail(
             name="emulated crash signals",
             testnames=[
                 "aarch64/emupac.c",
