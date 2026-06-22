@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 ### Security
 
+## [22.1.2]
+### Fixed
+- Updated the Armv7-A and Armv8-A multilib variants to not require Thumb for matching
+
 ## [22.1.1]
 ### Added
 - Added armv7m -mfpu=fpv5-d16 hard float runtime variant

@@ -18,6 +18,10 @@
 # CHECK-IMC-ZBA-ZBB-ZBC-ZBS-NO-THREADS-FNO-PIC: riscv32-unknown-elf/riscv32imc_zba_zbb_zbc_zbs_ilp32_nothreads_nopic{{$}}
 # CHECK-IMC-ZBA-ZBB-ZBC-ZBS-NO-THREADS-FNO-PIC-EMPTY:
 
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32im_zba_zbb_zbc_zbs_zca_zcb_zcmp -mabi=ilp32 -fmultilib-flag=no-threads -fno-pic | FileCheck %s --check-prefix=CHECK-IM-ZBA-ZBB-ZBC-ZBS-ZCA-ZCB-ZCMP-NO-THREADS-FNO-PIC
+# CHECK-IM-ZBA-ZBB-ZBC-ZBS-ZCA-ZCB-ZCMP-NO-THREADS-FNO-PIC: riscv32-unknown-elf/riscv32im_zba_zbb_zbc_zbs_zca_zcb_zcmp_ilp32_nothreads_nopic{{$}}
+# CHECK-IM-ZBA-ZBB-ZBC-ZBS-ZCA-ZCB-ZCMP-NO-THREADS-FNO-PIC-EMPTY:
+
 # RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac -mabi=ilp32 -fpic 2>&1 | FileCheck %s --check-prefix=CHECK-IMAC-PIC
 # CHECK-IMAC-PIC: riscv32-unknown-elf/riscv32imac_ilp32{{$}}
 # CHECK-IMAC-PIC-EMPTY:
