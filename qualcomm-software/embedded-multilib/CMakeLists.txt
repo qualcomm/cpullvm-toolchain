@@ -73,6 +73,7 @@ endif()
 # Arguments to pass down to the library projects.
 foreach(arg
     LLVM_BINARY_DIR
+    CMAKE_INSTALL_MESSAGE
 )
     if(${arg})
         list(APPEND passthrough_dirs "-D${arg}=${${arg}}")
