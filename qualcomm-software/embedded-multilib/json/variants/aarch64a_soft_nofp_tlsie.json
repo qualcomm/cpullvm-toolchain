@@ -12,13 +12,13 @@
             "FLASH_ADDRESS": "0x40000000",
             "FLASH_SIZE": "0x01000000",
             "RAM_ADDRESS": "0x41000000",
-            "RAM_SIZE": "0x00200000",
+            "RAM_SIZE": "0x1000000",
             "LIBRARY_BUILD_TYPE": "minsizerelease"
         },
         "picolibc": {
             "ENABLE_CXX_LIBS": "OFF",
             "ENABLE_LIBC_TESTS": "ON",
-            "ENABLE_COMPILER_RT_TESTS": "OFF",
+            "ENABLE_COMPILER_RT_TESTS": "ON",
             "ENABLE_LIBCXX_TESTS": "OFF",
             "TLS_MODEL": "initial-exec"
         }
