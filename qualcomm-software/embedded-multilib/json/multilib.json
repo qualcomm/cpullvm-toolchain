@@ -69,7 +69,8 @@
         {
             "variant": "armv7a_hard_vfpv3",
             "json": "armv7a_hard_vfpv3.json",
-            "flags": "--target=armv7-unknown-none-eabihf -mfpu=vfpv3 -munaligned-access"
+            "flags": "--target=armv7-unknown-none-eabihf -mfpu=vfpv3 -munaligned-access",
+            "libraries_supported": "picolibc"
         },
         {
             "variant": "armv8_soft_neon",
