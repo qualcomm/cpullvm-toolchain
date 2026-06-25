@@ -717,6 +717,9 @@ if(ENABLE_CXX_LIBS)
             -DLIBCXX_ENABLE_EXCEPTIONS=${ENABLE_EXCEPTIONS}
             -DLIBCXX_ENABLE_RTTI=${ENABLE_RTTI}
             -DRUNTIMES_USE_LIBC=picolibc
+            # FIXME: This is currently broken after 8a531c36 from upstream.
+            # Re-enable once it is resolved.
+            -DLIBCXX_ENABLE_LOCALIZATION=OFF
         )
         if(ENABLE_LIBCXX_TESTS)
             # Generate xfails for libxx.
