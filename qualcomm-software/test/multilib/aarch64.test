@@ -4,6 +4,7 @@
 # the original multilib.
 
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf | FileCheck %s --check-prefix=CHECK-AARCH64
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -munaligned-access | FileCheck %s --check-prefix=CHECK-AARCH64
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 | FileCheck %s --check-prefix=CHECK-AARCH64
 # CHECK-AARCH64: aarch64-none-elf/aarch64a_tlsie{{$}}
 # CHECK-AARCH64-EMPTY:
@@ -40,3 +41,6 @@
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BKEY-BTI
 # CHECK-NOFP-PACRET-BKEY-BTI: aarch64-none-elf/aarch64a_soft_nofp_pacret_bkey_bti{{$}}
 # CHECK-NOFP-PACRET-BKEY-BTI-EMPTY:
+
+# RUN: %clang -print-multi-directory -print-multi-directory --target=aarch64-none-elf -mno-unaligned-access 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
+# NOT-FOUND: warning: no multilib found matching flags
