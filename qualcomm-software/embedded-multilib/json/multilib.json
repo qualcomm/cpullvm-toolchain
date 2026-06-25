@@ -6,6 +6,11 @@
             "flags": "--target=aarch64-unknown-none-elf -munaligned-access"
         },
         {
+            "variant": "aarch64a_aligned_tlsie",
+            "json": "aarch64a_aligned_tlsie.json",
+            "flags": "--target=aarch64-unknown-none-elf -mno-unaligned-access"
+        },
+        {
             "variant": "aarch64a_pacret",
             "json": "aarch64a_pacret.json",
             "flags": "--target=aarch64-unknown-none-elf -march=armv8.3-a -mbranch-protection=pac-ret+leaf -munaligned-access"
@@ -21,14 +26,29 @@
             "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti -munaligned-access"
         },
         {
+            "variant": "aarch64a_pacret_bkey_bti_aligned_tlsie",
+            "json": "aarch64a_pacret_bkey_bti_aligned_tlsie.json",
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti -mno-unaligned-access"
+        },
+        {
             "variant": "aarch64a_soft_nofp_tlsie",
             "json": "aarch64a_soft_nofp_tlsie.json",
             "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft -munaligned-access"
         },
         {
+            "variant": "aarch64a_soft_nofp_aligned_tlsie",
+            "json": "aarch64a_soft_nofp_aligned_tlsie.json",
+            "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft -mno-unaligned-access"
+        },
+        {
             "variant": "aarch64a_soft_nofp_pacret_bti",
             "json": "aarch64a_soft_nofp_pacret_bti.json",
             "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -munaligned-access"
+        },
+        {
+            "variant": "aarch64a_soft_nofp_pacret_bti_aligned",
+            "json": "aarch64a_soft_nofp_pacret_bti_aligned.json",
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -mno-unaligned-access"
         },
         {
             "variant": "aarch64a_soft_nofp_pacret_bkey_bti",
