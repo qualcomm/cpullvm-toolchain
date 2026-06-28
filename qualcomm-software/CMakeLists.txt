@@ -270,6 +270,9 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE BOOL "" FORCE)
 endif()
 
+# Enable assertions for Release+Asserts builds
+set(LLVM_ENABLE_ASSERTIONS ON CACHE BOOL "")
+
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 if(NOT CMAKE_C_COMPILER_LAUNCHER AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
