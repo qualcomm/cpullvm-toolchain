@@ -23,3 +23,4 @@ REPO_ROOT=$( git -C "${SCRIPT_DIR}" rev-parse --show-toplevel )
 cd "${REPO_ROOT}"/build
 ninja check-all
 ninja check-llvm-toolchain
+ninja check-cxxabi
