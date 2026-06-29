@@ -9,7 +9,7 @@ on:
 jobs:
   Fetch-Upstream:
     runs-on: ubuntu-24.04
-    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    if: github.repository == 'sriyalamar/cpullvm-toolchain'
     strategy:
       matrix:
         branch: [main]

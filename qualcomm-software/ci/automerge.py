@@ -208,6 +208,49 @@ def is_worktree_clean(git_repo: Git) -> bool:
     status_output = git_repo.run_cmd(["status", "--porcelain"]).strip()
     return len(status_output) == 0
 
+def update_eld_version(git_repo: Git, dry_run: bool) -> None:
+    logger.info("Updating eld commit SHA in versions.json")
+
+    # Get latest SHA
+    result = subprocess.run(
+        ["git", "ls-remote", "https://github.com/qualcomm/eld", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    eld_sha = result.stdout.strip().split()[0]
+    logger.info("Latest eld SHA: %s", eld_sha)
+
+    versions_file = git_repo.get_repo_path()/"qualcomm-software"/"versions.json"
+
+    # Load JSON
+    with open(versions_file) as f:
+        data = json.load(f)
+
+    # Update values
+    data["repos"]["eld"]["tagType"] = "commithash"
+    data["repos"]["eld"]["tag"] = eld_sha
+
+    # Write back
+    with open(versions_file, "w") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+
+    # Commit if changed
+    git_repo.run_cmd(["add", str(versions_file)])
+
+    diff = git_repo.run_cmd(["diff", "--cached", "--quiet"], check=False)
+
+    if diff == "":
+        logger.info("No changes to versions.json")
+        return
+
+    git_repo.run_cmd(["commit", "-m", f"Update eld to {eld_sha}"])
+
+    if dry_run:
+        logger.info("Dry run: skipping push")
+    else:
+        git_repo.run_cmd(["push", REMOTE_NAME])
 
 def main():
     arg_parser = argparse.ArgumentParser(
@@ -281,6 +324,8 @@ def main():
                 args.dry_run,
                 args.verbose,
             )
+        # After all merges, update eld revision
+        update_eld_version(git_repo, args.dry_run)
     except MergeConflictError as conflict:
         process_conflict(
             git_repo,
