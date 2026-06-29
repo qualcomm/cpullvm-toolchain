@@ -187,9 +187,7 @@ def main():
                 "armv7m_soft_nofp_nopic",
             ],
             description="dynamic_cast14.pass.cpp (cxxabi test) fails due to"
-                "insufficient memory. It requires at-least 10MB RAM. Increasing the"
-                "RAM_SIZE from current 8MB to 10MB in"
-                "these variants leads to QTOOL-141735",
+                "insufficient memory. It requires at-least 10MB RAM."
         ),
         XFail(
             name="emulated crash signals",
