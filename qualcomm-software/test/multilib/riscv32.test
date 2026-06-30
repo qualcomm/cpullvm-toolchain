@@ -67,6 +67,10 @@
 # CHECK-GC-ILP32D-PIC: riscv32-unknown-elf/riscv32gc_ilp32d{{$}}
 # CHECK-GC-ILP32D-PIC-EMPTY:
 
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -mcpu=sifive-x160  -mabi=ilp32f -fpic 2>&1 | FileCheck %s --check-prefix=CHECK-X160-ILP32F-PIC
+# CHECK-X160-ILP32F-PIC: riscv32-unknown-elf/riscv32imaf_x160_ilp32f{{$}}
+# CHECK-X160-ILP32F-PIC-EMPTY:
+
 # RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32im_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp -mabi=ilp32 -fmultilib-flag=no-threads -fno-pic 2>&1 | FileCheck %s --check-prefix=CHECK-IM-XQCI-ILP32-NO-THREADS-NO-PIC
 # RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32im_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqci_xqccmp -mabi=ilp32 -fmultilib-flag=no-threads -fno-pic 2>&1 | FileCheck %s --check-prefix=CHECK-IM-XQCI-ILP32-NO-THREADS-NO-PIC
 # CHECK-IM-XQCI-ILP32-NO-THREADS-NO-PIC: riscv32-unknown-elf/riscv32im_xqci_ilp32_nothreads_nopic{{$}}
