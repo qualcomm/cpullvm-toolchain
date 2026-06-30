@@ -67,7 +67,7 @@
 # CHECK-GC-ILP32D-PIC: riscv32-unknown-elf/riscv32gc_ilp32d{{$}}
 # CHECK-GC-ILP32D-PIC-EMPTY:
 
-# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -mcpu=sifive-x160  -mabi=ilp32f -fpic 2>&1 | FileCheck %s --check-prefix=CHECK-X160-ILP32F-PIC
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imaf_zic64b_zicbom_zicbop_zicboz_ziccamoa_ziccif_ziccrse_zicond_zifencei_zihintntl_zihintpause_zihpm_zimop_za64rs_zawrs_zfa_zfbfmin_zfh_zce_zcmop_zba_zbb_zbs_zkt_smaia_smcsrind_smrnmi_sscofpmf_zicfilp1p0 -menable-experimental-extensions -mabi=ilp32f -fpic 2>&1 | FileCheck %s --check-prefix=CHECK-X160-ILP32F-PIC
 # CHECK-X160-ILP32F-PIC: riscv32-unknown-elf/riscv32imaf_x160_ilp32f{{$}}
 # CHECK-X160-ILP32F-PIC-EMPTY:
 
