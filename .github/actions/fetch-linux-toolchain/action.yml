@@ -64,8 +64,10 @@ runs:
         run-id: ${{ inputs.run-id || steps.latest.outputs.run_id }}
 
     - name: Extract toolchain
+      env:
+        INSTALL_DIR: ${{ inputs.install-dir }}
       shell: bash
       run: |
-        mkdir -p "${{ inputs.install-dir }}"
+        mkdir -p "$INSTALL_DIR"
         tarball=$(find . -name 'cpullvm-*.tar.xz' -print -quit)
-        tar -xf "$tarball" --strip-components=1 -C "${{ inputs.install-dir }}"
+        tar -xf "$tarball" --strip-components=1 -C "$INSTALL_DIR"
