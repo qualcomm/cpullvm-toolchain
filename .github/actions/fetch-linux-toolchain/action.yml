@@ -10,7 +10,7 @@ inputs:
   github-token:
     description: >
       Token with actions:read permission on qualcomm/cpullvm-toolchain.
-      Within this repo ${{ github.token }} works. External callers need a
+      Within this repo, github.token works. External callers need a
       fine-grained PAT or GitHub App token scoped to qualcomm/cpullvm-toolchain.
     required: true
   run-id:
