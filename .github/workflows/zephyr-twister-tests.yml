@@ -76,7 +76,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.run-id }}
-          package-name: ${{ inputs.package-name }}
+          package-name: ${{ inputs.package-name || 'cpullvm-packages-build.sh-Linux-x86' }}
 
       - name: West setup
         run: |
