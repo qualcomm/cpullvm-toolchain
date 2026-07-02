@@ -11,7 +11,7 @@ on:
           Run ID of a cpullvm-toolchain workflow that built the Linux x86_64 toolchain.
           Leave blank to use the latest nightly.
         required: false
-        default: '28495912079'
+        default: '28470780827'
       package-name:
         description: >
           Package name of the toolchain to download. Defaults to 'cpullvm-packages-build.sh-Linux-x86'.
