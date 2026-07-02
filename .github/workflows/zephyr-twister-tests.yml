@@ -11,13 +11,13 @@ on:
           Run ID of a cpullvm-toolchain workflow that built the Linux x86_64 toolchain.
           Leave blank to use the latest nightly.
         required: false
-        default: ''
+        default: '28495912079'
       package-name:
         description: >
           Package name of the toolchain to download. Defaults to 'cpullvm-packages-build.sh-Linux-x86'.
           Only Linux packages should be used.
         required: false
-        default: cpullvm-packages-build.sh-Linux-x86
+        default: cpullvm-packages-build_copy_runtimes.sh-Linux-AArch64
   schedule:
     - cron: '0 5 * * 1' # Sunday 21:00 PST (Monday 05:00 UTC)
   pull_request:
@@ -76,7 +76,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.run-id }}
-          package-name: ${{ inputs.package-name || 'cpullvm-packages-build.sh-Linux-x86' }}
+          package-name: ${{ inputs.package-name || 'cpullvm-packages-build_copy_runtimes.sh-Linux-AArch64' }}
 
       - name: West setup
         run: |
