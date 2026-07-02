@@ -25,6 +25,6 @@ export CXX=clang++
 mkdir -p "${REPO_ROOT}"/build
 cd "${REPO_ROOT}"/build
 
-cmake ../qualcomm-software -GNinja -DFETCHCONTENT_QUIET=OFF -DENABLE_LINUX_LIBRARIES=ON ${EXTRA_CMAKE_ARGS}
+cmake ../qualcomm-software -GNinja -DFETCHCONTENT_QUIET=OFF ${EXTRA_CMAKE_ARGS}
 
 ninja package-llvm-toolchain
