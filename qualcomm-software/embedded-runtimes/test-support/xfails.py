@@ -160,6 +160,7 @@ def main():
             project="libcxx",
             variants=[
                 "riscv32im_xqci_ilp32_nothreads_nopic",
+                "riscv32im_zba_zbb_zbc_zbs_zca_zcb_zcmp_ilp32_nothreads_nopic",
                 "riscv32imc_ilp32_nothreads_nopic",
                 "riscv32imc_ilp32_scs_nothreads_nopic",
                 "riscv32imc_zba_zbb_zbc_zbs_ilp32_nothreads_nopic",
