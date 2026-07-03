@@ -67,6 +67,12 @@
             "flags": "--target=armv7-unknown-none-eabi -mfpu=none -munaligned-access"
         },
         {
+            "variant": "armv7a_hard_vfpv3",
+            "json": "armv7a_hard_vfpv3.json",
+            "flags": "--target=armv7-unknown-none-eabihf -mfpu=vfpv3 -munaligned-access",
+            "libraries_supported": "picolibc"
+        },
+        {
             "variant": "armv8_soft_neon",
             "json": "armv8_soft_neon.json",
             "flags": "--target=armv8a-unknown-none-eabi -mfpu=neon-fp-armv8 -munaligned-access"

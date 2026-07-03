@@ -235,12 +235,15 @@ if(ENABLE_LIBC_TESTS OR ENABLE_COMPILER_RT_TESTS OR ENABLE_LIBCXX_TESTS)
 endif()
 
 set(compile_arch_flags "--target=${target_triple} ${COMPILE_FLAGS} --sysroot ${TEMP_LIB_DIR}")
+if(NOT C_LIBRARY STREQUAL musl-embedded)
+    # Apply the same TLS model to test compilation as is used for library builds.
+    # Without this, -fPIC variants default to general-dynamic TLS which emits
+    # __tls_get_addr calls that are not available on bare-metal.
+    string(APPEND compile_arch_flags " -ftls-model=${TLS_MODEL}")
+endif()
 # Compiling the libraries benefits from some extra optimization
 # flags, and requires a sysroot.
 set(lib_compile_flags "${compile_arch_flags} -ffunction-sections -fdata-sections")
-if(NOT C_LIBRARY STREQUAL musl-embedded)
-    string(APPEND lib_compile_flags " -ftls-model=${TLS_MODEL}")
-endif()
 
 # Generic target names for the C library.
 # Declare these now, since compiler-rt requires the 'install' dependency.
