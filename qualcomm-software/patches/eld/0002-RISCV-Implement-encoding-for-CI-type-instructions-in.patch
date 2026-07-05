@@ -1,0 +1,63 @@
+From 2a0e552fa272d3fbb519871061c52b58d4ff995c Mon Sep 17 00:00:00 2001
+From: Jonathon Penix <jpenix@qti.qualcomm.com>
+Date: Mon, 8 Jun 2026 11:17:13 -0700
+Subject: [PATCH 2/3] [RISCV] Implement encoding for CI-type instructions in
+ terms of its `Shift`. NFCI
+
+A follow-up patch will add a new internal relocation to handle `c.li`.
+Currently, `encodeCI` looks for the immediate in the higher bits of `Result`
+(bits 17 and 16:12) which makes sense for `c.lui` handling (and when `c.lui` is
+rewritten to `c.li`) but not really for the new relocation for `c.li` (where we
+want to look at bits 5 and 4:0).
+
+I don't think this would work as-is for some of the other CI-type instructions
+if they ever need to be handled so it isn't entirely generic. But, this should
+be sufficient for supporting both `c.li` and `c.lui` relocations. I also think
+this is marginally simpler/more straightforward than creating a separate
+`EncTy_*` or checking the instruction type, etc. so I went this route for now.
+
+Note `isValidRVCLUIType` is now in a (more) broken state as I didn't update the
+call to `encodeCI`. As far as I can tell, this code is already dead/broken (it
+ultimately calls `extractRVCImmediate` which itself has a typo (`exractBits`)
+so has never been compile-able as far as I can tell. Not sure if we want to fix
+this up or just remove it, so I'm leaving it be for the purposes of this patch.
+
+Signed-off-by: Jonathon Penix <jpenix@qti.qualcomm.com>
+---
+ lib/Target/RISCV/RISCVHelper.h              | 6 +++---
+ lib/Target/RISCV/RISCVRelocationCompute.cpp | 2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/lib/Target/RISCV/RISCVHelper.h b/lib/Target/RISCV/RISCVHelper.h
+index 3d783b61..92a8c9a9 100644
+--- a/lib/Target/RISCV/RISCVHelper.h
++++ b/lib/Target/RISCV/RISCVHelper.h
+@@ -275,9 +275,9 @@ template <typename T> T encodeCJ(T Result) {
+   return Result;
+ }
+ 
+-template <typename T> T encodeCI(T Result) {
+-  uint16_t Imm17 = extractBits(Result, 17, 17) << 12;
+-  uint16_t Imm16_12 = extractBits(Result, 16, 12) << 2;
++template <typename T> T encodeCI(T Result, uint32_t Shift) {
++  uint16_t Imm17 = extractBits(Result, 5 + Shift, 5 + Shift) << 12;
++  uint16_t Imm16_12 = extractBits(Result, 4 + Shift, Shift) << 2;
+   Result = Imm17 | Imm16_12;
+   return Result;
+ }
+diff --git a/lib/Target/RISCV/RISCVRelocationCompute.cpp b/lib/Target/RISCV/RISCVRelocationCompute.cpp
+index 0552d0ea..13a538fb 100644
+--- a/lib/Target/RISCV/RISCVRelocationCompute.cpp
++++ b/lib/Target/RISCV/RISCVRelocationCompute.cpp
+@@ -146,7 +146,7 @@ uint64_t doRelocHelper(const RelocationInfo &RelocInfo, uint64_t Instruction,
+     // `c.lui rd, 0` is illegal, convert to `c.li rd, 0`
+     if ((Instruction & 0xE003) == 0x6001 && Value >> 12 == 0)
+       Instruction ^= 0x2000;
+-    Value = encodeCI(Value);
++    Value = encodeCI(Value, RelocInfo.Shift);
+     break;
+   }
+   case EncTy_QC_EB:
+-- 
+2.43.0
+

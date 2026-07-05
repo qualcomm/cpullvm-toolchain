@@ -1,0 +1,1227 @@
+From b0a0b5ad2a68e161734b178ddb3fee16eb48ebc4 Mon Sep 17 00:00:00 2001
+From: Jonathon Penix <jpenix@qti.qualcomm.com>
+Date: Mon, 13 Apr 2026 16:18:08 -0700
+Subject: [PATCH 3/3] [RISCV] Implement GOT load relaxation
+
+The relaxation is defined in the RISC-V psABI at [1].
+
+Broadly, it allows relaxing a GOT-relative sequence to either a PC-relative
+sequence or absolute addi/c.li.
+
+There's a few limitations or items left for future work:
+- The psABI allows the linker to omit the GOT slot for a symbol if all
+  references to the symbol's GOT slot is removed. This is not implemented.
+- Similar to other relaxations in eld, relaxations for symbols of value
+  0 are generally avoided.
+- Weak undef symbols cannot be relaxed currently under `-static -pie` as they
+  are considered preemptible still. It's not clear to me if this intended
+  (and, we do have `-static -pie` users so it might be worth cleaning this
+  up if possible)--this is left to resolve elsewhere.
+
+[1] https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/ffde5a7f62a1bb12a4d775afa45342ac24138849/riscv-elf.adoc?plain=1#L1774
+
+Assisted-by: claude
+
+Signed-off-by: Jonathon Penix <jpenix@qti.qualcomm.com>
+---
+ include/eld/Config/GeneralOptions.h           |   5 +
+ include/eld/Driver/RISCVLinkerOptions.td      |   5 +
+ lib/LinkerWrapper/RISCVLinkDriver.cpp         |   4 +
+ lib/Target/RISCV/RISCVLDBackend.cpp           | 171 +++++++++++++++++-
+ lib/Target/RISCV/RISCVLDBackend.h             |  26 +++
+ lib/Target/RISCV/RISCVRelocationInfo.cpp      |  10 +
+ lib/Target/RISCV/RISCVRelocationInternal.h    |   1 +
+ lib/Target/RISCV/RISCVRelocator.cpp           |  11 ++
+ .../RunTests/HelloWorld/HelloWorld.test       |   2 +
+ .../GOT_LOAD_RELAX/GOT_LOAD_RELAX_RUN.test    |  31 ++++
+ .../GOT_LOAD_RELAX/Inputs/got_relax_run.c     |  19 ++
+ .../GOT_LOAD_RELAX/GOT_LOAD_RELAX_ABS.test    | 160 ++++++++++++++++
+ .../GOT_LOAD_RELAX/GOT_LOAD_RELAX_COMMON.test |  46 +++++
+ .../GOT_LOAD_RELAX/GOT_LOAD_RELAX_REL.test    |  76 ++++++++
+ .../GOT_LOAD_RELAX_REL_RV64.test              |  29 +++
+ .../GOT_LOAD_RELAX_WEAKUNDEF.test             |  57 ++++++
+ .../Relaxation/GOT_LOAD_RELAX/Inputs/abs.s    |  17 ++
+ .../GOT_LOAD_RELAX/Inputs/abs_syms.t          |  10 +
+ .../Relaxation/GOT_LOAD_RELAX/Inputs/addend.s |  13 ++
+ .../Relaxation/GOT_LOAD_RELAX/Inputs/common.s |  13 ++
+ .../GOT_LOAD_RELAX/Inputs/nonsequential.S     |  40 ++++
+ .../GOT_LOAD_RELAX/Inputs/partial_relax.s     |  53 ++++++
+ .../Relaxation/GOT_LOAD_RELAX/Inputs/rel.s    |  39 ++++
+ .../GOT_LOAD_RELAX/Inputs/rel_rv64.s          |  26 +++
+ .../GOT_LOAD_RELAX/Inputs/weakundef.s         |   9 +
+ .../fPICandNonFPICMix/fPICAndNonFPICMix.test  |   2 +-
+ 26 files changed, 873 insertions(+), 2 deletions(-)
+ create mode 100644 test/RISCV/RunTests/GOT_LOAD_RELAX/GOT_LOAD_RELAX_RUN.test
+ create mode 100644 test/RISCV/RunTests/GOT_LOAD_RELAX/Inputs/got_relax_run.c
+ create mode 100644 test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_ABS.test
+ create mode 100644 test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_COMMON.test
+ create mode 100644 test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_REL.test
+ create mode 100644 test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_REL_RV64.test
+ create mode 100644 test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_WEAKUNDEF.test
+ create mode 100644 test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/abs.s
+ create mode 100644 test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/abs_syms.t
+ create mode 100644 test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/addend.s
+ create mode 100644 test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/common.s
+ create mode 100644 test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/nonsequential.S
+ create mode 100644 test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/partial_relax.s
+ create mode 100644 test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/rel.s
+ create mode 100644 test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/rel_rv64.s
+ create mode 100644 test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/weakundef.s
+
+diff --git a/include/eld/Config/GeneralOptions.h b/include/eld/Config/GeneralOptions.h
+index a655614c..d736652b 100644
+--- a/include/eld/Config/GeneralOptions.h
++++ b/include/eld/Config/GeneralOptions.h
+@@ -938,6 +938,10 @@ public:
+ 
+   bool getRISCVRelaxTbljal() const { return BRiscvRelaxTbljal; }
+ 
++  void setRISCVRelaxGOT(bool Value) { BRiscvRelaxGOT = Value; }
++
++  bool getRISCVRelaxGOT() const { return BRiscvRelaxGOT; }
++
+   bool warnCommon() const { return BWarnCommon; }
+ 
+   void setWarnCommon() { BWarnCommon = true; }
+@@ -1302,6 +1306,7 @@ private:
+   bool BRiscvRelaxXqci = false; // enable riscv relaxations for xqci
+   bool BRiscvRelaxTLSDESC = true; // enable riscv relaxations for TLSDESC
+   bool BRiscvRelaxTbljal = false; // enable Zcmt table jump relaxation
++  bool BRiscvRelaxGOT = true;     // enable RISC-V GOT load relaxations
+   bool AllowIncompatibleSectionsMix = false; // Allow incompatibleSections;
+   bool ProgressBar = false;                  // Show progressbar.
+   bool RecordInputFiles = false;             // --reproduce
+diff --git a/include/eld/Driver/RISCVLinkerOptions.td b/include/eld/Driver/RISCVLinkerOptions.td
+index 91161dd7..c7deb5b7 100644
+--- a/include/eld/Driver/RISCVLinkerOptions.td
++++ b/include/eld/Driver/RISCVLinkerOptions.td
+@@ -55,6 +55,11 @@ def no_relax_tlsdesc
+       HelpText<"Disable relaxing TLSDESC instruction sequences">,
+       Group<grp_riscv_linker>;
+ 
++def no_relax_got
++    : Flag<["--"], "no-relax-got">,
++      HelpText<"Disable relaxing GOT load instruction sequences">,
++      Group<grp_riscv_linker>;
++
+ def riscv_relax : Flag<["--"], "relax">,
+                   HelpText<"Enable relaxation (default behavior)">,
+                   Group<grp_riscv_linker>;
+diff --git a/lib/LinkerWrapper/RISCVLinkDriver.cpp b/lib/LinkerWrapper/RISCVLinkDriver.cpp
+index 14f6720d..2c7d1e38 100644
+--- a/lib/LinkerWrapper/RISCVLinkDriver.cpp
++++ b/lib/LinkerWrapper/RISCVLinkDriver.cpp
+@@ -154,6 +154,10 @@ RISCVLinkDriver::parseOptions(ArrayRef<const char *> Args,
+   }
+   Config.options().setRISCVRelaxTbljal(EnableTbljal);
+ 
++  // --no-relax-got
++  if (ArgList.hasArg(OPT_RISCVLinkOptTable::no_relax_got))
++    Config.options().setRISCVRelaxGOT(false);
++
+   // --enable-bss-mixing
+   if (ArgList.hasArg(OPT_RISCVLinkOptTable::enable_bss_mixing))
+     Config.options().setAllowBSSMixing(true);
+diff --git a/lib/Target/RISCV/RISCVLDBackend.cpp b/lib/Target/RISCV/RISCVLDBackend.cpp
+index 3d490d4e..75d6bb71 100644
+--- a/lib/Target/RISCV/RISCVLDBackend.cpp
++++ b/lib/Target/RISCV/RISCVLDBackend.cpp
+@@ -25,6 +25,7 @@
+ #include "eld/Input/ELFObjectFile.h"
+ #include "eld/Object/ObjectBuilder.h"
+ #include "eld/Object/ObjectLinker.h"
++#include "eld/Readers/ELFSection.h"
+ #include "eld/Support/Memory.h"
+ #include "eld/Support/MemoryArea.h"
+ #include "eld/Support/MsgHandling.h"
+@@ -1406,6 +1407,142 @@ bool RISCVLDBackend::isGOTReloc(const Relocation &reloc) const {
+   return false;
+ }
+ 
++bool RISCVLDBackend::doRelaxationGOT(Relocation &Reloc) {
++  Fragment *frag = Reloc.targetRef()->frag();
++  RegionFragmentEx *region = llvm::dyn_cast<RegionFragmentEx>(frag);
++  if (!region)
++    return false;
++
++  const Relocation *BaseReloc = Reloc.type() == llvm::ELF::R_RISCV_GOT_HI20
++                                    ? &Reloc
++                                    : getBaseReloc(Reloc);
++  if (!BaseReloc)
++    return false;
++
++  // Until recently, the calculation for R_RISCV_GOT_HI20 was `G + GOT + A - P`
++  // where non-zero addends were allowed. The addend must now be zero and has
++  // been removed from calculation, but not all tools reflect this yet. It's
++  // unclear how this relaxation should work in the presence of a non-zero
++  // addend so avoid doing so to be safe.
++  if (BaseReloc->addend())
++    return false;
++
++  ResolveInfo *SymInfo = BaseReloc->symInfo();
++  // The psABI only includes "it’s bound at link time to be within the object"
++  // as a condition for the relative case. But, absolute symbols are seemingly
++  // also preemptible, so ignoring this check in the absolute case could mean a
++  // change in behavior if the relaxation is performed. Treat this as a general
++  // requirement for the relaxation.
++  if (isSymbolPreemptible(*SymInfo))
++    return false;
++
++  if (SymInfo->isIFunc())
++    return false;
++
++  Relocator::DWord S = getSymbolValuePLT(*BaseReloc);
++  uint64_t Offset = Reloc.targetRef()->offset();
++  StringRef SymName = SymInfo->name();
++  const char *RelaxName = "RISCV_GOT_LOAD";
++  bool GOTRelaxEnabled = config().options().getRISCVRelax() &&
++                         config().options().getRISCVRelaxGOT();
++  if (SymInfo->isAbsolute() || SymInfo->isWeakUndef()) {
++    // Comments elsewhere mention eld uses zero as an indicator of an unknown
++    // symbol value, so conservatively follow suit and skip this relaxation for
++    // symbols of value zero.
++    bool SymbolValueMayBeUnknown = S == 0 && !SymInfo->isWeakUndef();
++    bool CanRelaxToAddi =
++        GOTRelaxEnabled && !SymbolValueMayBeUnknown && llvm::isInt<12>(S);
++    if (Reloc.type() == llvm::ELF::R_RISCV_GOT_HI20) {
++      if (!CanRelaxToAddi) {
++        reportMissedRelaxation(RelaxName, *region, Offset, 4, SymName);
++        return false;
++      }
++
++      Reloc.setType(llvm::ELF::R_RISCV_NONE);
++      relaxDeleteBytes(RelaxName, *region, Offset, 4, SymName);
++      setRelocGOTLoadRelaxed(&Reloc);
++      return true;
++    }
++
++    assert(Reloc.type() == llvm::ELF::R_RISCV_PCREL_LO12_I &&
++           "Unexpected relocation type!");
++    uint64_t Instr = Reloc.target();
++    unsigned rd = (Instr >> 7) & 0x1Fu;
++    bool CanRelaxToCLi = GOTRelaxEnabled &&
++                         config().options().getRISCVRelaxToC() && rd != 0 &&
++                         !SymbolValueMayBeUnknown && llvm::isInt<6>(S);
++    if (CanRelaxToCLi) {
++      unsigned CLi = 0x4001u | rd << 7;
++      region->replaceInstruction(Offset, &Reloc,
++                                 reinterpret_cast<uint8_t *>(&CLi), 2);
++      Reloc.setTargetData(CLi);
++      Reloc.setType(ELF::riscv::internal::R_RISCV_RVC_LI);
++      Reloc.setSymInfo(SymInfo);
++      relaxDeleteBytes(RelaxName, *region, Offset + 2, 2, SymName);
++
++      if (m_Module.getPrinter()->isVerbose())
++        config().raise(Diag::relax_to_compress)
++            << "RISCV_LI_C" << llvm::utohexstr(Instr, true, 8)
++            << llvm::utohexstr(CLi, true, 4) << SymName
++            << region->getOwningSection()->name()
++            << llvm::utohexstr(Offset, true)
++            << region->getOwningSection()
++                   ->getInputFile()
++                   ->getInput()
++                   ->decoratedPath();
++
++      setRelocGOTLoadRelaxed(&Reloc);
++      return true;
++    }
++
++    if (CanRelaxToAddi) {
++      unsigned Addi = itype(ADDI, rd, X_ZERO, 0);
++      region->replaceInstruction(Offset, &Reloc,
++                                 reinterpret_cast<uint8_t *>(&Addi), 4);
++      Reloc.setTargetData(Addi);
++      Reloc.setType(llvm::ELF::R_RISCV_LO12_I);
++      // Report the two bytes missed if we had been able to use `c.li`.
++      reportMissedRelaxation(RelaxName, *region, Offset, 2, SymName);
++      setRelocGOTLoadRelaxed(&Reloc);
++      return true;
++    }
++
++    return false;
++  }
++
++  Relocator::Address P = BaseReloc->place(m_Module);
++  // Again avoid relaxing symbols with value zero in case they indicate a symbol
++  // with an unknown value. Make an exception for RV32 as a
++  // PCREL_HI20/PCREL_LO12_I pair can reach the entire address space.
++  bool SymKnownInRange = config().targets().is32Bits() ||
++                         (S != 0 && llvm::isInt<32>((S - P) + 0x800));
++  if (!GOTRelaxEnabled || !SymKnownInRange) {
++    // Still report a missed relaxation as we could have avoided a GOT access
++    // even if it doesn't save any bytes.
++    if (Reloc.type() == llvm::ELF::R_RISCV_PCREL_LO12_I)
++      reportMissedRelaxation(RelaxName, *region, Offset, 0, SymName);
++    return false;
++  }
++
++  if (Reloc.type() == llvm::ELF::R_RISCV_GOT_HI20) {
++    assert((Reloc.target() & 0x7Fu) == 0x17 &&
++           "Expected an auipc instruction!");
++    Reloc.setType(llvm::ELF::R_RISCV_PCREL_HI20);
++    setRelocGOTLoadRelaxed(&Reloc);
++    return true;
++  }
++
++  assert(Reloc.type() == llvm::ELF::R_RISCV_PCREL_LO12_I &&
++         "Unexpected relocation type!");
++  // Rewrite the I-type to an addi, preserving rs1 and rd only.
++  uint32_t Addi = (Reloc.target() & 0xF8F80u) | 0x13u;
++  region->replaceInstruction(Offset, &Reloc, reinterpret_cast<uint8_t *>(&Addi),
++                             4);
++  Reloc.setTargetData(Addi);
++  setRelocGOTLoadRelaxed(&Reloc);
++  return true;
++}
++
+ bool RISCVLDBackend::doRelaxationPC(Relocation *reloc, Relocator::DWord G) {
+ 
+   // There is no GP for shared objects.
+@@ -1521,6 +1658,7 @@ void RISCVLDBackend::translatePseudoRelocation(Relocation *reloc) {
+   Relocation *reloc_jalr = Relocation::Create(llvm::ELF::R_RISCV_PCREL_LO12_I,
+                                               32, fragRef, reloc->addend());
+   m_BaseRelocs[reloc_jalr] = reloc;
++  m_BaseRelocRefs[reloc].push_back(reloc_jalr);
+   reloc_jalr->setSymInfo(reloc->symInfo());
+   m_InternalRelocs.push_back(reloc_jalr);
+ }
+@@ -1635,10 +1773,27 @@ void RISCVLDBackend::mayBeRelax(int relaxation_pass, bool &pFinished) {
+         case RELAXATION_PC:
+           switch (type) {
+           case llvm::ELF::R_RISCV_PCREL_HI20:
+-          case llvm::ELF::R_RISCV_PCREL_LO12_I:
+           case llvm::ELF::R_RISCV_PCREL_LO12_S:
+             doRelaxationPC(relocation, GP);
+             break;
++          case llvm::ELF::R_RISCV_PCREL_LO12_I: {
++            const Relocation *HIReloc = getBaseReloc(*relocation);
++            if (!HIReloc)
++              break;
++
++            if (HIReloc->type() == llvm::ELF::R_RISCV_GOT_HI20 ||
++                relocWasGOTLoadRelaxed(HIReloc)) {
++              if (hasRelax(*HIReloc) && allGOTLOsRelaxable(*HIReloc, rs))
++                doRelaxationGOT(*relocation);
++            } else {
++              doRelaxationPC(relocation, GP);
++            }
++            break;
++          }
++          case llvm::ELF::R_RISCV_GOT_HI20:
++            if (allGOTLOsRelaxable(*relocation, rs))
++              doRelaxationGOT(*relocation);
++            break;
+           }
+           break;
+         case RELAXATION_LUI:
+@@ -2021,6 +2176,7 @@ bool RISCVLDBackend::handlePendingRelocations(ELFSection *section) {
+ 
+         R->setSymInfo(HiReloc->symInfo());
+         m_BaseRelocs[R] = HiReloc;
++        m_BaseRelocRefs[HiReloc].push_back(R);
+ 
+         if (IsPCRel && Offset < HiOffset) {
+           // Disable GP Relaxation for this pair to mimic GNU
+@@ -2540,6 +2696,19 @@ RISCVLDBackend::postProcessing(llvm::FileOutputBuffer &pOutput) {
+   return {};
+ }
+ 
++bool RISCVLDBackend::allGOTLOsRelaxable(const Relocation &HIReloc,
++                                        const ELFSection *S) const {
++  const llvm::SmallVectorImpl<const Relocation *> *LORelocs =
++      getBaseRelocRefs(HIReloc);
++  if (!LORelocs || LORelocs->empty())
++    return false;
++
++  return llvm::all_of(*LORelocs, [&](const Relocation *R) {
++    return ((R->type() == llvm::ELF::R_RISCV_PCREL_LO12_I && hasRelax(*R)) ||
++            relocWasGOTLoadRelaxed(R));
++  });
++}
++
+ namespace eld {
+ 
+ //===----------------------------------------------------------------------===//
+diff --git a/lib/Target/RISCV/RISCVLDBackend.h b/lib/Target/RISCV/RISCVLDBackend.h
+index 0eded3ba..a0828413 100644
+--- a/lib/Target/RISCV/RISCVLDBackend.h
++++ b/lib/Target/RISCV/RISCVLDBackend.h
+@@ -283,6 +283,7 @@ private:
+   bool doRelaxationAlign(Relocation *R);
+ 
+   bool doRelaxationPC(Relocation *R, Relocation::DWord G);
++  bool doRelaxationGOT(Relocation &R);
+ 
+   bool doRelaxationTLSDESC(Relocation &R, bool Relax);
+ 
+@@ -316,6 +317,24 @@ private:
+   /// postProcessing - Backend can do any needed modification in the final stage
+   eld::Expected<void> postProcessing(llvm::FileOutputBuffer &pOutput) override;
+ 
++  const llvm::SmallVectorImpl<const Relocation *> *
++  getBaseRelocRefs(const Relocation &R) const {
++    auto Refs = m_BaseRelocRefs.find(&R);
++    if (Refs == m_BaseRelocRefs.end())
++      return nullptr;
++    return &Refs->second;
++  }
++
++  void setRelocGOTLoadRelaxed(const Relocation *R) {
++    m_RelaxedGOTLoadRelocs.insert(R);
++  }
++
++  bool relocWasGOTLoadRelaxed(const Relocation *R) const {
++    return m_RelaxedGOTLoadRelocs.count(R);
++  }
++
++  bool allGOTLOsRelaxable(const Relocation &HIReloc, const ELFSection *S) const;
++
+ private:
+   ELFSection *createGOTSection(InputFile &InputFile);
+   ELFSection *createGOTPLTSection(InputFile &InputFile);
+@@ -370,6 +389,13 @@ private:
+   // A map from HI relocations to the relocations that should be used as a base
+   // address for the load instruction during TLSDESC to IE optimization.
+   std::unordered_map<const Relocation *, const Relocation *> m_HiToIELoadBase;
++
++  // A map to keep track of all relocations referencing a particular
++  // base relocation. This is effectively a reverse-mapping of `m_BaseRelocs`.
++  llvm::DenseMap<const Relocation *, llvm::SmallVector<const Relocation *, 1>>
++      m_BaseRelocRefs;
++
++  llvm::DenseSet<const Relocation *> m_RelaxedGOTLoadRelocs;
+ };
+ } // namespace eld
+ 
+diff --git a/lib/Target/RISCV/RISCVRelocationInfo.cpp b/lib/Target/RISCV/RISCVRelocationInfo.cpp
+index 2d10d144..9afd333d 100644
+--- a/lib/Target/RISCV/RISCVRelocationInfo.cpp
++++ b/lib/Target/RISCV/RISCVRelocationInfo.cpp
+@@ -657,6 +657,16 @@ RISCVRelocationMap RISCVRelocs = {
+       /*.VerifyAlignment = */ false,
+       /*.Signed = */ true,
+       /*.Size = */ 16}},
++    {eld::ELF::riscv::internal::R_RISCV_RVC_LI,
++     {/*.Name = */ "R_RISCV_RVC_LI",
++      /*.Type = */ eld::ELF::riscv::internal::R_RISCV_RVC_LI,
++      /*EncodingType = */ EncTy_CI,
++      /*.Alignment = */ 0,
++      /*.shift = */ 0,
++      /*.VerifyRange = */ true,
++      /*.VerifyAlignment = */ false,
++      /*.Signed = */ true,
++      /*.Size = */ 16}},
+     {eld::ELF::riscv::internal::R_RISCV_GPREL_I,
+      {/*.Name = */ "R_RISCV_GPREL_I",
+       /*.Type = */ eld::ELF::riscv::internal::R_RISCV_GPREL_I,
+diff --git a/lib/Target/RISCV/RISCVRelocationInternal.h b/lib/Target/RISCV/RISCVRelocationInternal.h
+index eff2fb37..b86619dd 100644
+--- a/lib/Target/RISCV/RISCVRelocationInternal.h
++++ b/lib/Target/RISCV/RISCVRelocationInternal.h
+@@ -49,6 +49,7 @@ enum : uint32_t {
+   LastRelaxationRelocation = 319,
+ 
+   R_RISCV_RVC_LUI = FirstRelaxationRelocation,
++  R_RISCV_RVC_LI,
+   R_RISCV_GPREL_I,
+   R_RISCV_GPREL_S,
+   R_RISCV_TPREL_I,
+diff --git a/lib/Target/RISCV/RISCVRelocator.cpp b/lib/Target/RISCV/RISCVRelocator.cpp
+index 0732a5f0..ad82bdb6 100644
+--- a/lib/Target/RISCV/RISCVRelocator.cpp
++++ b/lib/Target/RISCV/RISCVRelocator.cpp
+@@ -54,6 +54,7 @@ DECL_RISCV_APPLY_RELOC_FUNC(applyJumpOrCall)
+ DECL_RISCV_APPLY_RELOC_FUNC(applyAlign)
+ DECL_RISCV_APPLY_RELOC_FUNC(applyGPRel)
+ DECL_RISCV_APPLY_RELOC_FUNC(applyCompressedLUI)
++DECL_RISCV_APPLY_RELOC_FUNC(applyCompressedLI)
+ DECL_RISCV_APPLY_RELOC_FUNC(applyTprelAdd)
+ DECL_RISCV_APPLY_RELOC_FUNC(applyGOT)
+ DECL_RISCV_APPLY_RELOC_FUNC(applyXqciloAbs)
+@@ -205,6 +206,7 @@ RelocationDescMap RelocDescs = {
+ 
+     /* Internal Relocations for Relaxation */
+     INTERNAL_RELOC_DESC_ENTRY(R_RISCV_RVC_LUI, applyCompressedLUI),
++    INTERNAL_RELOC_DESC_ENTRY(R_RISCV_RVC_LI, applyCompressedLI),
+     INTERNAL_RELOC_DESC_ENTRY(R_RISCV_GPREL_I, applyGPRel),
+     INTERNAL_RELOC_DESC_ENTRY(R_RISCV_GPREL_S, applyGPRel),
+     INTERNAL_RELOC_DESC_ENTRY(R_RISCV_TPREL_I, unsupported),
+@@ -1165,6 +1167,15 @@ RISCVRelocator::Result applyCompressedLUI(Relocation &pReloc,
+                     Parent);
+ }
+ 
++RISCVRelocator::Result applyCompressedLI(Relocation &pReloc,
++                                         RISCVLDBackend &Backend,
++                                         RISCVRelocator &Parent,
++                                         RelocationDescription &pRelocDesc) {
++  int64_t S = Backend.getSymbolValuePLT(pReloc);
++  int64_t A = pReloc.addend();
++  return ApplyReloc(pReloc, S + A, pRelocDesc, Backend.config(), Parent);
++}
++
+ Relocator::Result unsupported(Relocation &pReloc, RISCVLDBackend &,
+                               RISCVRelocator &,
+                               RelocationDescription &pRelocDesc) {
+diff --git a/test/Common/RunTests/HelloWorld/HelloWorld.test b/test/Common/RunTests/HelloWorld/HelloWorld.test
+index 73cd43ba..391d7c3c 100644
+--- a/test/Common/RunTests/HelloWorld/HelloWorld.test
++++ b/test/Common/RunTests/HelloWorld/HelloWorld.test
+@@ -9,6 +9,8 @@ UNSUPPORTED: x86
+ #END_COMMENT
+ #START_TEST
+ RUN: %run_cc -o %t1.o %p/Inputs/HelloWorld.c -c -fno-pic
++RUN: %run_cc -o %t.norelax.out %t1.o -static -Wl,--no-relax-got
++RUN: %run %t.norelax.out | %filecheck %s
+ RUN: %run_cc -o %t.out %t1.o -static
+ RUN: %run %t.out | %filecheck %s
+ RUN: %run_cc -o %t1.pic.o %p/Inputs/HelloWorld.c -c -fPIC
+diff --git a/test/RISCV/RunTests/GOT_LOAD_RELAX/GOT_LOAD_RELAX_RUN.test b/test/RISCV/RunTests/GOT_LOAD_RELAX/GOT_LOAD_RELAX_RUN.test
+new file mode 100644
+index 00000000..af48f347
+--- /dev/null
++++ b/test/RISCV/RunTests/GOT_LOAD_RELAX/GOT_LOAD_RELAX_RUN.test
+@@ -0,0 +1,31 @@
++REQUIRES: run_test
++# XFAIL'ed for rv64 until https://github.com/qualcomm/eld/issues/1342 is resolved.
++# The accesses to __rela_iplt_start/__rela_iplt_end aren't relaxed in rv64 as
++# they are 0 at the time of relaxation so use the GOT and hit 1342. rv32 can
++# always assume relative accesses will be in range, so sidestep this issue.
++XFAIL: riscv64
++#----------GOT_LOAD_RELAX_RUN.test----------------- Executable------------------#
++#BEGIN_COMMENT
++# Run tests for RISC-V GOT load relaxation. Verifies that the correct runtime
++# behavior is produced for simple static executables.
++#END_COMMENT
++#START_TEST
++
++RUN: %run_cc -fPIC -c %p/Inputs/got_relax_run.c -o %t.o
++
++RUN: %run_cc -static -Wl,--defsym,sym_cli=31 -Wl,--defsym,sym_addi=100 \
++RUN:   %t.o -o %t.out
++RUN: %run %t.out | %filecheck %s
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.out | %filecheck %s --check-prefix=DUMP
++
++CHECK: relative: 12345
++CHECK: cli: 0x1f
++CHECK: addi: 0x64
++
++DUMP-LABEL: <get_relative>:
++DUMP: auipc a0,
++DUMP-NEXT: addi a0, a0,
++DUMP-LABEL: <get_cli>:
++DUMP: c.li a0, 31
++DUMP-LABEL: <get_addi>:
++DUMP: addi a0, zero, 100
+diff --git a/test/RISCV/RunTests/GOT_LOAD_RELAX/Inputs/got_relax_run.c b/test/RISCV/RunTests/GOT_LOAD_RELAX/Inputs/got_relax_run.c
+new file mode 100644
+index 00000000..e60d97b3
+--- /dev/null
++++ b/test/RISCV/RunTests/GOT_LOAD_RELAX/Inputs/got_relax_run.c
+@@ -0,0 +1,19 @@
++#include <stdio.h>
++
++int relative_var = 12345;
++
++extern int sym_cli;
++extern int sym_addi;
++
++__attribute__((noinline)) static int *get_relative(void) {
++  return &relative_var;
++}
++__attribute__((noinline)) static void *get_cli(void) { return &sym_cli; }
++__attribute__((noinline)) static void *get_addi(void) { return &sym_addi; }
++
++int main() {
++  printf("relative: %d\n", *get_relative());
++  printf("cli: %p\n", get_cli());
++  printf("addi: %p\n", get_addi());
++  return 0;
++}
+diff --git a/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_ABS.test b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_ABS.test
+new file mode 100644
+index 00000000..0acb77d7
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_ABS.test
+@@ -0,0 +1,160 @@
++REQUIRES: riscv32 || riscv64
++#----------GOT_LOAD_RELAX_ABS.test----------------- Executable------------------#
++#BEGIN_COMMENT
++# This tests checks GOT load relaxation behavior specific to handling absolute
++# symbols.
++#END_COMMENT
++#START_TEST
++
++RUN: %clang %clangopts -c %p/Inputs/abs.s -o %t.o
++
++## Static executable
++RUN: %link %linkopts -static -T %p/Inputs/abs_syms.t --verbose -MapStyle txt -Map %t.static.map \
++RUN: %t.o -o %t.static.out 2>&1 | %filecheck %s --check-prefixes=VERBOSE-COMMON,VERBOSE-C
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.static.out | %filecheck %s --check-prefixes=DUMP-COMMON,DUMP-C
++RUN: %filecheck %s --input-file=%t.static.map --check-prefix=MAP-C
++
++## Static, pie executable
++RUN: %link %linkopts -T %p/Inputs/abs_syms.t -static -pie --verbose -MapStyle txt -Map %t.static-pie.map \
++RUN: %t.o -o %t.static-pie.out 2>&1 | %filecheck %s --check-prefixes=VERBOSE-COMMON,VERBOSE-C
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.static-pie.out | %filecheck %s --check-prefixes=DUMP-COMMON,DUMP-C
++RUN: %filecheck %s --input-file=%t.static-pie.map --check-prefix=MAP-C
++
++## Static executable with --no-relax-c
++RUN: %link %linkopts -T %p/Inputs/abs_syms.t -static --no-relax-c --verbose -MapStyle txt -Map %t.norelaxc.map \
++RUN: %t.o -o %t.norelaxc.out 2>&1 | %filecheck %s --check-prefixes=VERBOSE-COMMON,VERBOSE-NO-C
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.norelaxc.out | %filecheck %s --check-prefixes=DUMP-COMMON,DUMP-NO-C
++RUN: %filecheck %s --input-file=%t.norelaxc.map --check-prefix=MAP-NO-C
++
++## Shared. The psABI only includes "it’s bound at link time to be within the
++## object" as a condition for the relative case, but it is enforced in eld for
++## the absolute case as well. Check that no relaxation is performed for
++## preemptible absolute symbols.
++RUN: %link %linkopts -shared -T %p/Inputs/abs_syms.t \
++RUN: --verbose -MapStyle txt -Map %t.shared.map %t.o -o %t.so 2>&1 | %filecheck %s --check-prefix=SHARED-VERBOSE
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.so | %filecheck %s --check-prefix=SHARED-DUMP
++RUN: %filecheck %s --input-file=%t.shared.map --check-prefix=MAP-SHARED
++
++RUN: %clang %clangopts -c %p/Inputs/nonsequential.S -o %t.nonseq.o
++
++## Check nonsequential relaxations look as expected when relaxing to c.li
++RUN: %link %linkopts -static --defsym var=10 --defsym var2=5 --verbose -MapStyle txt -Map %t.nonseq-cli.map \
++RUN: %t.nonseq.o -o %t.nonseq-cli.out 2>&1 | %filecheck %s --check-prefix=VERBOSE-NONSEQ-CLI
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.nonseq-cli.out | %filecheck %s --check-prefixes=DUMP-NONSEQ-COMMON,DUMP-NONSEQ-CLI
++RUN: %filecheck %s --input-file=%t.nonseq-cli.map --check-prefix=MAP-NONSEQ-CLI
++
++## Check nonsequential relaxations look as expected when relaxing to addi
++RUN: %link %linkopts -static --defsym var=10 --defsym var2=5 --no-relax-c --verbose -MapStyle txt -Map %t.nonseq-addi.map \
++RUN: %t.nonseq.o -o %t.nonseq-addi.out 2>&1 | %filecheck %s --check-prefix=VERBOSE-NONSEQ-ADDI
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.nonseq-addi.out | %filecheck %s --check-prefix=DUMP-NONSEQ-COMMON,DUMP-NONSEQ-ADDI
++RUN: %filecheck %s --input-file=%t.nonseq-addi.map --check-prefix=MAP-NONSEQ-ADDI
++
++VERBOSE-COMMON: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'sym_cli_pos'
++VERBOSE-C-NEXT: RISCV_GOT_LOAD : Deleting 2 bytes for symbol 'sym_cli_pos'
++VERBOSE-C-NEXT: RISCV_LI_C : relaxing instruction {{.*}} to compressed instruction {{.*}} for symbol sym_cli_pos
++VERBOSE-NO-C-NEXT: RISCV_GOT_LOAD : Cannot relax 2 bytes for symbol 'sym_cli_pos'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'sym_cli_neg'
++VERBOSE-C-NEXT: RISCV_GOT_LOAD : Deleting 2 bytes for symbol 'sym_cli_neg'
++VERBOSE-C-NEXT: RISCV_LI_C : relaxing instruction {{.*}} to compressed instruction {{.*}} for symbol sym_cli_neg
++VERBOSE-NO-C-NEXT: RISCV_GOT_LOAD : Cannot relax 2 bytes for symbol 'sym_cli_neg'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'sym_cli_pos_oob'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Cannot relax 2 bytes for symbol 'sym_cli_pos_oob'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'sym_cli_neg_oob'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Cannot relax 2 bytes for symbol 'sym_cli_neg_oob'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'sym_addi_pos'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Cannot relax 2 bytes for symbol 'sym_addi_pos'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'sym_addi_neg'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Cannot relax 2 bytes for symbol 'sym_addi_neg'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Cannot relax 4 bytes for symbol 'sym_addi_pos_oob'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Cannot relax 4 bytes for symbol 'sym_addi_neg_oob'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Cannot relax 4 bytes for symbol 'sym_zero'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'sym_cli_pos'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Cannot relax 2 bytes for symbol 'sym_cli_pos'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'sym_hidden'
++VERBOSE-COMMON-NEXT: RISCV_GOT_LOAD : Cannot relax 2 bytes for symbol 'sym_hidden'
++
++DUMP-C: c.li a0, 31
++DUMP-NO-C: addi a0, zero, 31
++DUMP-C: c.li a1, -32
++DUMP-NO-C: addi a1, zero, -32
++DUMP-COMMON: addi a2, zero, 32
++DUMP-COMMON: addi a3, zero, -33
++DUMP-COMMON: addi a0, zero, 2047
++DUMP-COMMON: addi a1, zero, -2048
++DUMP-COMMON: auipc a2, 0
++DUMP-COMMON-NEXT: {{l[wd]}} a2, {{-?[0-9]+}}(a2)
++DUMP-COMMON: auipc a3, 0
++DUMP-COMMON-NEXT: {{l[wd]}} a3, {{-?[0-9]+}}(a3)
++DUMP-COMMON: auipc a0, 0
++DUMP-COMMON-NEXT: {{l[wd]}} a0, {{-?[0-9]+}}(a0)
++DUMP-COMMON: addi zero, zero, 31
++DUMP-COMMON: addi a1, zero, 42
++
++MAP-C: # RelaxationBytesDeleted : 36
++MAP-C: # RelaxationBytesMissed : 24
++
++MAP-NO-C: # RelaxationBytesDeleted : 32
++MAP-NO-C: # RelaxationBytesMissed : 28
++
++SHARED-VERBOSE: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'sym_hidden'
++SHARED-VERBOSE-NEXT: RISCV_GOT_LOAD : Cannot relax 2 bytes for symbol 'sym_hidden'
++
++SHARED-DUMP: auipc a0, 0
++SHARED-DUMP-NEXT: {{l[wd]}} a0, {{-?[0-9]+}}(a0)
++SHARED-DUMP-NEXT: auipc a1, 0
++SHARED-DUMP-NEXT: {{l[wd]}} a1, {{-?[0-9]+}}(a1)
++SHARED-DUMP-NEXT: auipc a2, 0
++SHARED-DUMP-NEXT: {{l[wd]}} a2, {{-?[0-9]+}}(a2)
++SHARED-DUMP-NEXT: auipc a3, 0
++SHARED-DUMP-NEXT: {{l[wd]}} a3, {{-?[0-9]+}}(a3)
++SHARED-DUMP-NEXT: auipc a0, 0
++SHARED-DUMP-NEXT: {{l[wd]}} a0, {{-?[0-9]+}}(a0)
++SHARED-DUMP-NEXT: auipc a1, 0
++SHARED-DUMP-NEXT: {{l[wd]}} a1, {{-?[0-9]+}}(a1)
++SHARED-DUMP-NEXT: auipc a2, 0
++SHARED-DUMP-NEXT: {{l[wd]}} a2, {{-?[0-9]+}}(a2)
++SHARED-DUMP-NEXT: auipc a3, 0
++SHARED-DUMP-NEXT: {{l[wd]}} a3, {{-?[0-9]+}}(a3)
++SHARED-DUMP-NEXT: auipc a0, 0
++SHARED-DUMP-NEXT: {{l[wd]}} a0, {{-?[0-9]+}}(a0)
++SHARED-DUMP-NEXT: auipc zero, 0
++SHARED-DUMP-NEXT: {{l[wd]}} zero, {{-?[0-9]+}}(zero)
++SHARED-DUMP-NEXT: addi a1, zero, 42
++
++MAP-SHARED: # RelaxationBytesDeleted : 4
++MAP-SHARED: # RelaxationBytesMissed : 2
++
++VERBOSE-NONSEQ-CLI: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'var'
++VERBOSE-NONSEQ-CLI-NEXT: RISCV_GOT_LOAD : Deleting 2 bytes for symbol 'var'
++VERBOSE-NONSEQ-CLI-NEXT: RISCV_LI_C : relaxing instruction {{.*}} to compressed instruction {{.*}} for symbol var
++VERBOSE-NONSEQ-CLI-NEXT: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'var2'
++VERBOSE-NONSEQ-CLI-NEXT: RISCV_GOT_LOAD : Deleting 2 bytes for symbol 'var2'
++VERBOSE-NONSEQ-CLI-NEXT: RISCV_LI_C : relaxing instruction {{.*}} to compressed instruction {{.*}} for symbol var2
++VERBOSE-NONSEQ-CLI-NEXT: RISCV_GOT_LOAD : Deleting 2 bytes for symbol 'var'
++VERBOSE-NONSEQ-CLI-NEXT: RISCV_LI_C : relaxing instruction {{.*}} to compressed instruction {{.*}} for symbol var
++
++VERBOSE-NONSEQ-ADDI: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'var'
++VERBOSE-NONSEQ-ADDI-NEXT: RISCV_GOT_LOAD : Cannot relax 2 bytes for symbol 'var'
++VERBOSE-NONSEQ-ADDI-NEXT: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'var2'
++VERBOSE-NONSEQ-ADDI-NEXT: RISCV_GOT_LOAD : Cannot relax 2 bytes for symbol 'var2'
++VERBOSE-NONSEQ-ADDI-NEXT: RISCV_GOT_LOAD : Cannot relax 2 bytes for symbol 'var'
++
++DUMP-NONSEQ-COMMON-LABEL: <foo>:
++DUMP-NONSEQ-COMMON: c.nop
++DUMP-NONSEQ-COMMON: c.nop
++DUMP-NONSEQ-CLI: c.li a3, 10
++DUMP-NONSEQ-CLI: c.li a1, 5
++DUMP-NONSEQ-CLI: c.li a2, 10
++DUMP-NONSEQ-ADDI: addi a3, zero, 10
++DUMP-NONSEQ-ADDI: addi a1, zero, 5
++DUMP-NONSEQ-ADDI: addi a2, zero, 10
++
++DUMP-NONSEQ-COMMON-LABEL: <bar>:
++DUMP-NONSEQ-CLI: c.li a0, 5
++DUMP-NONSEQ-ADDI: addi a0, zero, 5
++DUMP-NONSEQ-COMMON-NOT: auipc a0
++
++MAP-NONSEQ-CLI: # RelaxationBytesDeleted : 20
++
++MAP-NONSEQ-ADDI: # RelaxationBytesDeleted : 12
++MAP-NONSEQ-ADDI: # RelaxationBytesMissed : 8
+diff --git a/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_COMMON.test b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_COMMON.test
+new file mode 100644
+index 00000000..6f64253d
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_COMMON.test
+@@ -0,0 +1,46 @@
++REQUIRES: riscv32 || riscv64
++#----------GOT_LOAD_RELAX_COMMON.test----------------- Executable------------------#
++#BEGIN_COMMENT
++# This tests checks GOT load relaxation behavior common to both relative and
++# absolute symbols around when the relaxation should not occur.
++#END_COMMENT
++#START_TEST
++
++## Check --no-relax and --no-relax-got are respected.
++RUN: %clang %clangopts -c %p/Inputs/common.s -o %t.common.o
++RUN: %link %linkopts --defsym abs_var=5 --no-relax %t.common.o -o %t.out
++RUN: %link %linkopts --defsym abs_var=5 --no-relax-got %t.common.o -o %t2.out
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.out | %filecheck %s --check-prefix=NO-RELAX
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t2.out | %filecheck %s --check-prefix=NO-RELAX
++
++## Check relaxation isn't performed if there's a non-zero addend on the got_hi.
++RUN: %clang %clangopts -c %p/Inputs/addend.s -o %t.addend.o
++RUN: %link %linkopts --defsym abs_var=5 %t.addend.o -o %t.addend.out
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.addend.out | %filecheck %s --check-prefix=NO-RELAX
++
++## Check relaxation isn't performed if not all HI/LOs have R_RISCV_RELAX or
++## if a LO is missing.
++RUN: %clang %clangopts -c %p/Inputs/partial_relax.s -o %t.partial.o
++RUN: %link %linkopts --defsym abs_var=5 %t.partial.o -o %t.partial.out
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.partial.out | %filecheck %s --check-prefix=PARTIAL-NO-RELAX
++
++NO-RELAX: auipc a1, 1
++NO-RELAX-NEXT: {{l[wd]}} a1, {{-?[0-9]+}}(a1)
++NO-RELAX: auipc a2, 1
++NO-RELAX-NEXT: {{l[wd]}} a2, {{-?[0-9]+}}(a2)
++
++PARTIAL-NO-RELAX: auipc a1, 1
++PARTIAL-NO-RELAX-NEXT: {{l[wd]}} a1, {{-?[0-9]+}}(a1)
++PARTIAL-NO-RELAX: auipc a2, 1
++PARTIAL-NO-RELAX-NEXT: {{l[wd]}} a2, {{-?[0-9]+}}(a2)
++PARTIAL-NO-RELAX: auipc a1, 1
++PARTIAL-NO-RELAX-NEXT: {{l[wd]}} a1, {{-?[0-9]+}}(a1)
++PARTIAL-NO-RELAX: auipc a2, 1
++PARTIAL-NO-RELAX-NEXT: {{l[wd]}} a2, {{-?[0-9]+}}(a2)
++PARTIAL-NO-RELAX: auipc a1, 1
++PARTIAL-NO-RELAX-NEXT: {{l[wd]}} a2, {{-?[0-9]+}}(a1)
++PARTIAL-NO-RELAX-NEXT: {{l[wd]}} a3, {{-?[0-9]+}}(a1)
++PARTIAL-NO-RELAX: auipc a1, 1
++PARTIAL-NO-RELAX-NEXT: {{l[wd]}} a2, {{-?[0-9]+}}(a1)
++PARTIAL-NO-RELAX-NEXT: {{l[wd]}} a3, {{-?[0-9]+}}(a1)
++PARTIAL-NO-RELAX: auipc a1, 1
+diff --git a/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_REL.test b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_REL.test
+new file mode 100644
+index 00000000..8043686b
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_REL.test
+@@ -0,0 +1,76 @@
++REQUIRES: riscv32 || riscv64
++#----------GOT_LOAD_RELAX_REL.test----------------- Executable------------------#
++#BEGIN_COMMENT
++# This tests checks GOT load relaxation behavior specific to handling relative
++# symbols.
++#END_COMMENT
++#START_TEST
++
++RUN: %clang %clangopts -c %p/Inputs/rel.s -o %t.o
++
++## Static executable
++RUN: %link %linkopts -static %t.o -o %t.static.out \
++RUN: --section-start zero=0x0 --section-start .text=0x10000 --section-start .data=0x20000 \
++RUN: --section-start .got=0x30000 --section-start .plt=0x40000
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.static.out | %filecheck %s --check-prefixes=DUMP-STATIC,DUMP-STATIC%xlen
++
++## Static, pie executable
++RUN: %link %linkopts -static -pie %t.o -o %t.static-pie.out \
++RUN: --section-start zero=0x0 --section-start .text=0x10000 --section-start .data=0x20000 \
++RUN: --section-start .got=0x30000 --section-start .plt=0x40000
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.static-pie.out | %filecheck %s --check-prefixes=DUMP-STATIC,DUMP-STATIC%xlen
++
++## Shared
++RUN: %link %linkopts -shared %t.o -o %t.so \
++RUN: --section-start zero=0x0 --section-start .text=0x10000 --section-start .data=0x20000 \
++RUN: --section-start .got=0x30000 --section-start .plt=0x40000
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.so | %filecheck %s --check-prefix=DUMP-SHARED
++
++## Check nonsequential relaxations look as expected.
++RUN: %clang %clangopts -DUSE_REL=1 -c %p/Inputs/nonsequential.S -o %t.nonseq.o
++RUN: %link %linkopts -static %t.nonseq.o -o %t.nonseq.out \
++RUN: --section-start .text=0x10000 --section-start .data=0x20000 --section-start .got=0x30000
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.nonseq.out | %filecheck %s --check-prefixes=DUMP-NONSEQ
++
++DUMP-STATIC-LABEL: <foo>:
++DUMP-STATIC: auipc a0, 16
++DUMP-STATIC-NEXT: addi a0, a0, -6
++DUMP-STATIC: auipc a1, 16
++DUMP-STATIC-NEXT: addi a1, a1, -10
++DUMP-STATIC: auipc a2, 32
++DUMP-STATIC-NEXT: {{l[wd]}} a2, {{-?[0-9]+}}(a2)
++DUMP-STATIC4: auipc a3, 1048560
++DUMP-STATIC4-NEXT: addi a3, a3, -30
++DUMP-STATIC8: auipc a3, 32
++DUMP-STATIC8-NEXT: {{l[wd]}} a3, 2(a3)
++DUMP-STATIC: auipc a4, 0
++DUMP-STATIC-NEXT: addi a4, a4, -36
++DUMP-STATIC: auipc a5, 0
++DUMP-STATIC-NEXT: addi a5, a5, -42
++
++DUMP-SHARED-LABEL: <foo>:
++DUMP-SHARED: auipc a0, 32
++DUMP-SHARED-NEXT: {{l[wd]}} a0, {{-?[0-9]+}}(a0)
++DUMP-SHARED-NEXT: auipc a1, 16
++DUMP-SHARED-NEXT: addi a1, a1, -10
++DUMP-SHARED-NEXT: auipc a2, 32
++DUMP-SHARED-NEXT: {{l[wd]}} a2, {{-?[0-9]+}}(a2)
++DUMP-SHARED-NEXT: auipc a3, 32
++DUMP-SHARED-NEXT: {{l[wd]}} a3, {{-?[0-9]+}}(a3)
++DUMP-SHARED-NEXT: auipc a4, 0
++DUMP-SHARED-NEXT: addi a4, a4, -36
++DUMP-SHARED-NEXT: auipc a5, 32
++DUMP-SHARED-NEXT: {{l[wd]}} a5, {{-?[0-9]+}}(a5)
++
++DUMP-NONSEQ-LABEL: <foo>:
++DUMP-NONSEQ: auipc a0, 16
++DUMP-NONSEQ: c.nop
++DUMP-NONSEQ: c.nop
++DUMP-NONSEQ: addi a3, a0, 0
++DUMP-NONSEQ: auipc a1, 16
++DUMP-NONSEQ: addi a1, a1, -8
++DUMP-NONSEQ: addi a2, a0, 0
++
++DUMP-NONSEQ-LABEL: <bar>:
++DUMP-NONSEQ: addi a0, a0, -28
++DUMP-NONSEQ: auipc a0, 16
+diff --git a/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_REL_RV64.test b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_REL_RV64.test
+new file mode 100644
+index 00000000..7d305f33
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_REL_RV64.test
+@@ -0,0 +1,29 @@
++REQUIRES: riscv64
++#----------GOT_LOAD_RELAX_REL_RV64.test----------------- Executable------------------#
++#BEGIN_COMMENT
++# This tests checks GOT load relaxation behavior specific to handling relative symbols
++# for rv64 targets.
++#END_COMMENT
++#START_TEST
++
++## Check the bounds for the relative relaxation for rv64 are working as expected.
++RUN: %clang %clangopts -c %p/Inputs/rel_rv64.s -o %t.rel_rv64.o
++RUN: %link %linkopts -static --verbose %t.rel_rv64.o -o %t.rel_rv64.out 2>&1 \
++RUN: --section-start .text=0x80002000 \
++RUN: --section-start .sym_wp=0x100001000 --section-start .sym_op=0x100002000 \
++RUN: --section-start .sym_wn=0x2000 --section-start .sym_on=0x1000 \
++RUN: --section-start .got=0x80006000 | %filecheck %s --check-prefix=VERBOSE
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.rel_rv64.out | %filecheck %s --check-prefix=DUMP
++
++VERBOSE: RISCV_GOT_LOAD : Cannot relax 0 bytes for symbol 'sym_op'
++VERBOSE-NEXT: RISCV_GOT_LOAD : Cannot relax 0 bytes for symbol 'sym_on'
++
++DUMP-LABEL: <foo>:
++DUMP: auipc a0, 524287
++DUMP-NEXT: addi a0, a0, 0
++DUMP: auipc a1, 4
++DUMP-NEXT: ld a1, 8(a1)
++DUMP: auipc a2, 524288
++DUMP-NEXT: addi a2, a2, -16
++DUMP: auipc a3, 4
++DUMP-NEXT: ld a3, 8(a3)
+diff --git a/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_WEAKUNDEF.test b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_WEAKUNDEF.test
+new file mode 100644
+index 00000000..022c9fe4
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/GOT_LOAD_RELAX_WEAKUNDEF.test
+@@ -0,0 +1,57 @@
++REQUIRES: riscv32 || riscv64
++#----------GOT_LOAD_RELAX_WEAKUNDEF.test----------------- Executable------------------#
++#BEGIN_COMMENT
++# This tests checks GOT load relaxation behavior specific to handling weakundef
++# symbols.
++#END_COMMENT
++#START_TEST
++
++RUN: %clang %clangopts -c %p/Inputs/weakundef.s -o %t.o
++
++## Static executable
++RUN: %link %linkopts -static --verbose -MapStyle txt -Map %t.static.map \
++RUN: %t.o -o %t.static.out 2>&1 | %filecheck %s --check-prefix=VERBOSE-C
++RUN: %objdump --no-print-imm-hex -M no-aliases -dr %t.static.out | %filecheck %s --check-prefix=DUMP-C
++RUN: %filecheck %s --input-file=%t.static.map --check-prefix=MAP-C
++
++## Static executable with --no-relax-c
++RUN: %link %linkopts -static --no-relax-c --verbose -MapStyle txt -Map %t.norelaxc.map \
++RUN: %t.o -o %t.norelaxc.out 2>&1 | %filecheck %s --check-prefix=VERBOSE-NO-C
++RUN: %objdump --no-print-imm-hex -M no-aliases -dr %t.norelaxc.out | %filecheck %s --check-prefix=DUMP-NO-C
++RUN: %filecheck %s --input-file=%t.norelaxc.map --check-prefix=MAP-NO-C
++
++## Static pie executable, currently eld treats weak undef symbols as preemptible
++## under static pie, so no relaxation can happen here.
++RUN: %link %linkopts -static -pie --verbose -MapStyle txt -Map %t.static-pie.map %t.o -o %t.static-pie.out 2>&1 | %filecheck %s --check-prefix=NO-RELAX-VERBOSE
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.static-pie.out | %filecheck %s --check-prefix=NO-RELAX-DUMP
++RUN: %filecheck %s --input-file=%t.static-pie.map --check-prefix=MAP-NO-RELAX
++
++## Shared, the symbol is preemptible so no relaxation should happen.
++RUN: %link %linkopts -shared --verbose -MapStyle txt -Map %t.shared.map %t.o -o %t.so 2>&1 | %filecheck %s --check-prefix=NO-RELAX-VERBOSE
++RUN: %objdump --no-print-imm-hex -M no-aliases -d %t.so | %filecheck %s --check-prefix=NO-RELAX-DUMP
++RUN: %filecheck %s --input-file=%t.shared.map --check-prefix=MAP-NO-RELAX
++
++VERBOSE-C: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'sym_weakundef'
++VERBOSE-C-NEXT: RISCV_GOT_LOAD : Deleting 2 bytes for symbol 'sym_weakundef'
++VERBOSE-C-NEXT: RISCV_LI_C : relaxing instruction {{.*}} to compressed instruction {{.*}} for symbol sym_weakundef
++DUMP-C: c.li a0, 0
++
++MAP-C: # RelaxationBytesDeleted : 6
++MAP-C-NOT: # RelaxationBytesMissed
++
++VERBOSE-NO-C: RISCV_GOT_LOAD : Deleting 4 bytes for symbol 'sym_weakundef'
++VERBOSE-NO-C-NEXT: RISCV_GOT_LOAD : Cannot relax 2 bytes for symbol 'sym_weakundef'
++
++DUMP-NO-C: addi a0, zero, 0
++
++MAP-NO-C: # RelaxationBytesDeleted : 4
++MAP-NO-C: # RelaxationBytesMissed : 2
++
++NO-RELAX-VERBOSE-NOT: RISCV_GOT_LOAD
++NO-RELAX-VERBOSE-NOT: RISCV_LI_C
++
++NO-RELAX-DUMP: auipc a0, 1
++NO-RELAX-DUMP-NEXT: {{l[wd]}} a0, {{-?[0-9]+}}(a0)
++
++MAP-NO-RELAX-NOT: # RelaxationBytesDeleted
++MAP-NO-RELAX-NOT: # RelaxationBytesMissed
+diff --git a/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/abs.s b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/abs.s
+new file mode 100644
+index 00000000..a576552f
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/abs.s
+@@ -0,0 +1,17 @@
++.option relax
++.option pic
++
++.text
++.global foo
++foo:
++    lga a0, sym_cli_pos
++    lga a1, sym_cli_neg
++    lga a2, sym_cli_pos_oob
++    lga a3, sym_cli_neg_oob
++    lga a0, sym_addi_pos
++    lga a1, sym_addi_neg
++    lga a2, sym_addi_pos_oob
++    lga a3, sym_addi_neg_oob
++    lga a0, sym_zero
++    lga zero, sym_cli_pos
++    lga a1, sym_hidden
+diff --git a/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/abs_syms.t b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/abs_syms.t
+new file mode 100644
+index 00000000..0506c9ea
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/abs_syms.t
+@@ -0,0 +1,10 @@
++sym_cli_pos = 31;
++sym_cli_neg = -32;
++sym_cli_pos_oob = 32;
++sym_cli_neg_oob = -33;
++sym_addi_pos = 2047;
++sym_addi_neg = -2048;
++sym_addi_pos_oob = 2048;
++sym_addi_neg_oob = -2049;
++sym_zero = 0;
++HIDDEN(sym_hidden = 42);
+diff --git a/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/addend.s b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/addend.s
+new file mode 100644
+index 00000000..c6649430
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/addend.s
+@@ -0,0 +1,13 @@
++.option relax
++.option pic
++
++.data
++.global rel_var
++rel_var:
++.word 10
++
++.text
++.global foo
++foo:
++    lga a1, abs_var + 4
++    lga a2, rel_var + 4
+diff --git a/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/common.s b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/common.s
+new file mode 100644
+index 00000000..8495ca70
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/common.s
+@@ -0,0 +1,13 @@
++.option relax
++.option pic
++
++.data
++.global rel_var
++rel_var:
++.word 10
++
++.text
++.global foo
++foo:
++    lga a1, abs_var
++    lga a2, rel_var
+diff --git a/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/nonsequential.S b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/nonsequential.S
+new file mode 100644
+index 00000000..95e51434
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/nonsequential.S
+@@ -0,0 +1,40 @@
++.option relax
++.option pic
++
++#ifdef USE_REL
++.data
++.global var
++var:
++.word 10
++
++.global var2
++var2:
++.word 5
++#endif
++
++## The relaxation should work with unrelated instructions
++## and relocations interspersed.
++.text
++.global foo
++foo:
++.La:
++    auipc a0, %got_pcrel_hi(var)
++    nop
++    nop
++    lw a3, %pcrel_lo(.La)(a0)
++    lga a1, var2
++    lw a2, %pcrel_lo(.La)(a0)
++
++## Check that the relaxation is able to cope with the HI/LO relocations
++## not necessarily being processed in that order.
++.global bar
++bar:
++    j .Lgotpcrel_hi1
++
++.Lpcrel_lo1:
++    lw a0, %pcrel_lo(.Lgotpcrel_hi1)(a0)
++    ret
++
++.Lgotpcrel_hi1:
++    auipc a0, %got_pcrel_hi(var2)
++    j .Lpcrel_lo1
+diff --git a/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/partial_relax.s b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/partial_relax.s
+new file mode 100644
+index 00000000..bf1151fb
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/partial_relax.s
+@@ -0,0 +1,53 @@
++.option norelax
++.option pic
++
++.data
++.global rel_var
++rel_var:
++.word 10
++
++.text
++.global foo
++foo:
++## Only LO is marked with RELAX. No relaxation
++.La_abs:
++    auipc a1, %got_pcrel_hi(abs_var)
++    lw    a1, %pcrel_lo(.La_abs)(a1)
++    .reloc .-4, R_RISCV_RELAX
++
++.La_rel:
++    auipc a2, %got_pcrel_hi(rel_var)
++    lw    a2, %pcrel_lo(.La_rel)(a2)
++    .reloc .-4, R_RISCV_RELAX
++
++## Only HI is marked with RELAX. No relaxation.
++.Lb_abs:
++    auipc a1, %got_pcrel_hi(abs_var)
++    .reloc .-4, R_RISCV_RELAX
++    lw    a1, %pcrel_lo(.Lb_abs)(a1)
++
++.Lb_rel:
++    auipc a2, %got_pcrel_hi(rel_var)
++    .reloc .-4, R_RISCV_RELAX
++    lw    a2, %pcrel_lo(.Lb_rel)(a2)
++
++## Multiple LOs for one HI, not all are marked RELAX.
++## There should be no relaxation
++.Lc_abs:
++    auipc a1, %got_pcrel_hi(abs_var)
++    .reloc .-4, R_RISCV_RELAX
++    lw    a2, %pcrel_lo(.Lc_abs)(a1)
++    .reloc .-4, R_RISCV_RELAX
++    lw    a3, %pcrel_lo(.Lc_abs)(a1)
++
++.Lc_rel:
++    auipc a1, %got_pcrel_hi(rel_var)
++    .reloc .-4, R_RISCV_RELAX
++    lw    a2, %pcrel_lo(.Lc_rel)(a1)
++    .reloc .-4, R_RISCV_RELAX
++    lw    a3, %pcrel_lo(.Lc_rel)(a1)
++
++## HI with RELAX but no LO. No relaxation.
++.Ld_rel:
++    auipc a1, %got_pcrel_hi(rel_var)
++    .reloc .-4, R_RISCV_RELAX
+diff --git a/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/rel.s b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/rel.s
+new file mode 100644
+index 00000000..e9a6cf16
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/rel.s
+@@ -0,0 +1,39 @@
++.option relax
++.option pic
++
++.section zero, "aw", @progbits
++.global zero_var
++zero_var:
++.word 42
++
++.data
++.global rel_var
++rel_var:
++.word 5
++
++.hidden hidden_var
++hidden_var:
++.word 6
++
++.text
++.type ifunc STT_GNU_IFUNC
++.hidden ifunc
++ifunc:
++    ret
++
++.hidden hidden_func
++hidden_func:
++    ret
++
++.global global_func
++global_func:
++    ret
++
++.global foo
++foo:
++    lga a0, rel_var
++    lga a1, hidden_var
++    lga a2, ifunc
++    lga a3, zero_var
++    lga a4, hidden_func
++    lga a5, global_func
+diff --git a/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/rel_rv64.s b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/rel_rv64.s
+new file mode 100644
+index 00000000..15eda69a
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/rel_rv64.s
+@@ -0,0 +1,26 @@
++.option relax
++.option pic
++
++.section .sym_wp, "aw", @progbits
++.global sym_wp
++sym_wp: .word 0
++
++.section .sym_op, "aw", @progbits
++.global sym_op
++sym_op: .word 0
++
++.section .sym_wn, "aw", @progbits
++.global sym_wn
++sym_wn: .word 0
++
++.section .sym_on, "aw", @progbits
++.global sym_on
++sym_on: .word 0
++
++.text
++.global foo
++foo:
++    lga a0, sym_wp
++    lga a1, sym_op
++    lga a2, sym_wn
++    lga a3, sym_on
+diff --git a/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/weakundef.s b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/weakundef.s
+new file mode 100644
+index 00000000..1a5bfb2a
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/GOT_LOAD_RELAX/Inputs/weakundef.s
+@@ -0,0 +1,9 @@
++.option relax
++.option pic
++
++.weak sym_weakundef
++
++.text
++.global foo
++foo:
++    lga a0, sym_weakundef
+diff --git a/test/RISCV/standalone/fPICandNonFPICMix/fPICAndNonFPICMix.test b/test/RISCV/standalone/fPICandNonFPICMix/fPICAndNonFPICMix.test
+index 30e0e200..0c3a9872 100644
+--- a/test/RISCV/standalone/fPICandNonFPICMix/fPICAndNonFPICMix.test
++++ b/test/RISCV/standalone/fPICandNonFPICMix/fPICAndNonFPICMix.test
+@@ -8,7 +8,7 @@
+ #END_COMMENT
+ RUN: %clang %clangopts -c %p/Inputs/1.c -o %t1.1.o -O2
+ RUN: %clang %clangopts -c %p/Inputs/2.c -o %t1.2.o -O2 -fPIC
+-RUN: %link %linkopts  %t1.2.o %t1.1.o -o %t.out
++RUN: %link %linkopts --no-relax-got %t1.2.o %t1.1.o -o %t.out
+ RUN: %objdump --no-print-imm-hex -d %t.out | %filecheck %s
+ 
+ #CHECK: l{{[wd]}}      a0, -{{.*}}(a0)
+-- 
+2.43.0
+

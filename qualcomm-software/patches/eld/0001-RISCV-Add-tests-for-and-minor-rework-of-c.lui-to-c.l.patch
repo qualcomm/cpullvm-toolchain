@@ -1,0 +1,159 @@
+From d6d8a93d70584a6f6ba6f268df9db1a0d5b600a4 Mon Sep 17 00:00:00 2001
+From: Jonathon Penix <jpenix@qti.qualcomm.com>
+Date: Wed, 1 Jul 2026 00:46:08 -0700
+Subject: [PATCH 1/3] [RISCV] Add tests for and minor rework of c.lui to c.li
+ rewriting. NFCI
+
+A follow-up patch will introduce a new internal relocation for `c.li` for
+handling GOT load relaxations. The existing code is incorrect for that case,
+so limit this rewriting to only when we see a `c.lui`.
+
+While here, try to align how `EncTy_CI` is handled with other types. It seems
+a bit confusing for this to be handled differently than all the other types.
+
+Also, originally I tried deleting this thinking that this code was dead.
+Turns out it isn't, but it doesn't seem like there's any tests covering it
+currently. So try and add tests. These are intended more to document the
+current state of things rather than what necessarily ought to happen.
+
+Assisted-by: claude
+
+Signed-off-by: Jonathon Penix <jpenix@qti.qualcomm.com>
+---
+ lib/Target/RISCV/RISCVHelper.h                |  2 --
+ lib/Target/RISCV/RISCVRelocationCompute.cpp   | 13 +++----
+ .../HI20_LO12_I_TO_CLUI.test                  | 34 +++++++++++++++++++
+ .../Relaxation/HI20_LO12_I_TO_CLUI/Inputs/2.s | 19 +++++++++++
+ .../Relaxation/HI20_LO12_I_TO_CLUI/Inputs/2.t |  4 +++
+ 5 files changed, 62 insertions(+), 10 deletions(-)
+ create mode 100644 test/RISCV/standalone/Relaxation/HI20_LO12_I_TO_CLUI/Inputs/2.s
+ create mode 100644 test/RISCV/standalone/Relaxation/HI20_LO12_I_TO_CLUI/Inputs/2.t
+
+diff --git a/lib/Target/RISCV/RISCVHelper.h b/lib/Target/RISCV/RISCVHelper.h
+index b82aa833..3d783b61 100644
+--- a/lib/Target/RISCV/RISCVHelper.h
++++ b/lib/Target/RISCV/RISCVHelper.h
+@@ -276,8 +276,6 @@ template <typename T> T encodeCJ(T Result) {
+ }
+ 
+ template <typename T> T encodeCI(T Result) {
+-  // `c.lui rd, 0` is illegal, it will be converted  to `c.li rd, 0` when
+-  // applying
+   uint16_t Imm17 = extractBits(Result, 17, 17) << 12;
+   uint16_t Imm16_12 = extractBits(Result, 16, 12) << 2;
+   Result = Imm17 | Imm16_12;
+diff --git a/lib/Target/RISCV/RISCVRelocationCompute.cpp b/lib/Target/RISCV/RISCVRelocationCompute.cpp
+index 23e4e0b1..0552d0ea 100644
+--- a/lib/Target/RISCV/RISCVRelocationCompute.cpp
++++ b/lib/Target/RISCV/RISCVRelocationCompute.cpp
+@@ -102,8 +102,8 @@ uint64_t clearImmediateBits(uint64_t Instr, EncodingType Type) {
+     return Instr & 0x00000000C00FFFFFull;
+   case EncTy_QC_ES:
+     return Instr & 0x00000000C1FFF07Full;
+-  /* C.LUI/C.LI clearing handled in doRelocHelper */
+   case EncTy_CI:
++    return Instr & 0xEF83;
+   /* No overwriting being performed */
+   case EncTy_None:
+   case EncTy_LEB128:
+@@ -143,13 +143,10 @@ uint64_t doRelocHelper(const RelocationInfo &RelocInfo, uint64_t Instruction,
+     Value = encodeCJ(Value);
+     break;
+   case EncTy_CI: {
+-    if (Value >> 12 == 0) {
+-      // `c.lui rd, 0` is illegal, convert to `c.li rd, 0`
+-      return (Instruction & 0x0F83) | 0x4000;
+-    } else {
+-      Instruction &= 0xEF83;
+-      Value = encodeCI(Value);
+-    }
++    // `c.lui rd, 0` is illegal, convert to `c.li rd, 0`
++    if ((Instruction & 0xE003) == 0x6001 && Value >> 12 == 0)
++      Instruction ^= 0x2000;
++    Value = encodeCI(Value);
+     break;
+   }
+   case EncTy_QC_EB:
+diff --git a/test/RISCV/standalone/Relaxation/HI20_LO12_I_TO_CLUI/HI20_LO12_I_TO_CLUI.test b/test/RISCV/standalone/Relaxation/HI20_LO12_I_TO_CLUI/HI20_LO12_I_TO_CLUI.test
+index 0cbc3498..49b52d95 100644
+--- a/test/RISCV/standalone/Relaxation/HI20_LO12_I_TO_CLUI/HI20_LO12_I_TO_CLUI.test
++++ b/test/RISCV/standalone/Relaxation/HI20_LO12_I_TO_CLUI/HI20_LO12_I_TO_CLUI.test
+@@ -170,6 +170,40 @@ CHECK-NEXT: 80402503  	lw	a0, -2044(zero)
+ CHECK-NEXT: 00001137  	lui	sp, 1
+ CHECK-NEXT: 80412503  	lw	a0, -2044(sp)
+ 
++## Check that --no-relax-zero is honored. Also check that a c.lui with imm 0
++## is not generated when it is known to be 0.
+ RUN: %clang %clangopts -c  %p/Inputs/1.s -o %t.1.o
+ RUN: %link %linkopts -MapStyle txt -Map %t.1.map --verbose --no-relax-zero %t.1.o -o %t.1.no-relax-zero.out -T %p/Inputs/1.t 2>&1 | %filecheck %s --check-prefix=VERBOSE-NO-RELAX-ZERO
+ VERBOSE-NO-RELAX-ZERO-NOT: RISCV_LUI_ZERO : Deleting [[#]] bytes
++VERBOSE-NO-RELAX-ZERO-NOT: RISCV_LUI_C : Deleting 2 bytes for symbol 'B'
++VERBOSE-NO-RELAX-ZERO-NOT: RISCV_LUI_C : relaxing instruction {{.*}} for symbol B
++VERBOSE-NO-RELAX-ZERO-NOT: RISCV_LUI_C : Deleting 2 bytes for symbol 'C'
++VERBOSE-NO-RELAX-ZERO-NOT: RISCV_LUI_C : relaxing instruction {{.*}} for symbol C
++
++RUN: %objdump --no-print-imm-hex -d %t.1.no-relax-zero.out 2>&1 | %filecheck %s --check-prefix=NO-RELAX-ZERO-DUMP
++
++NO-RELAX-ZERO-DUMP: <.text>:
++NO-RELAX-ZERO-DUMP-NEXT: 00000537      lui     a0, 0
++NO-RELAX-ZERO-DUMP-NEXT: 00052503      lw      a0, 0(a0)
++NO-RELAX-ZERO-DUMP-NEXT: 00000537      lui     a0, 0
++NO-RELAX-ZERO-DUMP-NEXT: 7fc52503      lw      a0, 2044(a0)
++NO-RELAX-ZERO-DUMP-NEXT: 00000537      lui     a0, 0
++NO-RELAX-ZERO-DUMP-NEXT: 80452503      lw      a0, -2044(a0)
++
++## There are some cases where c.lui's are created without knowing that the imm will
++## be 0. Check that these are handled in some way. Currently this is done by rewriting
++## `c.lui rd, 0` to `c.li rd, 0`.
++RUN: %clang %clangopts -c  %p/Inputs/2.s -o %t.2.o
++RUN: %link %linkopts -MapStyle txt -Map %t.2.map --verbose %t.2.o -o %t.2.out -T %p/Inputs/2.t 2>&1 | %filecheck %s --check-prefix=VERBOSE-CLI
++VERBOSE-CLI: RISCV_LUI_C : Deleting 2 bytes for symbol 'var'
++VERBOSE-CLI-NEXT: RISCV_LUI_C : relaxing instruction {{.*}} for symbol var
++VERBOSE-CLI: RISCV_LUI_C : Deleting 2 bytes for symbol 'var'
++VERBOSE-CLI-NEXT: RISCV_LUI_C : relaxing instruction {{.*}} for symbol var
++
++RUN: %objdump --no-print-imm-hex -d %t.2.out 2>&1 | %filecheck %s --check-prefix=CLI-DUMP
++
++CLI-DUMP: <foo>:
++CLI-DUMP-NEXT: 4501          li      a0, 0
++CLI-DUMP-NEXT: 7fe52503      lw      a0, 2046(a0)
++CLI-DUMP-NEXT: 4501          li      a0, 0
++CLI-DUMP-NEXT: 7fe52503      lw      a0, 2046(a0)
+diff --git a/test/RISCV/standalone/Relaxation/HI20_LO12_I_TO_CLUI/Inputs/2.s b/test/RISCV/standalone/Relaxation/HI20_LO12_I_TO_CLUI/Inputs/2.s
+new file mode 100644
+index 00000000..28cb371d
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/HI20_LO12_I_TO_CLUI/Inputs/2.s
+@@ -0,0 +1,19 @@
++.option relax
++
++.data
++.global var
++var:
++.word 10
++
++.section foo_sec, "ax", @progbits
++.global foo
++# `foo` and `.data` will be placed in the linker script such that `%hi(var)` is initially
++# non-zero, so we relax to `c.lui`. But these relaxations change where `.data` is placed
++# in the end, resulting in a `c.lui` with imm 0, which isn't allowed. Check that this
++# case is handled in some manner.
++foo:
++  lui a0, %hi(var)
++  lw a0, %lo(var)(a0)
++  lui a0, %hi(var)
++  lw a0, %lo(var)(a0)
++  ret
+diff --git a/test/RISCV/standalone/Relaxation/HI20_LO12_I_TO_CLUI/Inputs/2.t b/test/RISCV/standalone/Relaxation/HI20_LO12_I_TO_CLUI/Inputs/2.t
+new file mode 100644
+index 00000000..a254d9ab
+--- /dev/null
++++ b/test/RISCV/standalone/Relaxation/HI20_LO12_I_TO_CLUI/Inputs/2.t
+@@ -0,0 +1,4 @@
++SECTIONS {
++  foo_text 0x7F0 : { *(foo_sec) }
++  .data : { *(.data) }
++}
+-- 
+2.43.0
+
