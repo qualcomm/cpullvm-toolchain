@@ -1,0 +1,32 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. 
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Check whether a PR makes changes only in files that we are allowed
+# to modify.
+
+name: Check Modified Files
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-modified-files:
+    # Don't run on forks
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Create a file
+        run: echo "hello world" > build/my-file.txt
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: my-artifact # NOTE: same artifact name
+          path: build/my-file.txt
