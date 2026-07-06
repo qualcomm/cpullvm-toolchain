@@ -4,7 +4,7 @@
 # Check whether a PR makes changes only in files that we are allowed
 # to modify.
 
-name: Check Modified Files
+name: Test Upload Files
 
 on:
   pull_request:
@@ -17,14 +17,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check-modified-files:
+  test-upload:
     # Don't run on forks
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     runs-on: ubuntu-24.04
 
     steps:
       - name: Create a file
-        run: echo "hello world" > build/my-file.txt
+        run: |
+          mkdir build
+          echo "hello world" > build/my-file.txt
       - name: Upload Artifact
         uses: actions/upload-artifact@v7
         with:
