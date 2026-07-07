@@ -43,6 +43,17 @@ jobs:
           git fetch origin ${{ matrix.branches.from_branch }}:${{ matrix.branches.from_branch }}
           git pull --unshallow --ff-only origin ${{ matrix.branches.to_branch }}
       - name: Run automerge
-        run: python3 qualcomm-software/ci/automerge.py --project-name ${{ github.repository }} --from-branch ${{ matrix.branches.from_branch }} --to-branch ${{ matrix.branches.to_branch }} --verbose
+        run: |
+          python3 qualcomm-software/ci/automerge.py \
+            --project-name ${{ github.repository }} \
+            --from-branch ${{ matrix.branches.from_branch }} \
+            --to-branch ${{ matrix.branches.to_branch }} \
+            --verbose
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+      - name: Update dependency repo versions
+        run: |
+          python3 qualcomm-software/ci/update_repo_versions.py \
+            --to-branch ${{ matrix.branches.to_branch }}
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
