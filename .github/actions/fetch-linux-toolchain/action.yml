@@ -4,7 +4,8 @@
 name: Fetch cpullvm Linux toolchain
 description: >
   Downloads and extracts a CPULLVM Linux toolchain. Windows toolchains and hosts
-  are currently unsupported.
+  are currently unsupported. Artifacts containing multiple packages or toolchains
+  are also unsupported.
 
 inputs:
   github-token:
