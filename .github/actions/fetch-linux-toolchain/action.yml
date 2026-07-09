@@ -45,6 +45,7 @@ runs:
             owner: 'qualcomm',
             repo: 'cpullvm-toolchain',
             workflow_id: 'nightly.yml',
+            event: 'schedule',
             status: 'success',
             per_page: 1,
           });
