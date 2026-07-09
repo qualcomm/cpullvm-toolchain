@@ -22,5 +22,5 @@ REPO_ROOT=$( git -C "${SCRIPT_DIR}" rev-parse --show-toplevel )
 # or libc++ testing enabled) we can run everything.
 cd "${REPO_ROOT}"/build
 # ninja check-all
-ninja check-llvm-toolchain
+ninja check-llvm-toolchain-lit
 # ninja check-cxxabi
