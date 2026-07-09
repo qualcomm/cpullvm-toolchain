@@ -100,9 +100,10 @@ pushd "${DOWNLOAD_DIR}" >/dev/null
 KERNEL_SOURCE_BASE="linux-5.10.247"
 KERNEL_SOURCE_BASE_DIR="${DOWNLOAD_DIR}/${KERNEL_SOURCE_BASE}"
 if [[ ! -d "${KERNEL_SOURCE_BASE_DIR}" ]]; then
-  wget https://cdn.kernel.org/pub/linux/kernel/v5.x/${KERNEL_SOURCE_BASE}.tar.xz
-  tar xvf "${KERNEL_SOURCE_BASE}.tar.xz"
-  rm "${KERNEL_SOURCE_BASE}.tar.xz"
+  git clone --depth 1 \
+    --branch v5.10.247 \
+    https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git \
+    "${KERNEL_SOURCE_BASE_DIR}"
 fi
 
 CLANG_RESOURCE_DIR="$(clang --print-resource-dir)"

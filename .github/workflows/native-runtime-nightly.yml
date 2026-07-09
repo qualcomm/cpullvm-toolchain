@@ -99,7 +99,7 @@ jobs:
           path: |
             build*/cpullvm-*.tar.xz
             build*/cpullvm-*.zip
-          retention-days: 2
+          retention-days: 7
 
       - name: Test
         if: matrix.test_script != ''

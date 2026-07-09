@@ -19,8 +19,10 @@ config.substitutions.append(('%{link_flags}',
     ' -nostdlib++ -L %{lib}'
     ' -lc++ -lc++abi'
     ' -nostdlib -L %{libc-lib}'
+    ' -Wl,--start-group'
     ' -lc -lm -lclang_rt.builtins'
     ' %{libc-extra-link-flags}'
+    ' -Wl,--end-group'
 ))
 config.substitutions.append(('%{exec}',
     '%{executor} --execdir %{temp} -- '

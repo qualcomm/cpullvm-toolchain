@@ -235,12 +235,15 @@ if(ENABLE_LIBC_TESTS OR ENABLE_COMPILER_RT_TESTS OR ENABLE_LIBCXX_TESTS)
 endif()
 
 set(compile_arch_flags "--target=${target_triple} ${COMPILE_FLAGS} --sysroot ${TEMP_LIB_DIR}")
+if(NOT C_LIBRARY STREQUAL musl-embedded)
+    # Apply the same TLS model to test compilation as is used for library builds.
+    # Without this, -fPIC variants default to general-dynamic TLS which emits
+    # __tls_get_addr calls that are not available on bare-metal.
+    string(APPEND compile_arch_flags " -ftls-model=${TLS_MODEL}")
+endif()
 # Compiling the libraries benefits from some extra optimization
 # flags, and requires a sysroot.
 set(lib_compile_flags "${compile_arch_flags} -ffunction-sections -fdata-sections")
-if(NOT C_LIBRARY STREQUAL musl-embedded)
-    string(APPEND lib_compile_flags " -ftls-model=${TLS_MODEL}")
-endif()
 
 # Generic target names for the C library.
 # Declare these now, since compiler-rt requires the 'install' dependency.
@@ -795,20 +798,17 @@ if(ENABLE_CXX_LIBS)
         -DLIBCXXABI_ENABLE_STATIC=ON
         -DLIBCXXABI_USE_COMPILER_RT=ON
         -DLIBCXXABI_USE_LLVM_UNWINDER=ON
-        -DLIBCXXABI_SHARED_OUTPUT_NAME="c++abi-shared"
         -DLIBCXX_CXX_ABI=libcxxabi
         -DLIBCXX_ENABLE_FILESYSTEM=OFF
         -DLIBCXX_ENABLE_SHARED=OFF
         -DLIBCXX_ENABLE_STATIC=ON
         -DLIBCXX_INCLUDE_BENCHMARKS=OFF
-        -DLIBCXX_SHARED_OUTPUT_NAME="c++-shared"
         -DLIBUNWIND_ENABLE_ASSERTIONS=OFF
         -DLIBUNWIND_ENABLE_SHARED=OFF
         -DLIBUNWIND_ENABLE_STATIC=ON
         -DLIBUNWIND_IS_BAREMETAL=ON
         -DLIBUNWIND_REMEMBER_HEAP_ALLOC=ON
         -DLIBUNWIND_USE_COMPILER_RT=ON
-        -DLIBUNWIND_SHARED_OUTPUT_NAME="unwind-shared"
         -DLLVM_LIT_ARGS=${LLVM_LIT_ARGS}
         -DLLVM_ENABLE_RUNTIMES=libcxxabi,libcxx,libunwind
         -DRUNTIME_VARIANT_NAME=${VARIANT}

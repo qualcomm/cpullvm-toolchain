@@ -1,0 +1,46 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Reject any commit in the PR whose message contains a Gerrit Change-Id footer.
+
+name: Check for Gerrit Change-Id
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-change-id:
+    # Don't run on forks
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Reject commits containing a Gerrit Change-Id
+        shell: bash
+        run: |
+          BASE=${{ github.event.pull_request.base.sha }}
+          HEAD=${{ github.event.pull_request.head.sha }}
+          FAILED=0
+          while IFS= read -r sha; do
+            if git log -1 --format=%B "$sha" | grep -q '^Change-Id:'; then
+              echo "ERROR: commit $sha contains a Gerrit Change-Id line."
+              FAILED=1
+            fi
+          done < <(git rev-list "$BASE".."$HEAD")
+          if [ "$FAILED" -eq 1 ]; then
+            echo "Remove the 'Change-Id:' footer from the listed commits before merging."
+            exit 1
+          fi
+          echo "No Gerrit Change-Id footers found."
