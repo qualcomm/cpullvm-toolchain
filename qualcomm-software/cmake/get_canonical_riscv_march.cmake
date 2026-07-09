@@ -9,7 +9,10 @@
 # - `march_out` should contain the variable to be used to return the
 #   canonicalized arch string.
 function(get_canonical_riscv_march compiler_path build_args march_out)
-    set(command_args ${build_args} "--print-enabled-extensions")
+    # Always enable experimental extensions when normalizing the arch string
+    # to avoid needing to expose it as a multilib flag if experimental
+    # extensions are used.
+    set(command_args ${build_args} "-menable-experimental-extensions" "--print-enabled-extensions")
     execute_process(
         COMMAND ${compiler_path}
         ${command_args}
