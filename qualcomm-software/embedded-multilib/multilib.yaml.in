@@ -64,20 +64,6 @@ Variants:
 
 Mappings:
 
-# RISC-V variants that are built with experimental extensions are
-# configured with -menable-experimental-extensions, and that flag is
-# recorded as one of their multilib selection flags. However, clang does
-# NOT emit -menable-experimental-extensions in the multilib selection flag
-# set (-print-multi-flags-experimental), so such variants could never be
-# selected and clang would fall back to a less specific variant. The
-# canonical -march in the selection set still contains the experimental
-# extension (e.g. xsfvfexpa), so re-add -menable-experimental-extensions
-# here whenever an experimental extension is present, allowing those
-# variants to match.
-- Match: -march=rv32.*xsfvfexpa.*
-  Flags:
-  - -menable-experimental-extensions
-
 # Map extended sets of extensions back to the variants provided
 # for RISC-V targets.
 @riscv_march_mappings@
