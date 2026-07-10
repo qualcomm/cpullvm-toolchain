@@ -252,8 +252,6 @@ set(LIBCLANG_BUILD_STATIC ON CACHE BOOL "")
 set(LLVM_POLLY_LINK_INTO_TOOLS ON CACHE BOOL "")
 set(CLANG_DEFAULT_LINKER lld CACHE STRING "")
 set(LLDB_ENABLE_PYTHON ON CACHE BOOL "")
-# Allow using any version of Python at runtime.
-set(LLDB_ENABLE_DYNAMIC_SCRIPTINTERPRETERS ON CACHE BOOL "")
 # LLDB tests don't work on x86 because clang defaults to AArch64 target triple.
 # See https://github.com/llvm/llvm-project/issues/203090 .  Using a clang
 # wrapper works around a few of the failures; we don't have any good workaround
