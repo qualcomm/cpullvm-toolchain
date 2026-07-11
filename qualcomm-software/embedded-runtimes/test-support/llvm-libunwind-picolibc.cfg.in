@@ -31,9 +31,9 @@ config.substitutions.append(('%{compile_flags}',
 config.substitutions.append(('%{link_flags}',
     ' -nostdlib++ -L %{lib}'
     ' -lc++ -lc++abi -lunwind'
-    ' -nostdlib -L %{libc-lib}'
+    ' -nostdlib -L %{libc-lib} -lm'
     ' -Wl,--start-group'
-    ' -lc -lm -lclang_rt.builtins'
+    ' -lc -lclang_rt.builtins'
     ' %{libc-extra-link-flags}'
     ' -Wl,--end-group'
 ))
