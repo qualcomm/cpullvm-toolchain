@@ -1,0 +1,85 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Manually triggered workflow to sync a specific LLVM RC tag into the
+# upstream release branch and automerge changes into the corresponding
+# Qualcomm downstream release branch.
+name: Sync Release RC from Upstream LLVM
+on:
+  workflow_dispatch:
+    inputs:
+      rc_tag:
+        description: 'LLVM RC tag to sync (e.g. llvmorg-23.1.0-rc1)'
+        required: true
+      upstream_release_branch:
+        description: 'Upstream LLVM release branch (e.g. release/23.x)'
+        required: true
+      downstream_release_branch:
+        description: 'Qualcomm downstream release branch (e.g. release/qualcomm-software/23.x)'
+        required: true
+jobs:
+  Sync-Release-RC:
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    steps:
+      - name: Validate Inputs
+        env:
+          RC_TAG: ${{ inputs.rc_tag }}
+          DOWNSTREAM_BRANCH: ${{ inputs.downstream_release_branch }}
+        run: |
+          if ! git ls-remote --exit-code https://github.com/llvm/llvm-project.git "refs/tags/${RC_TAG}" > /dev/null 2>&1; then
+            echo "ERROR: RC tag '${RC_TAG}' not found in upstream LLVM." && exit 1
+          fi
+          if ! git ls-remote --exit-code https://github.com/qualcomm/cpullvm-toolchain.git "refs/heads/${DOWNSTREAM_BRANCH}" > /dev/null 2>&1; then
+            echo "ERROR: Downstream branch '${DOWNSTREAM_BRANCH}' not found in repository." && exit 1
+          fi
+      - name: Configure Access Token
+        uses: actions/create-github-app-token@f45685208fd9b88321d74015b5996fc8c3e43d18 # v1.0.0
+        id: generate-token
+        with:
+          app_id: ${{ secrets.SYNC_APP_ID }}
+          private_key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ inputs.downstream_release_branch }}
+          token: ${{ steps.generate-token.outputs.token }}
+          fetch-depth: 0
+      - name: Configure Git Identity
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Fetch Upstream RC Tag
+        env:
+          RC_TAG: ${{ inputs.rc_tag }}
+        run: |
+          git remote add upstream https://github.com/llvm/llvm-project.git
+          git fetch upstream "refs/tags/${RC_TAG}:refs/tags/${RC_TAG}"
+      - name: Sync Upstream Release Branch to RC Tag
+        env:
+          RC_TAG: ${{ inputs.rc_tag }}
+          UPSTREAM_BRANCH: ${{ inputs.upstream_release_branch }}
+        run: |
+          RC_COMMIT=$(git rev-list -n 1 "refs/tags/${RC_TAG}")
+          echo "Syncing ${UPSTREAM_BRANCH} to RC commit ${RC_COMMIT}"
+          git push origin "${RC_COMMIT}:refs/heads/${UPSTREAM_BRANCH}"
+      - name: Fetch Branches
+        env:
+          UPSTREAM_BRANCH: ${{ inputs.upstream_release_branch }}
+        run: |
+          git remote set-branches --add origin "${UPSTREAM_BRANCH}"
+          git fetch origin "${UPSTREAM_BRANCH}:${UPSTREAM_BRANCH}"
+      - name: Run Automerge
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          PROJECT_NAME: ${{ github.repository }}
+          FROM_BRANCH: ${{ inputs.upstream_release_branch }}
+          TO_BRANCH: ${{ inputs.downstream_release_branch }}
+        run: |
+          python3 qualcomm-software/ci/automerge.py \
+            --project-name "${PROJECT_NAME}" \
+            --from-branch "${FROM_BRANCH}" \
+            --to-branch "${TO_BRANCH}" \
+            --verbose
