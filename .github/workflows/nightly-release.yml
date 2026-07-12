@@ -1,0 +1,23 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Nightly Release build — calls nightly.yml with assertions disabled
+# (Release mode) by passing enable_assertions: false.
+
+name: Nightly Release Build and Test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/nightly.yml'
+      - '.github/workflows/nightly-release.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  nightly-release:
+    uses: ./.github/workflows/nightly.yml
+    with:
+      enable_assertions: false

@@ -29,10 +29,16 @@ cd $buildDir
 
 python3 ..\qualcomm-software\cmake\copy_target_libraries.py --include-linux-libraries --distribution-file=cpullvm-*.tar.xz --build-dir=$buildDir
 
+$extraCmakeArgs = @()
+if ($env:EXTRA_CMAKE_ARGS) {
+    $extraCmakeArgs = $env:EXTRA_CMAKE_ARGS -split '\s+'
+}
+
 cmake ..\qualcomm-software `
   -GNinja `
   -DFETCHCONTENT_QUIET=OFF `
   -DPREBUILT_TARGET_LIBRARIES=ON `
-  -DENABLE_LINUX_LIBRARIES=ON
+  -DENABLE_LINUX_LIBRARIES=ON `
+  @extraCmakeArgs
 
 ninja package-llvm-toolchain

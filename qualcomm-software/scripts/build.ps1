@@ -27,9 +27,15 @@ mkdir $buildDir
 cd $buildDir
 
 # Omit Linux runtimes, QEMU testing on Windows builds.
+$extraCmakeArgs = @()
+if ($env:EXTRA_CMAKE_ARGS) {
+    $extraCmakeArgs = $env:EXTRA_CMAKE_ARGS -split '\s+'
+}
+
 cmake ..\qualcomm-software `
   -GNinja `
   -DFETCHCONTENT_QUIET=OFF `
-  -DENABLE_QEMU_TESTING=OFF
+  -DENABLE_QEMU_TESTING=OFF `
+  @extraCmakeArgs
 
 ninja package-llvm-toolchain
