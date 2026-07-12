@@ -21,6 +21,17 @@ name: Nightly Build and Test
 
 on:
   workflow_dispatch:
+    inputs:
+      enable_assertions:
+        description: 'Enable LLVM assertions'
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      enable_assertions:
+        description: 'Enable LLVM assertions'
+        type: boolean
+        default: true
   pull_request:
     paths:
       - '.github/workflows/nightly.yml'
@@ -28,6 +39,9 @@ on:
     - cron: '0 7,19 * * *' # 12 AM, 12 PM PT
 permissions:
   contents: read
+
+env:
+  EXTRA_CMAKE_ARGS: ${{ format('{0}', inputs.enable_assertions) == 'false' && '-DLLVM_ENABLE_ASSERTIONS=OFF' || '-DLLVM_ENABLE_ASSERTIONS=ON' }}
 
 jobs:
   build-and-test-Linux-x86:
