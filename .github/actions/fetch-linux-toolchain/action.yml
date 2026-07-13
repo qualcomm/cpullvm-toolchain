@@ -1,0 +1,75 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Fetch cpullvm Linux toolchain
+description: >
+  Downloads and extracts a CPULLVM Linux toolchain. Windows toolchains and hosts
+  are currently unsupported. Artifacts containing multiple packages or toolchains
+  are also unsupported.
+
+inputs:
+  github-token:
+    description: >
+      Token with actions:read permission on qualcomm/cpullvm-toolchain.
+      Within this repo, github.token works. External callers need a
+      fine-grained PAT or GitHub App token scoped to qualcomm/cpullvm-toolchain.
+    required: true
+  run-id:
+    description: >
+      Run ID of a qualcomm/cpullvm-toolchain workflow that uploaded the toolchain artifact.
+      Leave blank to use the latest successful nightly.yml run.
+    required: false
+    default: ''
+  package-name:
+    description: >
+      Package name of the toolchain to download. Defaults to 'cpullvm-packages-build.sh-Linux-x86'.
+      Only Linux packages should be used.
+    required: false
+    default: cpullvm-packages-build.sh-Linux-x86
+  install-dir:
+    description: Directory to extract the toolchain into.
+    required: false
+    default: /opt/cpullvm
+
+runs:
+  using: composite
+  steps:
+    - name: Get latest nightly run ID
+      id: latest
+      if: inputs.run-id == ''
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const resp = await github.rest.actions.listWorkflowRuns({
+            owner: 'qualcomm',
+            repo: 'cpullvm-toolchain',
+            workflow_id: 'nightly.yml',
+            event: 'schedule',
+            status: 'success',
+            per_page: 1,
+          });
+          if (!resp.data.workflow_runs?.length) {
+            core.setFailed('No successful nightly runs found in qualcomm/cpullvm-toolchain');
+            return;
+          }
+          const run = resp.data.workflow_runs[0];
+          core.info(`Using run id=${run.id}, number=${run.run_number}`);
+          core.setOutput('run_id', String(run.id));
+
+    - name: Download toolchain artifact
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      with:
+        name: ${{ inputs.package-name }}
+        github-token: ${{ inputs.github-token }}
+        repository: qualcomm/cpullvm-toolchain
+        run-id: ${{ inputs.run-id || steps.latest.outputs.run_id }}
+
+    - name: Extract toolchain
+      env:
+        INSTALL_DIR: ${{ inputs.install-dir }}
+      shell: bash
+      run: |
+        mkdir -p "$INSTALL_DIR"
+        tarball=$(find . -name 'cpullvm-*.tar.xz' -print -quit)
+        tar -xf "$tarball" --strip-components=1 -C "$INSTALL_DIR"

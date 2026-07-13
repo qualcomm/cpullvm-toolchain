@@ -147,7 +147,8 @@ def main():
             variants=[
                 "riscv32imafc_ilp32f",
                 "riscv32imafc_zba_zbb_ilp32f",
-                "riscv32imafc_zcb_zcmp_zba_zbb_ilp32f"
+                "riscv32imafc_zcb_zcmp_zba_zbb_ilp32f",
+                "riscv32imaf_zve32f_zvfh_zba_zbb_ilp32f_nothreads"
             ],
             description="Disable the tests for now while the issue is being fixed upstream (https://github.com/picolibc/picolibc/pull/1072).",
         ),

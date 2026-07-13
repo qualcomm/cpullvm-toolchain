@@ -5,6 +5,19 @@ name: Zephyr Twister Tests
 
 on:
   workflow_dispatch:
+    inputs:
+      run-id:
+        description: >
+          Run ID of a cpullvm-toolchain workflow that built the Linux x86_64 toolchain.
+          Leave blank to use the latest nightly.
+        required: false
+        default: ''
+      package-name:
+        description: >
+          Package name of the toolchain to download. Defaults to 'cpullvm-packages-build.sh-Linux-x86'.
+          Only Linux packages should be used.
+        required: false
+        default: cpullvm-packages-build.sh-Linux-x86
   schedule:
     - cron: '0 5 * * 1' # Sunday 21:00 PST (Monday 05:00 UTC)
   pull_request:
@@ -15,37 +28,9 @@ permissions:
   contents: read
 
 jobs:
-  build-Linux-x86-toolchain:
-    if: github.repository == 'qualcomm/cpullvm-toolchain'
-    name: Build toolchain
-    runs-on: cpullvm-ubuntu24-x86_64
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          # We build in the repository and rely on clean to cleanup possible
-          # old build products if the runner doesn't do it itself.
-          clean: true
-
-      - name: Apply llvm-project patches
-        run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
-
-      - name: Build
-        run: ./qualcomm-software/scripts/build.sh
-
-      - name: Upload built packages
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        if: success()
-        with:
-          name: cpullvm-packages-build.sh-Linux-x86
-          path: build*/cpullvm-*.tar.xz
-          if-no-files-found: error
-          retention-days: 1
-
   run-twister-tests:
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: Twister tests for ${{ matrix.platform }} (${{ matrix.subset }}/2)
-    needs: build-Linux-x86-toolchain
     # Zephyr's tests take a relatively long time to complete but can be split to
     # run in parallel on different machines fairly easily (by platform/arch,
     # using `--subset`, etc.). So let's use Github's runners to avoid tying up
@@ -80,15 +65,18 @@ jobs:
           wget https://github.com/zephyrproject-rtos/zephyr/pull/103778.patch
           git apply 103778.patch
 
-      - name: Download toolchain package
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - name: Checkout fetch-linux-toolchain action
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
-          name: cpullvm-packages-build.sh-Linux-x86
+          sparse-checkout: .github/actions/fetch-linux-toolchain
+          path: .cpullvm
 
-      - name: Unpack toolchain
-        run: |
-          tar -xvf build/cpullvm-*-Linux-x86_64.tar.xz
-          mv cpullvm-*-Linux-x86_64 /opt/cpullvm
+      - name: Fetch toolchain
+        uses: ./.cpullvm/.github/actions/fetch-linux-toolchain
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run-id }}
+          package-name: ${{ inputs.package-name || 'cpullvm-packages-build.sh-Linux-x86' }}
 
       - name: West setup
         run: |
