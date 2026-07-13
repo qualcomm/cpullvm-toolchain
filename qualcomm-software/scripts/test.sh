@@ -21,8 +21,6 @@ REPO_ROOT=$( git -C "${SCRIPT_DIR}" rev-parse --show-toplevel )
 # but while we have a limited number of variants (and no compiler-rt
 # or libc++ testing enabled) we can run everything.
 cd "${REPO_ROOT}"/build
-ninja check-cxx-riscv64gc_lp64_nopic
-ninja check-cxx-riscv64gc_lp64d_nopic
-ninja check-cxx-riscv64gc_zba_zbb_lp64_nopic
-ninja check-cxx-riscv64gc_zba_zbb_lp64d_nopic
-ninja check-cxx-riscv64imac_lp64_nopic
+ninja check-all
+ninja check-llvm-toolchain
+ninja check-cxxabi
