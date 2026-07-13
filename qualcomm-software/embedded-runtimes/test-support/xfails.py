@@ -140,6 +140,28 @@ def main():
             description="If the installed default multilib does not have a library available for -mcpu=cortex-r52, this test will fail.",
         ),
         XFail(
+            name="compiler-rt rv32 z_inx extendhftf2",
+            testnames=[
+                "extendhftf2_test.c",
+            ],
+            result=NewResult.XFAILED,
+            project="compiler-rt",
+            variants=[
+                "riscv32ima_zinx_xqci_ilp32_nopic",
+            ],
+            description="Possible QEMU zhinx bug in fneg.h/fsgnjn.h (not "
+                "compiler-rt/clang/picolibc):\n"
+                "(1) Only the 4th check, test__extendhftf2(-makeInf16(), "
+                "0xffff..), fails. The unary '-' on a _Float16 compiles "
+                "(correctly) to fneg.h; on RV32 zhinx QEMU does not flip the "
+                "sign bit, so +inf (0x7c00) is used instead of -inf (0xfc00) "
+                "and __extendhftf2 returns +inf (0x7fff..) vs expected -inf "
+                "(0xffff..). __extendhftf2 itself is bit-correct.\n"
+                "(2) Zinx-only: across all riscv32 variants only this "
+                "FP-in-GPR (zhinx) one fails; hardware-FP (ilp32f/ilp32d) and "
+                "library soft-float (non-zinx, incl. riscv32ima_xqci) all PASS.",
+        ),
+        XFail(
             name="picolibc rv32/64gc",
             testnames=[
                 "math_errhandling.test",
@@ -149,6 +171,7 @@ def main():
             project="picolibc",
             variants=[
                 "riscv32gc_ilp32d",
+                "riscv32ima_zinx_xqci_ilp32_nopic",
                 "riscv64gc_lp64d_nopic",
                 "riscv64gc_zba_zbb_lp64d_nopic",
                 "riscv64gc_lp64_nopic",
