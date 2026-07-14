@@ -25,7 +25,7 @@ on:
     paths:
       - '.github/workflows/nightly.yml'
   schedule:
-    - cron: '0 7,19 * * *' # 12 AM, 12 PM PT
+    - cron: '0 7 * * *' # 12 AM PT
 permissions:
   contents: read
 
