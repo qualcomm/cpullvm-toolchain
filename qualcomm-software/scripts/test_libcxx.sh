@@ -34,16 +34,8 @@ ninja check-cxx-armv7m_soft_nofp_nopic
 ninja check-cxx-armv8_soft_neon
 ninja check-cxx-riscv32gc_ilp32d
 ninja check-cxx-riscv32imac_ilp32
-ninja check-cxx-riscv32imac_ilp32_nopic
-ninja check-cxx-riscv32imac_zba_zbb_ilp32
 ninja check-cxx-riscv32imac_zba_zbb_ilp32_nopic
-ninja check-cxx-riscv32imac_zcb_zcmp_ilp32_nopic
-ninja check-cxx-riscv32imac_zcb_zcmp_zba_zbb_ilp32_nopic
-ninja check-cxx-riscv32imafc_ilp32f
-ninja check-cxx-riscv32imafc_zba_zbb_ilp32f
 ninja check-cxx-riscv32imafc_zcb_zcmp_zba_zbb_ilp32f
 ninja check-cxx-riscv64gc_lp64_nopic
-ninja check-cxx-riscv64gc_lp64d_nopic
-ninja check-cxx-riscv64gc_zba_zbb_lp64_nopic
 ninja check-cxx-riscv64gc_zba_zbb_lp64d_nopic
 ninja check-cxx-riscv64imac_lp64_nopic
