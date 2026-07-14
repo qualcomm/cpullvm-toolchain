@@ -1,0 +1,51 @@
+From ace671aa0596e41cdff83f2fac14b87633e32415 Mon Sep 17 00:00:00 2001
+From: Sam Elliott <aelliott@qti.qualcomm.com>
+Date: Sun, 12 Jul 2026 23:16:38 -0700
+Subject: [PATCH] [riscv] Add CRT for Zcmt/Xqccmt
+
+---
+ arch/riscv32/crt_arch.h | 8 ++++++++
+ arch/riscv64/crt_arch.h | 8 ++++++++
+ 2 files changed, 16 insertions(+)
+
+diff --git a/arch/riscv32/crt_arch.h b/arch/riscv32/crt_arch.h
+index 6b93fcfd..b59712b1 100644
+--- a/arch/riscv32/crt_arch.h
++++ b/arch/riscv32/crt_arch.h
+@@ -10,6 +10,14 @@ START ":\n"
+ ".option norelax\n\t"
+ "lla gp, __global_pointer$\n"
+ ".option pop\n\t"
++#if defined(__riscv_zcmt) || defined(__riscv_xqccmt)
++".weak __jvt_base$\n\t"
++".hidden __jvt_base$\n\t"
++"lla a0, __jvt_base$\n\t"
++"beqz a0, .Lafter_jvt_init\n\t"
++"csrw jvt, a0\n\t"
++".Lafter_jvt_init:\n\t"
++#endif
+ "mv a0, sp\n"
+ ".weak _DYNAMIC\n"
+ ".hidden _DYNAMIC\n\t"
+diff --git a/arch/riscv64/crt_arch.h b/arch/riscv64/crt_arch.h
+index 6b93fcfd..b59712b1 100644
+--- a/arch/riscv64/crt_arch.h
++++ b/arch/riscv64/crt_arch.h
+@@ -10,6 +10,14 @@ START ":\n"
+ ".option norelax\n\t"
+ "lla gp, __global_pointer$\n"
+ ".option pop\n\t"
++#if defined(__riscv_zcmt) || defined(__riscv_xqccmt)
++".weak __jvt_base$\n\t"
++".hidden __jvt_base$\n\t"
++"lla a0, __jvt_base$\n\t"
++"beqz a0, .Lafter_jvt_init\n\t"
++"csrw jvt, a0\n\t"
++".Lafter_jvt_init:\n\t"
++#endif
+ "mv a0, sp\n"
+ ".weak _DYNAMIC\n"
+ ".hidden _DYNAMIC\n\t"
+-- 
+2.51.0
+
