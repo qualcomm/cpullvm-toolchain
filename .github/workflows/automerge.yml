@@ -19,6 +19,8 @@ jobs:
         branches:
           - from_branch: main
             to_branch: qualcomm-software
+          - from_branch: release/23.x
+            to_branch: release/qualcomm-software/23.x
     steps:
       - name: Configure Access Token
         uses: actions/create-github-app-token@f45685208fd9b88321d74015b5996fc8c3e43d18 # v1.0.0
