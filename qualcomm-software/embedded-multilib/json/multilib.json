@@ -191,6 +191,12 @@
             "libraries_supported": "picolibc"
         },
         {
+            "variant": "riscv32imaf_zve32f_zvfh_zba_zbb_ilp32f_nothreads",
+            "json": "riscv32imaf_zve32f_zvfh_zba_zbb_ilp32f_nothreads.json",
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imaf_zic64b_zicbom_zicbop_zicboz_ziccamoa_ziccif_ziccrse_zicond_zifencei_zihintntl_zihintpause_zihpm_zimop_za64rs_zawrs_zfa_zfbfmin_zfh_zce_zcmop_zba_zbb_zbs_zkt_zvbb_zve32f_zvl128b_zvfbfmin_zvfbfwma_zvfh_zvkt_smaia_smcsrind_smrnmi_sscofpmf_xsfvfexpa_zvdot4a8i0p1_zicfilp1p0 -fmultilib-flag=no-threads -mabi=ilp32f",
+            "libraries_supported": "picolibc"
+        },
+        {
             "variant": "riscv32im_xqci_ilp32_nothreads_nopic",
             "json": "riscv32im_xqci_ilp32_nothreads_nopic.json",
             "flags": "--target=riscv32-unknown-unknown-elf -march=rv32im_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp -mabi=ilp32 -fmultilib-flag=no-threads -fno-pic",

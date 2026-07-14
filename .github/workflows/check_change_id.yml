@@ -1,22 +1,25 @@
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Reject any commit in the PR whose message contains a Gerrit Change-Id footer.
+# Reject any commit in the PR whose message contains a Gerrit Change-Id footer,
+# and reject PRs whose description contains a Gerrit Change-Id footer.
 
 name: Check for Gerrit Change-Id
 
 on:
   pull_request:
+    types: [opened, edited, reopened, synchronize]
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  check-change-id:
+  check-commits:
     # Don't run on forks
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     runs-on: ubuntu-24.04
@@ -43,4 +46,22 @@ jobs:
             echo "Remove the 'Change-Id:' footer from the listed commits before merging."
             exit 1
           fi
-          echo "No Gerrit Change-Id footers found."
+          echo "No Gerrit Change-Id footers found in commits."
+
+  check-pr-description:
+    # Don't run on forks
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Reject PR description containing a Gerrit Change-Id
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        shell: bash
+        run: |
+          if echo "$PR_BODY" | grep -q '^Change-Id:'; then
+            echo "ERROR: PR description contains a Gerrit Change-Id line."
+            echo "Remove the 'Change-Id:' footer from the PR description before merging."
+            exit 1
+          fi
+          echo "No Gerrit Change-Id footer found in PR description."
