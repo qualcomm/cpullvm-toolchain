@@ -153,29 +153,6 @@ def main():
             description="Disable the tests for now while the issue is being fixed upstream (https://github.com/picolibc/picolibc/pull/1072).",
         ),
         XFail(
-            name="no hardware atomics cxxabi",
-            testnames=[
-                "test_exception_storage.pass.cpp",
-            ],
-            result=NewResult.XFAILED,
-            project="libcxx",
-            variants=[
-                "riscv32im_xqci_ilp32_nothreads_nopic",
-                "riscv32imc_ilp32_nothreads_nopic",
-                "riscv32imc_ilp32_scs_nothreads_nopic",
-                "riscv32imc_zba_zbb_zbc_zbs_ilp32_nothreads_nopic",
-                "riscv64imc_lp64_nothreads_nopic",
-                "riscv64imc_lp64_scs_nothreads_nopic",
-            ],
-            description="These variants are built without the RISC-V A (atomic) extension "
-                "so no hardware atomic instructions are available. "
-                "test_exception_storage.pass.cpp links against libc++, which pulls in "
-                "ios_base::xalloc() from ios.cpp. That function unconditionally uses "
-                "std::atomic<int>, which lowers to a __atomic_fetch_add_4 call on targets "
-                "without hardware atomics. This symbol has no provider on these targets "
-                "since compiler-rt's atomic.c requires lock-free hardware CAS to compile.",
-        ),
-        XFail(
             name="Insufficient RAM",
             testnames=[
                 "dynamic_cast14.pass.cpp",
