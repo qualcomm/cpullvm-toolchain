@@ -39,6 +39,14 @@ jobs:
             target_os: Linux-x86_64
             runner: cpullvm-ubuntu24-x86_64
 
+          # FIXME: this should probably go in the nightlies instead like
+          # musl-embedded, but I don't want to keep triggering those
+          # for the proof-of-concept PR.
+          - build_script: build_picolibc-main_overlay.sh
+            test_script: test_picolibc-main.sh
+            target_os: Linux-x86_64
+            runner: cpullvm-ubuntu24-x86_64
+
     steps:
       - name: Checkout source
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
