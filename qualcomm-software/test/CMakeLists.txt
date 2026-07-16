@@ -5,6 +5,10 @@ llvm_canonicalize_cmake_booleans(
   ENABLE_BACKTRACES
 )
 
+if(LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL)
+  set(EMBEDDED_LIBS_DIR_SUFFIX "/${LLVM_TOOLCHAIN_C_LIBRARY}")
+endif()
+
 configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
   ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py

@@ -315,13 +315,11 @@ fetch_repo(eld)
 #
 # If you want to stop cmake updating the repos then run
 # cmake . -DFETCHCONTENT_FULLY_DISCONNECTED=ON
-if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc)
-    fetch_repo(picolibc)
-endif()
-if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded OR ENABLE_LINUX_LIBRARIES)
-    fetch_repo(musl-embedded)
-endif()
+fetch_repo(${LLVM_TOOLCHAIN_C_LIBRARY})
 if(ENABLE_LINUX_LIBRARIES)
+    if(NOT LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
+        fetch_repo(musl-embedded)
+    endif()
     fetch_repo(musl)
 endif()
 
@@ -344,7 +342,7 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 ##################################################################################################
 
-if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
+if(NOT LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc)
     set(libc_cfg_path ${CMAKE_CURRENT_BINARY_DIR}/${LLVM_TOOLCHAIN_C_LIBRARY}.cfg)
 
     configure_file(
@@ -495,14 +493,14 @@ add_custom_target(
     -Dllvmproject_src_dir=${llvmproject_src_dir}
     -Deld_SOURCE_DIR=${eld_SOURCE_DIR}
     -Deld_URL=${eld_URL}
-    # at most one of picolibc and musl options is needed, but easiest to
-    # specify both definitions
-    -Dpicolibc_SOURCE_DIR=${picolibc_SOURCE_DIR}
-    -Dpicolibc_URL=${picolibc_URL}
+    -D${LLVM_TOOLCHAIN_C_LIBRARY}_SOURCE_DIR=${${LLVM_TOOLCHAIN_C_LIBRARY}_SOURCE_DIR}
+    -D${LLVM_TOOLCHAIN_C_LIBRARY}_URL=${${LLVM_TOOLCHAIN_C_LIBRARY}_URL}
+    -DLLVM_TOOLCHAIN_C_LIBRARY=${LLVM_TOOLCHAIN_C_LIBRARY}
+    # Always pass through the Linux library information--the script will
+    # determine if it is needed. This might be a repeat if musl-embedded
+    # is the selected C library, but repeating it is harmless.
     -Dmusl-embedded_SOURCE_DIR=${musl-embedded_SOURCE_DIR}
     -Dmusl-embedded_URL=${musl-embedded_URL}
-    # but we do tell the script which library we're actually using
-    -DLLVM_TOOLCHAIN_C_LIBRARY=${LLVM_TOOLCHAIN_C_LIBRARY}
     -Dmusl_SOURCE_DIR=${musl_SOURCE_DIR}
     -Dmusl_URL=${musl_URL}
     -DENABLE_LINUX_LIBRARIES=${ENABLE_LINUX_LIBRARIES}
@@ -610,6 +608,7 @@ if(NOT PREBUILT_TARGET_LIBRARIES)
     string(REPLACE ";" "," ENABLE_VARIANTS_PASSTHROUGH "${LLVM_TOOLCHAIN_LIBRARY_VARIANTS}")
 
     set(multilib_prefix ${CMAKE_BINARY_DIR}/multilib-builds)
+    string(TOUPPER ${LLVM_TOOLCHAIN_C_LIBRARY} toolchain_c_lib_upper)
 
     ExternalProject_Add(
         multilib-${LLVM_TOOLCHAIN_C_LIBRARY}
@@ -630,8 +629,7 @@ if(NOT PREBUILT_TARGET_LIBRARIES)
         -DENABLE_PARALLEL_LIB_BUILD=${ENABLE_PARALLEL_LIB_BUILD}
         -DPARALLEL_LIB_BUILD_LEVELS=${PARALLEL_LIB_BUILD_LEVELS}
         -DENABLE_QEMU_TESTING=${ENABLE_QEMU_TESTING}
-        -DFETCHCONTENT_SOURCE_DIR_PICOLIBC=${FETCHCONTENT_SOURCE_DIR_PICOLIBC}
-        -DFETCHCONTENT_SOURCE_DIR_MUSL-EMBEDDED=${FETCHCONTENT_SOURCE_DIR_MUSL-EMBEDDED}
+        -DFETCHCONTENT_SOURCE_DIR_${toolchain_c_lib_upper}=${FETCHCONTENT_SOURCE_DIR_${toolchain_c_lib_upper}}
         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
         -DPROJECT_PREFIX=${multilib_prefix}
         -DNUMERICAL_BUILD_NAMES=${SHORT_BUILD_PATHS}
@@ -816,7 +814,7 @@ install(
     COMPONENT llvm-toolchain-docs
 )
 
-if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc)
+if(LLVM_TOOLCHAIN_C_LIBRARY MATCHES "^picolibc")
     string(APPEND LIBC_LICENSE_FILES " - Picolibc: third-party-licenses/COPYING.NEWLIB, third-party-licenses/COPYING.picolibc\n")
 endif()
 if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded OR ENABLE_LINUX_LIBRARIES)
@@ -862,10 +860,10 @@ list(APPEND third_party_license_files
     ${CMAKE_CURRENT_LIST_DIR}/ATfE-LICENSE.txt ATfE-LICENSE.txt
 )
 
-if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc)
+if(LLVM_TOOLCHAIN_C_LIBRARY MATCHES "^picolibc")
     list(APPEND third_party_license_files
-        ${picolibc_SOURCE_DIR}/COPYING.NEWLIB           COPYING.NEWLIB
-        ${picolibc_SOURCE_DIR}/COPYING.picolibc         COPYING.picolibc
+        ${${LLVM_TOOLCHAIN_C_LIBRARY}_SOURCE_DIR}/COPYING.NEWLIB           COPYING.NEWLIB
+        ${${LLVM_TOOLCHAIN_C_LIBRARY}_SOURCE_DIR}/COPYING.picolibc         COPYING.picolibc
     )
 elseif(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
     list(APPEND third_party_license_files

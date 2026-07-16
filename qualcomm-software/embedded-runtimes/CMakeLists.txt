@@ -41,7 +41,13 @@ if(VARIANT_JSON)
         set(${json_param}_def ${json_val})
     endforeach()
     # Load arguments specific to the chosen library, overwriting any existing values.
-    string(JSON json_args GET ${variant_json_read} "args" ${C_LIBRARY})
+    # Let all picolibc versions share the same library-specific settings.
+    if(C_LIBRARY MATCHES "^picolibc")
+        set(json_library_key picolibc)
+    else()
+        set(json_library_key ${C_LIBRARY})
+    endif()
+    string(JSON json_args GET ${variant_json_read} "args" ${json_library_key})
     string(JSON json_args_len LENGTH ${json_args})
     math(EXPR json_args_len_dec "${json_args_len} - 1")
     foreach(json_idx RANGE ${json_args_len_dec})
@@ -169,7 +175,7 @@ add_custom_target(check-all)
 # If any testing is enabled, prepare test executor settings.
 if(ENABLE_LIBC_TESTS OR ENABLE_COMPILER_RT_TESTS OR ENABLE_LIBCXX_TESTS)
     # Flags required to link tests.
-    if(C_LIBRARY STREQUAL picolibc)
+    if(C_LIBRARY MATCHES "^picolibc")
         if(TEST_EXECUTOR STREQUAL qemu)
             set(picocrt "crt0-semihost")
         endif()
@@ -455,8 +461,8 @@ ExternalProject_Add(
 # picolibc
 ###############################################################################
 
-if(C_LIBRARY STREQUAL picolibc)
-    fetch_repo(picolibc)
+if(C_LIBRARY MATCHES "^picolibc")
+    fetch_repo(${C_LIBRARY})
     include(${CMAKE_CURRENT_SOURCE_DIR}/to_meson_list.cmake)
 
     # For building picolibc use Meson.
@@ -504,12 +510,12 @@ if(C_LIBRARY STREQUAL picolibc)
     endif()
 
     ExternalProject_Add(
-        picolibc
-        STAMP_DIR ${PROJECT_PREFIX}/picolibc/${VARIANT_BUILD_ID}/stamp
-        BINARY_DIR ${PROJECT_PREFIX}/picolibc/${VARIANT_BUILD_ID}/build
-        DOWNLOAD_DIR ${PROJECT_PREFIX}/picolibc/${VARIANT_BUILD_ID}/dl
-        TMP_DIR ${PROJECT_PREFIX}/picolibc/${VARIANT_BUILD_ID}/tmp
-        SOURCE_DIR ${picolibc_SOURCE_DIR}
+        ${C_LIBRARY}
+        STAMP_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/stamp
+        BINARY_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/build
+        DOWNLOAD_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/dl
+        TMP_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/tmp
+        SOURCE_DIR ${${C_LIBRARY}_SOURCE_DIR}
         INSTALL_DIR ${TEMP_LIB_DIR}
         DEPENDS compiler_rt-install
         CONFIGURE_COMMAND
@@ -546,30 +552,30 @@ if(C_LIBRARY STREQUAL picolibc)
         STEP_TARGETS configure build install
     )
 
-    add_custom_target(check-picolibc)
-    add_dependencies(check-all check-picolibc)
+    add_custom_target(check-${C_LIBRARY})
+    add_dependencies(check-all check-${C_LIBRARY})
     if(ENABLE_LIBC_TESTS)
         # meson builds the tests at the same time as the library.
         # So reconfigure to enable tests at a later point.
         ExternalProject_Add_Step(
-            picolibc
+            ${C_LIBRARY}
             compile-tests
             COMMAND ${MESON_EXECUTABLE} setup -Dtests=true --reconfigure <BINARY_DIR> <SOURCE_DIR>
             COMMAND ${MESON_EXECUTABLE} compile -C <BINARY_DIR>
             USES_TERMINAL TRUE
             EXCLUDE_FROM_MAIN TRUE
         )
-        ExternalProject_Add_StepTargets(picolibc compile-tests)
+        ExternalProject_Add_StepTargets(${C_LIBRARY} compile-tests)
         ExternalProject_Add_StepDependencies(
-            picolibc
+            ${C_LIBRARY}
             compile-tests
-            picolibc-build
+            ${C_LIBRARY}-build
             compiler_rt-install
         )
 
         # Step target to run the picolibc test via meson.
         ExternalProject_Add_Step(
-            picolibc
+            ${C_LIBRARY}
             check-meson
             COMMAND ${MESON_EXECUTABLE} test -C <BINARY_DIR> --no-rebuild
             USES_TERMINAL TRUE
@@ -577,23 +583,23 @@ if(C_LIBRARY STREQUAL picolibc)
             ALWAYS TRUE
             DEPENDEES compile-tests
         )
-        ExternalProject_Add_StepTargets(picolibc check-meson)
+        ExternalProject_Add_StepTargets(${C_LIBRARY} check-meson)
 
         # Generate lit wrappers for the tests.
         set(picolibc_lit_dir ${CMAKE_CURRENT_BINARY_DIR}/picolibc_lit)
         ExternalProject_Add_Step(
-            picolibc
+            ${C_LIBRARY}
             gen-lit-tests
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test-support/gen-picolibc-lit-tests.py
                 --meson ${MESON_EXECUTABLE}
                 --build <BINARY_DIR>
                 --output ${picolibc_lit_dir}
-                --name picolibc-${variant_xml_name}
+                --name ${C_LIBRARY}-${variant_xml_name}
             USES_TERMINAL TRUE
             EXCLUDE_FROM_MAIN TRUE
             DEPENDEES compile-tests
         )
-        ExternalProject_Add_StepTargets(picolibc gen-lit-tests)
+        ExternalProject_Add_StepTargets(${C_LIBRARY} gen-lit-tests)
 
         # Generate xfails for picolibc.
         set(picolibc_lit_xfails_path "${picolibc_lit_dir}/${VARIANT}_picolibc_lit_xfails.txt")
@@ -614,7 +620,7 @@ if(C_LIBRARY STREQUAL picolibc)
 
         # Step target to run the picolibc test via lit.
         ExternalProject_Add_Step(
-            picolibc
+            ${C_LIBRARY}
             check-lit
             COMMAND ${check_lit_cmd}
             USES_TERMINAL TRUE
@@ -622,13 +628,13 @@ if(C_LIBRARY STREQUAL picolibc)
             ALWAYS TRUE
             DEPENDEES gen-lit-tests
         )
-        ExternalProject_Add_StepTargets(picolibc check-lit)
+        ExternalProject_Add_StepTargets(${C_LIBRARY} check-lit)
         ExternalProject_Add_StepDependencies(
-            picolibc
+            ${C_LIBRARY}
             check-lit
             picolibc-xfail-lit-args
         )
-        add_dependencies(check-picolibc picolibc-check-lit)
+        add_dependencies(check-${C_LIBRARY} ${C_LIBRARY}-check-lit)
         add_dependencies(clib-build ${C_LIBRARY}-compile-tests)
     endif()
 
@@ -714,7 +720,7 @@ add_dependencies(clib-install ${C_LIBRARY}-install)
 ###############################################################################
 
 if(ENABLE_CXX_LIBS)
-    if(C_LIBRARY STREQUAL picolibc)
+    if(C_LIBRARY MATCHES "^picolibc")
         set(cxxlibs_extra_cmake_options
             -DLIBCXXABI_ENABLE_THREADS=OFF
             -DLIBCXX_ENABLE_MONOTONIC_CLOCK=OFF
