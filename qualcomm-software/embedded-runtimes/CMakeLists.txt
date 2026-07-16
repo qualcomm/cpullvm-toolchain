@@ -118,6 +118,7 @@ set(TEMP_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/tmp_install")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 include(ExternalProject)
+include(${TOOLCHAIN_SOURCE_DIR}/cmake/fetch_repo.cmake)
 
 # If a compiler launcher such as ccache has been set, it should be
 # passed down to each subproject build.
@@ -449,7 +450,7 @@ ExternalProject_Add(
 ###############################################################################
 
 if(C_LIBRARY STREQUAL picolibc)
-    include(${TOOLCHAIN_SOURCE_DIR}/cmake/fetch_picolibc.cmake)
+    fetch_repo(picolibc)
     include(${CMAKE_CURRENT_SOURCE_DIR}/to_meson_list.cmake)
 
     # For building picolibc use Meson.
@@ -643,7 +644,7 @@ if(C_LIBRARY STREQUAL musl-embedded)
         message(FATAL_ERROR "Only Arm and AArch64 targets are supported for musl-embedded")
     endif()
 
-    include(${TOOLCHAIN_SOURCE_DIR}/cmake/fetch_musl-embedded.cmake)
+    fetch_repo(musl-embedded)
 
     include(ProcessorCount)
     set(make_flags)
