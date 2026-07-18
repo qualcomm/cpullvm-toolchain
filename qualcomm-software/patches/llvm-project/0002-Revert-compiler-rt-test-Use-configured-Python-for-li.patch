@@ -1,0 +1,27 @@
+From 9de4983ac720a926f0dff9e387bebfd6fe7b1452 Mon Sep 17 00:00:00 2001
+From: Namish Kukreja <namikukr@qti.qualcomm.com>
+Date: Fri, 17 Jul 2026 17:09:55 -0700
+Subject: [PATCH] Revert "[compiler-rt][test] Use configured Python for lit
+ page-size probe (#209175)"
+
+This reverts commit 30bc042395a6cf0aa1e5de4fcc625d5b8c611767.
+---
+ compiler-rt/test/lit.common.cfg.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/compiler-rt/test/lit.common.cfg.py b/compiler-rt/test/lit.common.cfg.py
+index c038b57f9e98..20c1b872bb14 100644
+--- a/compiler-rt/test/lit.common.cfg.py
++++ b/compiler-rt/test/lit.common.cfg.py
+@@ -970,7 +970,7 @@ def target_page_size():
+         return 4096
+     try:
+         proc = subprocess.Popen(
+-            f"{emulator or ''} {shlex.quote(config.python_executable)}",
++            f"{emulator or ''} python3",
+             shell=True,
+             stdin=subprocess.PIPE,
+             stdout=subprocess.PIPE,
+-- 
+2.34.1
+
