@@ -12,3 +12,6 @@ sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 
 
 # Install meson. eld support was added in v1.9.0, so we need at least that.
 pip install meson==1.10.0
+
+# psutil is used to set per-test timeouts in lit
+pip install psutil
