@@ -1,4 +1,4 @@
-From ead200a7e1dd5e3ca9e3550385009cbad46dfdec Mon Sep 17 00:00:00 2001
+From 7cee3ab60350842d50ade2b3748d637061b1a916 Mon Sep 17 00:00:00 2001
 From: Sudharsan Veeravalli <svs@qti.qualcomm.com>
 Date: Sun, 19 Jul 2026 08:37:10 +0530
 Subject: [PATCH] LTO with linker scripts, end-to-end.
@@ -25,6 +25,7 @@ RFC: https://discourse.llvm.org/t/rfc-lto-lld-lto-with-linker-scripts-implemente
  lld/ELF/Options.td                            |   5 +
  .../CheckWrapSymbolResolution.test            |  67 ++++++++
  .../lto-with-linker-scripts/LTOAsmAlias.test  |  41 +++++
+ .../LTOAsmEmptySymbol.test                    |  51 ++++++
  .../LTOKeepSymbol.test                        |  63 ++++++++
  .../LTOPreemptSymbol.test                     |  53 +++++++
  .../lto-with-linker-scripts/LTOSaveTemps.test |  63 ++++++++
@@ -47,13 +48,14 @@ RFC: https://discourse.llvm.org/t/rfc-lto-lld-lto-with-linker-scripts-implemente
  llvm/lib/Analysis/InlineCost.cpp              |  23 +++
  llvm/lib/CodeGen/AssignSectionsToGlobals.cpp  | 145 ++++++++++++++++++
  llvm/lib/CodeGen/CMakeLists.txt               |   1 +
- llvm/lib/LTO/LTO.cpp                          |  53 ++++++-
+ llvm/lib/LTO/LTO.cpp                          |  59 ++++++-
  llvm/lib/Object/IRSymtab.cpp                  |   2 +
  llvm/lib/Object/ModuleSymbolTable.cpp         |   2 +-
- 39 files changed, 1332 insertions(+), 14 deletions(-)
+ 40 files changed, 1388 insertions(+), 15 deletions(-)
  create mode 100644 clang/test/CodeGen/lto-linker-scripts.c
  create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/CheckWrapSymbolResolution.test
  create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmAlias.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmEmptySymbol.test
  create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOKeepSymbol.test
  create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOPreemptSymbol.test
  create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOSaveTemps.test
@@ -489,6 +491,63 @@ index 000000000000..14a556b05af4
 +#--- script.t
 +SECTIONS {
 +foo : { *(.text.*) }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmEmptySymbol.test b/lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmEmptySymbol.test
+new file mode 100644
+index 000000000000..39f8613b8159
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmEmptySymbol.test
+@@ -0,0 +1,51 @@
++# REQUIRES: aarch64
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/1.ll -o %t/1.o
++# RUN: llvm-as %t/2.ll -o %t/2.o
++# RUN: llvm-mc -filetype=obj -triple=aarch64-unknown-linux-gnu %t/3.s -o %t/3.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts --gc-sections -e main -T %t/script.t \
++# RUN:   %t/1.o %t/2.o %t/3.o -o %t/out
++# RUN: llvm-readelf -s -W %t/out | FileCheck %s
++
++# CHECK: FUNC GLOBAL DEFAULT {{.*}} foo
++
++#--- 1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++module asm ".xword ."
++
++define i32 @foo(i32 %x) nounwind section ".text.foo" {
++  %r = add i32 %x, 2
++  ret i32 %r
++}
++
++#--- 2.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++module asm ".xword ."
++module asm ".weak foo"
++module asm ".equ foo,bar"
++
++@llvm.compiler.used = appending global [1 x ptr] [ptr @bar], section "llvm.metadata"
++
++define internal i32 @bar(i32 %x) nounwind section ".text.bar" {
++  %r = add i32 %x, 1
++  ret i32 %r
++}
++
++#--- 3.s
++.text
++.section .text.main,"ax",@progbits
++.globl main
++.type main,@function
++main:
++  .xword foo
++  ret
++.size main, .-main
++
++#--- script.t
++SECTIONS {
++  .text : { *(.text.*) }
 +}
 diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/LTOKeepSymbol.test b/lld/test/ELF/lto/lto-with-linker-scripts/LTOKeepSymbol.test
 new file mode 100644
@@ -1756,7 +1815,7 @@ index c572128b023c..69a692a9508b 100644
    BasicTargetTransformInfo.cpp
    BranchFolding.cpp
 diff --git a/llvm/lib/LTO/LTO.cpp b/llvm/lib/LTO/LTO.cpp
-index c8c5b0880819..e13d22da1b9d 100644
+index c8c5b0880819..e516754f5ce3 100644
 --- a/llvm/lib/LTO/LTO.cpp
 +++ b/llvm/lib/LTO/LTO.cpp
 @@ -627,13 +627,15 @@ void llvm::thinLTOInternalizeAndPromoteInIndex(
@@ -1848,6 +1907,19 @@ index c8c5b0880819..e13d22da1b9d 100644
      } else if (auto *AS =
                     dyn_cast_if_present<ModuleSymbolTable::AsmSymbol *>(Msym)) {
        // Collect non-prevailing symbols.
+@@ -1128,7 +1167,11 @@ LTO::addRegularLTO(InputFile &Input, ArrayRef<SymbolResolution> InputRes,
+             if (!NonPrevailingAsmSymbols.count(Alias))
+               NonPrevailingAsmSymbols.erase(Name);
+           });
+-      NewIA += " " + llvm::join(NonPrevailingAsmSymbols, ", ");
++      // Empty names can be produced by asm symbol scanning for empty inline asm
++      // statements. They are not valid operands for .lto_discard.
++      NonPrevailingAsmSymbols.erase(StringRef());
++      if (!NonPrevailingAsmSymbols.empty())
++        NewIA += " " + llvm::join(NonPrevailingAsmSymbols, ", ");
+     }
+     NewIA += "\n";
+     M.prependModuleInlineAsm(NewIA);
 diff --git a/llvm/lib/Object/IRSymtab.cpp b/llvm/lib/Object/IRSymtab.cpp
 index 0f404be9bd4a..24698c3be6a6 100644
 --- a/llvm/lib/Object/IRSymtab.cpp

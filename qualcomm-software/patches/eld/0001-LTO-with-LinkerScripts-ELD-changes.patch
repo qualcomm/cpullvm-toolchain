@@ -1,4 +1,4 @@
-From 16239c567766d924074d4e5144213fe2a014b072 Mon Sep 17 00:00:00 2001
+From baa746ed9757e849eff8654f2c5a85824ca4140c Mon Sep 17 00:00:00 2001
 From: Sudharsan Veeravalli <svs@qti.qualcomm.com>
 Date: Tue, 9 Jun 2026 09:30:36 +0530
 Subject: [PATCH] LTO with LinkerScripts ELD changes
@@ -25,6 +25,7 @@ Signed-off-by: Sudharsan Veeravalli <svs@qti.qualcomm.com>
  .../lto-with-linker-scripts/AdvancedLTO.cfg   |   4 +
  .../CheckWrapSymbolResolution.test            |  64 ++++++
  .../lto-with-linker-scripts/LTOAsmAlias.test  |  38 ++++
+ .../LTOAsmEmptySymbol.test                    |  46 ++++
  .../LTOKeepPreserveLocal.test                 |  27 +++
  .../LTOKeepSymbol.test                        |  62 ++++++
  .../LTOPreemptSymbol.test                     |  46 ++++
@@ -41,13 +42,14 @@ Signed-off-by: Sudharsan Veeravalli <svs@qti.qualcomm.com>
  .../ThinLTOWithLS.test                        |  60 +++++
  .../LTO/lto-with-linker-scripts/ltokeep.test  |  41 ++++
  .../ltosectionattribute.test                  |  39 ++++
- 36 files changed, 1279 insertions(+), 19 deletions(-)
+ 37 files changed, 1325 insertions(+), 19 deletions(-)
  create mode 100644 Plugins/AdvancedLTO/AdvancedLTO.cpp
  create mode 100644 Plugins/AdvancedLTO/AdvancedLTO.yaml
  create mode 100644 Plugins/AdvancedLTO/CMakeLists.txt
  create mode 100644 test/Common/LTO/lto-with-linker-scripts/AdvancedLTO.cfg
  create mode 100644 test/Common/LTO/lto-with-linker-scripts/CheckWrapSymbolResolution.test
  create mode 100644 test/Common/LTO/lto-with-linker-scripts/LTOAsmAlias.test
+ create mode 100644 test/Common/LTO/lto-with-linker-scripts/LTOAsmEmptySymbol.test
  create mode 100644 test/Common/LTO/lto-with-linker-scripts/LTOKeepPreserveLocal.test
  create mode 100644 test/Common/LTO/lto-with-linker-scripts/LTOKeepSymbol.test
  create mode 100644 test/Common/LTO/lto-with-linker-scripts/LTOPreemptSymbol.test
@@ -824,6 +826,58 @@ index 00000000..b9d4b6fd
 +#--- script.t
 +SECTIONS {
 +foo : { *(.text.*) }
++}
+diff --git a/test/Common/LTO/lto-with-linker-scripts/LTOAsmEmptySymbol.test b/test/Common/LTO/lto-with-linker-scripts/LTOAsmEmptySymbol.test
+new file mode 100644
+index 00000000..f160ec29
+--- /dev/null
++++ b/test/Common/LTO/lto-with-linker-scripts/LTOAsmEmptySymbol.test
+@@ -0,0 +1,46 @@
++# RUN: rm -rf %t && split-file %s %t
++# RUN: %opt -mtriple=%triple %t/1.ll -o %t/1.o
++# RUN: %opt -mtriple=%triple %t/2.ll -o %t/2.o
++# RUN: %llvm-mc -filetype=obj -triple=%triple %t/3.s -o %t/3.o
++# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg --gc-sections -e main -T %t/script.t \
++# RUN:   %t/1.o %t/2.o %t/3.o -o %t/out
++# RUN: %readelf -s -W %t/out | %filecheck %s
++
++# CHECK: FUNC GLOBAL DEFAULT {{.*}} foo
++
++#--- 1.ll
++
++module asm ".word ."
++
++define i32 @foo(i32 %x) nounwind section ".text.foo" {
++  %r = add i32 %x, 2
++  ret i32 %r
++}
++
++#--- 2.ll
++
++module asm ".word ."
++module asm ".weak foo"
++module asm ".equ foo,bar"
++
++@llvm.compiler.used = appending global [1 x ptr] [ptr @bar], section "llvm.metadata"
++
++define internal i32 @bar(i32 %x) nounwind section ".text.bar" {
++  %r = add i32 %x, 1
++  ret i32 %r
++}
++
++#--- 3.s
++.text
++.section .text.main,"ax",%progbits
++.globl main
++.type main,%function
++main:
++  .word foo
++  .byte 0
++.size main, .-main
++
++#--- script.t
++SECTIONS {
++  .text : { *(.text.*) }
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/LTOKeepPreserveLocal.test b/test/Common/LTO/lto-with-linker-scripts/LTOKeepPreserveLocal.test
 new file mode 100644
