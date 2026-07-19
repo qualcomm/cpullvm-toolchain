@@ -1,4 +1,4 @@
-From 34b97abc57aad665f0f8a15e6298a028889580a3 Mon Sep 17 00:00:00 2001
+From 16239c567766d924074d4e5144213fe2a014b072 Mon Sep 17 00:00:00 2001
 From: Sudharsan Veeravalli <svs@qti.qualcomm.com>
 Date: Tue, 9 Jun 2026 09:30:36 +0530
 Subject: [PATCH] LTO with LinkerScripts ELD changes
@@ -23,7 +23,7 @@ Signed-off-by: Sudharsan Veeravalli <svs@qti.qualcomm.com>
  lib/Object/ObjectLinker.cpp                   |  37 +++-
  lib/Readers/BitcodeReader.cpp                 |   4 +-
  .../lto-with-linker-scripts/AdvancedLTO.cfg   |   4 +
- .../CheckWrapSymbolResolution.test            |  60 +++++
+ .../CheckWrapSymbolResolution.test            |  64 ++++++
  .../lto-with-linker-scripts/LTOAsmAlias.test  |  38 ++++
  .../LTOKeepPreserveLocal.test                 |  27 +++
  .../LTOKeepSymbol.test                        |  62 ++++++
@@ -41,7 +41,7 @@ Signed-off-by: Sudharsan Veeravalli <svs@qti.qualcomm.com>
  .../ThinLTOWithLS.test                        |  60 +++++
  .../LTO/lto-with-linker-scripts/ltokeep.test  |  41 ++++
  .../ltosectionattribute.test                  |  39 ++++
- 36 files changed, 1275 insertions(+), 19 deletions(-)
+ 36 files changed, 1279 insertions(+), 19 deletions(-)
  create mode 100644 Plugins/AdvancedLTO/AdvancedLTO.cpp
  create mode 100644 Plugins/AdvancedLTO/AdvancedLTO.yaml
  create mode 100644 Plugins/AdvancedLTO/CMakeLists.txt
@@ -596,7 +596,7 @@ index af7daae2..e4d535e4 100644
    return Config.options().getUnparsedLTOOptions();
  }
 diff --git a/lib/Object/ObjectLinker.cpp b/lib/Object/ObjectLinker.cpp
-index 8750f81c..2126b80f 100644
+index 8750f81c..3111510f 100644
 --- a/lib/Object/ObjectLinker.cpp
 +++ b/lib/Object/ObjectLinker.cpp
 @@ -32,6 +32,7 @@
@@ -654,7 +654,7 @@ index 8750f81c..2126b80f 100644
          llvm::StringMap<std::string>::iterator RenameSym =
              ThisConfig.options().renameMap().find(WrapSymbolName);
 -        if (ThisConfig.options().renameMap().end() != RenameSym) {
-+        if (Sym.isGlobal() &&
++        if (Sym.isGlobal() && Info->resolvedOrigin() == Inp &&
 +            ThisConfig.options().renameMap().end() != RenameSym) {
            LTORes.Prevailing = true;
            LTORes.VisibleToRegularObj = true;
@@ -713,10 +713,10 @@ index 00000000..5d8bc672
 +    Library: AdvancedLTO
 diff --git a/test/Common/LTO/lto-with-linker-scripts/CheckWrapSymbolResolution.test b/test/Common/LTO/lto-with-linker-scripts/CheckWrapSymbolResolution.test
 new file mode 100644
-index 00000000..9eac98ba
+index 00000000..0af7832b
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/CheckWrapSymbolResolution.test
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,64 @@
 +# RUN: rm -rf %t && split-file %s %t
 +# RUN: %llvm-mc -filetype=obj -triple=%triple %t/1.s -o %t/1.o
 +# RUN: %opt -mtriple=%triple %t/2.ll -o %t/2.o
@@ -740,7 +740,9 @@ index 00000000..9eac98ba
 +
 +#--- 2.ll
 +
-+declare i32 @foo()
++define weak i32 @foo() nounwind section ".text.foo.1" {
++  ret i32 1
++}
 +
 +define i32 @bar() nounwind section ".text.bar" {
 +  %v = call i32 @foo()
@@ -749,7 +751,9 @@ index 00000000..9eac98ba
 +
 +#--- 3.ll
 +
-+declare i32 @foo()
++define weak i32 @foo() nounwind section ".text.foo.2" {
++  ret i32 2
++}
 +
 +define i32 @b1() nounwind section ".text.b1" {
 +  %v = call i32 @foo()
