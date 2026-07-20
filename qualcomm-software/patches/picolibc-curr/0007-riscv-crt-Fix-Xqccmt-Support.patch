@@ -1,0 +1,60 @@
+From 1bf1a2ae4e9901cdd96ea883eb2b593db5558491 Mon Sep 17 00:00:00 2001
+From: Sam Elliott <aelliott@qti.qualcomm.com>
+Date: Thu, 9 Jul 2026 17:57:30 -0700
+Subject: [PATCH] [riscv][crt] Fix Xqccmt Support
+
+This fixes two issues:
+- Using the wrong mnemonics with Xqccmt (the encodings are the same, the
+  mnemonics are different), and
+- A logic error in the ifdefs.
+
+Signed-off-by: Sam Elliott <aelliott@qti.qualcomm.com>
+---
+ test/test-riscv-jvt.c | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
+
+diff --git a/test/test-riscv-jvt.c b/test/test-riscv-jvt.c
+index cb22a7c22..65aff459d 100644
+--- a/test/test-riscv-jvt.c
++++ b/test/test-riscv-jvt.c
+@@ -36,7 +36,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
+-#if !defined(__riscv) || (!defined(__riscv_zcmt) && !defined(__riscv_xqccmt))
++#if defined(__riscv) && (defined(__riscv_zcmt) || defined(__riscv_xqccmt))
+ 
+ const char    *get_message(void);
+ 
+@@ -77,16 +77,23 @@ main(void)
+     /*
+      * This is a RISC-V specific feature.
+      */
+-#if !defined(__riscv) || (!defined(__riscv_zcmt) && !defined(__riscv_xqccmt))
+-    printf("jvt not supported for this target\n");
+-    return 77;
+-#else
+-
++#if defined(__riscv) && defined(__riscv_zcmt)
+     __asm__("cm.jalt 32\n" // This is equivalent to `call func_table[32]`
+             "cm.jt 0\n"    // This is equivalent to `tail func_table[0]`
+     );
+ 
+     printf("ERROR: cm.jt returned\n");
+     return 1;
++#elif defined(__riscv) && defined(__riscv_xqccmt)
++    __asm__("qc.cm.jalt 32\n" // This is equivalent to `call func_table[32]`
++            "qc.cm.jt 0\n"    // This is equivalent to `tail func_table[0]`
++    );
++
++    printf("ERROR: qc.cm.jt returned\n");
++    return 1;
++#else
++    printf("jvt not supported for this target\n");
++    return 77;
+ #endif
++
+ }
+-- 
+2.51.0
+

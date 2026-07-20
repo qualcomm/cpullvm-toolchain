@@ -1,0 +1,287 @@
+From 02ba9150018b65d10fae64613a2c285a03a22390 Mon Sep 17 00:00:00 2001
+From: Sam Elliott <aelliott@qti.qualcomm.com>
+Date: Wed, 10 Jun 2026 17:43:48 -0700
+Subject: [PATCH 5/5] [riscv][crt] Add Support for Zcmt
+
+Zcmt is the "jump table" extension for RISC-V. Broadly, how this is
+supported in the CRT is that the weak symbol `__riscv_jvt$` is defined
+if the toolchain has created a jump table, and this variable needs to be
+used to initialize the `jvt` csr. The jump table itself will be placed
+in an (executable) `.riscv.jvt` section, because the `cm.jt` and
+`cm.jalt` instructions access the table as if it were instruction
+memory, not data memory.
+
+The test here is designed to create its own jump table using the C
+compiler and inline assembly, and to use it, and does not rely on a
+Linker to create the jump table, as would usually be the case. I can
+rewrite this in assembly if preferred.
+
+This slightly reorganises the riscv crt0.c, to bring comments back to
+the code they relate to, and to align the _start and _trap
+implementations.
+---
+ meson.build                  |  8 ++++
+ picocrt/machine/riscv/crt0.c | 69 ++++++++++++++++++++++-----
+ picolibc.ld.in               |  2 +
+ test/meson.build             |  1 +
+ test/test-riscv-jvt.c        | 92 ++++++++++++++++++++++++++++++++++++
+ 5 files changed, 160 insertions(+), 12 deletions(-)
+ create mode 100644 test/test-riscv-jvt.c
+
+diff --git a/meson.build b/meson.build
+index 5fd9d790a..5ce9b0c38 100644
+--- a/meson.build
++++ b/meson.build
+@@ -1053,6 +1053,14 @@ foreach params : [default_target] + targets
+       picolibc_linker_type_data.set('TLS_INIT_SEG', 'tls_init')
+     endif
+ 
++    if host_cpu_family == 'riscv'
++      picolibc_linker_type_data.set('RISCV_START', '/* For RISC-V Only: */')
++      picolibc_linker_type_data.set('RISCV_END', '')
++    else
++      picolibc_linker_type_data.set('RISCV_START', '/* For RISC-V Only:')
++      picolibc_linker_type_data.set('RISCV_END', '*/')
++    endif
++
+     init_memory_template = '''
+ 	@0@ (rx!w) :
+ 		ORIGIN = DEFINED(__@0@) ? __@0@ : @1@,
+diff --git a/picocrt/machine/riscv/crt0.c b/picocrt/machine/riscv/crt0.c
+index cbf267b2d..fc75d7cb3 100644
+--- a/picocrt/machine/riscv/crt0.c
++++ b/picocrt/machine/riscv/crt0.c
+@@ -158,18 +158,30 @@ _trap(void)
+         SAVE_CSR(mcause);
+         SAVE_CSR(mtval);
+ 
+-        /*
+-         * Pass pointer to saved registers in first parameter register
+-         */
+-	__asm__(".option	push\n"
+-                ".option	norelax\n"
++    /*
++     * Ensure GP and JVT are initialized before calling C
++     */
++    __asm__(".option	push\n"
++            ".option	norelax\n"
+ #ifdef __riscv_cmodel_large
+                 "ld     gp,.trap_gp\n"
+ #else
+                 "la	gp, __global_pointer$\n"
+ #endif
+-                ".option	pop");
+-        __asm__("mv     a0, sp");
++            ".option	pop");
++
++#ifdef __riscv_zcmt
++    __asm__(".weak __jvt_base$\n"
++#ifdef __riscv_cmodel_large
++            "ld t0, .trap_jvt_base\n"
++#else
++            "la t0, __jvt_base$\n"
++#endif
++            // __jvt_base$ is weak, so skip initializing `CSR[jvt]` if it is zero (undefined)
++            "beqz t0, .Lafter_jvt_init_trap\n"
++            "csrw jvt, t0\n"
++            ".Lafter_jvt_init_trap:\n");
++#endif
+ 
+         /* Enable FPU (just in case) */
+ #ifdef __riscv_flen
+@@ -179,10 +191,21 @@ _trap(void)
+                 "csrw	mstatus, t0\n"
+                 "csrwi	fcsr, 0");
+ #endif
+-        __asm__("jal    _ctrap");
++
++    /*
++     * Call to C passing the saved registers as the first parameter.
++     */
++    __asm__("mv     a0, sp\n"
++            "jal    _ctrap");
++
+ #ifdef __riscv_cmodel_large
+-        __asm__(".align 3\n.trap_sp:\n.dword __stack");
+-        __asm__(".align 3\n.trap_gp:\n.dword __global_pointer$");
++    __asm__(".align 3\n"
++            ".trap_sp: .dword __stack\n" /* FIXME: this is __heap_end in non-large code models. */
++            ".trap_gp: .dword __global_pointer$\n"
++#ifdef __riscv_zcmt
++            ".trap_jvt_base: .dword __jvt_base$\n"
++#endif
++    );
+ #endif
+ }
+ #endif
+@@ -228,6 +251,20 @@ _start(void)
+                 "csrw	mstatus, t0\n"
+                 "csrwi	vxrm, 1");
+ #endif
++
++#ifdef __riscv_zcmt
++    __asm__(".weak __jvt_base$\n"
++#ifdef __riscv_cmodel_large
++            "ld t0, .start_jvt_base\n"
++#else
++            "la t0, __jvt_base$\n"
++#endif
++            // __jvt_base$ is weak, so skip initializing `CSR[jvt]` if it is zero (undefined)
++            "beqz t0, .Lafter_jvt_init\n"
++            "csrw jvt, t0\n"
++            ".Lafter_jvt_init:\n");
++#endif
++
+ #ifdef CRT0_SEMIHOST
+ #ifdef __riscv_cmodel_large
+         __asm__("ld     t0,.start_trap");
+@@ -237,13 +274,21 @@ _start(void)
+         __asm__("csrw   mtvec, t0");
+         __asm__("csrr   t1, mtvec");
+ #endif
+-        __asm__("j      _cstart");
++
++    /*
++     * Call into C start function
++     */
++    __asm__("j      _cstart");
++
+ #ifdef __riscv_cmodel_large
+         __asm__(".align 3\n"
+                 ".start_sp: .dword __stack\n"
+                 ".start_gp: .dword __global_pointer$\n"
+ #ifdef CRT0_SEMIHOST
+-                ".start_trap: .dword _trap"
++            ".start_trap: .dword _trap\n"
++#endif
++#ifdef __riscv_zcmt
++            ".start_jvt_base: .dword __jvt_base$\n"
+ #endif
+             );
+ #endif
+diff --git a/picolibc.ld.in b/picolibc.ld.in
+index c766e60a6..490d81427 100644
+--- a/picolibc.ld.in
++++ b/picolibc.ld.in
+@@ -101,6 +101,8 @@ SECTIONS
+ 		KEEP (*(.fini_array*))
+ 		PROVIDE_HIDDEN ( @PREFIX@__fini_array_end = . );
+ 
++		@RISCV_START@ KEEP (*(.riscv.jvt)) @RISCV_END@
++
+ 	} >flash AT>flash :text
+ 
+ 	.rodata : {
+diff --git a/test/meson.build b/test/meson.build
+index 8e6a72869..f042890a5 100644
+--- a/test/meson.build
++++ b/test/meson.build
+@@ -48,6 +48,7 @@ plain_tests_common = ['regex', 'ungetc',
+                       'test-scmpu',
+                       'test-strncpy',
+                       'time-tests',
++                      'test-riscv-jvt',
+ 	      ]
+ 
+ math_tests_common = [
+diff --git a/test/test-riscv-jvt.c b/test/test-riscv-jvt.c
+new file mode 100644
+index 000000000..e9539bd08
+--- /dev/null
++++ b/test/test-riscv-jvt.c
+@@ -0,0 +1,92 @@
++/*
++ * SPDX-License-Identifier: BSD-3-Clause
++ *
++ * Copyright © 2022 Keith Packard
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above
++ *    copyright notice, this list of conditions and the following
++ *    disclaimer in the documentation and/or other materials provided
++ *    with the distribution.
++ *
++ * 3. Neither the name of the copyright holder nor the names of its
++ *    contributors may be used to endorse or promote products derived
++ *    from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++ * COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
++ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
++ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
++ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++ * OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++
++#if !defined(__riscv) || !defined(__riscv_jvt)
++
++const char    *get_message(void);
++
++_Noreturn void print_message(const char *);
++
++/*
++ * The Jump Table has 256 entries, the first 32 are for `cm.jt` and the rest are
++ * for `cm.jalt`. The former is for `tail` and the latter is for `call`.
++ */
++__attribute__((aligned(64))) __attribute__((section(".riscv.jvt"))) void *func_table[256] = {
++    [0] = &print_message,
++    [32] = &get_message,
++};
++
++__asm__(".weak __jvt_base$\n"
++        ".set __jvt_base$, func_table\n");
++
++const char *
++get_message(void)
++{
++    return "retrieved message correctly";
++}
++
++void
++print_message(const char *message)
++{
++    printf("SUCCESS: %s\n", message);
++    exit(0);
++}
++
++#endif
++
++int
++main(void)
++{
++    printf("executing jvt tests\n");
++
++    /*
++     * This is a RISC-V specific feature.
++     */
++#if !defined(__riscv) || !defined(__riscv_zcmt)
++    printf("jvt not supported for this target\n");
++    return 77;
++#else
++
++    __asm__("cm.jalt 32\n" // This is equivalent to `call func_table[32]`
++            "cm.jt 0\n"    // This is equivalent to `tail func_table[0]`
++    );
++
++    printf("ERROR: cm.jt returned\n");
++    return 1;
++#endif
++}
+-- 
+2.51.0
+

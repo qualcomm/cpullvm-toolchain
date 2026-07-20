@@ -15,6 +15,11 @@
       "tagType": "branch",
       "tag": "main"
     },
+    "picolibc-curr": {
+      "url": "https://github.com/picolibc/picolibc.git",
+      "tagType": "commithash",
+      "tag": "01254932e8e81085817ed61fd858648584ffe37c"
+    },
     "musl": {
       "url": "git://git.musl-libc.org/musl",
       "tagType": "tag",

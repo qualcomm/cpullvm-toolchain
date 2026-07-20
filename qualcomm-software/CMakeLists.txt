@@ -120,7 +120,7 @@ set(LLVM_TOOLCHAIN_C_LIBRARY
     "Which C library to use."
 )
 set_property(CACHE LLVM_TOOLCHAIN_C_LIBRARY
-    PROPERTY STRINGS picolibc picolibc-main musl-embedded)
+    PROPERTY STRINGS picolibc picolibc-main picolibc-curr musl-embedded)
 
 option(
     SHORT_BUILD_PATHS
@@ -819,7 +819,7 @@ install(
     COMPONENT llvm-toolchain-docs
 )
 
-if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc)
+if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc OR LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc-curr)
     string(APPEND LIBC_LICENSE_FILES " - Picolibc: third-party-licenses/COPYING.NEWLIB, third-party-licenses/COPYING.picolibc\n")
 endif()
 if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc-main)
@@ -873,7 +873,7 @@ if(LLVM_TOOLCHAIN_C_LIBRARY MATCHES "^picolibc")
         ${${LLVM_TOOLCHAIN_C_LIBRARY}_SOURCE_DIR}/COPYING.picolibc         COPYING.picolibc
     )
     # COPYING.NEWLIB has been removed in mainline picolibc.
-    if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL "picolibc")
+    if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc OR LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc-curr)
         list(APPEND third_party_license_files
             ${${LLVM_TOOLCHAIN_C_LIBRARY}_SOURCE_DIR}/COPYING.NEWLIB         COPYING.NEWLIB
         )
