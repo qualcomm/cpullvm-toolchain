@@ -13,21 +13,35 @@ jobs:
   discover-python:
     name: Python on ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
-
+    
     strategy:
       fail-fast: false
       matrix:
         runner:
           - windows-2025
           - windows-11-arm
-
+    
     steps:
       - name: List Python installations
         shell: pwsh
         run: |
           Write-Host "Python installations on ${{ matrix.runner }}:"
           Write-Host ""
+          
+          # Check x64
           Get-ChildItem -Path "C:\hostedtoolcache\windows\Python\*\x64\python.exe" -ErrorAction SilentlyContinue | ForEach-Object {
             $version = & $_.FullName --version 2>&1
-            Write-Host "$version"
+            Write-Host "$version (x64)"
           }
+          
+          # Check arm64
+          Get-ChildItem -Path "C:\hostedtoolcache\windows\Python\*\arm64\python*.exe" -ErrorAction SilentlyContinue | ForEach-Object {
+            $version = & $_.FullName --version 2>&1
+            Write-Host "$version (arm64)"
+          }
+          
+          # Show what's in PATH
+          Write-Host ""
+          Write-Host "Python in PATH:"
+          where.exe python 2>$null
+          where.exe python3 2>$null
