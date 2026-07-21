@@ -1,0 +1,31 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Reject any commit in the PR whose message contains a Gerrit Change-Id footer,
+# and reject PRs whose description contains a Gerrit Change-Id footer.
+
+name: Testing
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # Don't run on forks
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    runs-on: cpullvm-ubuntu24-x86_64
+
+    steps:
+      - name: Check qemu
+        shell: bash
+        run: |
+          ls -l `which qemu-system-riscv32-xqci`
