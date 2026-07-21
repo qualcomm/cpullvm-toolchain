@@ -98,6 +98,27 @@ def main():
 
     xfails = [
         XFail(
+            name="signal unwind picolibc",
+            testnames=[
+                "signal_unwind.pass.cpp",
+                "unwind_leaffunction.pass.cpp",
+            ],
+            result=NewResult.XFAILED,
+            project="libcxx",
+            variants=[
+                "aarch64a_tlsie",
+                "riscv64gc_lp64d_nopic",
+                "riscv64gc_lp64_nopic",
+                "riscv64gc_zba_zbb_lp64d_nopic",
+                "riscv64gc_zba_zbb_lp64_nopic",
+                "riscv64imac_lp64_nopic",
+                "riscv64imc_lp64_nothreads_nopic",
+            ],
+            description="picolibc semihost defines kill as a stub that calls _exit(128 + sig) "
+                "instead of delivering the signal to the registered handler, so signal-based "
+                "unwind tests cannot run on bare-metal targets.",
+        ),
+        XFail(
             name="no frwpi",
             testnames=[
                 "Clang :: Driver/ropi-rwpi.c",
