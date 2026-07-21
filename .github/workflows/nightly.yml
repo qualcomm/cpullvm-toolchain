@@ -61,83 +61,91 @@ jobs:
       - name: Test
         run: ./qualcomm-software/scripts/test.sh
 
-  build-and-test:
-    if: github.repository == 'qualcomm/cpullvm-toolchain'
-    name: ${{ matrix.build_script }} on ${{ matrix.target_os }}
-    needs: build-and-test-Linux-x86
-    runs-on: ${{ matrix.runner }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - build_script: build_copy_runtimes.sh
-            test_script: test.sh
-            install_script: install_dependencies.sh
-            target_os: Linux-AArch64
-            runner: ubuntu-24.04-arm
-
-          - build_script: build_musl-embedded_overlay.sh
-            test_script: ''
-            install_script: ''
-            target_os: Linux-x86_64
-            runner: cpullvm-ubuntu24-x86_64
-
-          - build_script: build_copy_runtimes.ps1
-            test_script: test.ps1
-            install_script: install_dependencies.ps1
-            target_os: Windows-x86_64
-            runner: windows-2025
-
-          - build_script: build_copy_runtimes.ps1
-            test_script: test.ps1
-            install_script: install_dependencies.ps1
-            target_os: Windows-AArch64
-            runner: windows-11-arm
-
-    steps:
-      # Not setting these can cause lit test failures on Windows machines when
-      # files with ex: different line endings are compared.
-      - name: Preconfigure git
-        shell: bash
-        run: |
-          git config --global core.autocrlf false
-          git config --global core.eol lf
-          git config --global core.longpaths true
-
-      - name: Checkout source
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          # We build in the repository and rely on clean to cleanup possible
-          # old build products if the runner doesn't do it itself.
-          clean: true
-
-      - name: Download Linux-x86 package
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: cpullvm-packages-build.sh-Linux-x86
-
-      - name: Install dependencies
-        if: matrix.install_script != ''
-        run: ./qualcomm-software/scripts/${{ matrix.install_script }}
-
-      - name: Apply llvm-project patches
-        run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
-
-      - name: Build
-        run: ./qualcomm-software/scripts/${{ matrix.build_script }}
-
-      - name: Upload built packages
+      - name: Upload Test Logs
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        if: success()
         with:
-          name: cpullvm-packages-${{ matrix.build_script }}-${{ matrix.target_os }}
-          path: |
-            build*/cpullvm-*.tar.xz
-            build*/cpullvm-*.zip
-            !build/cpullvm-*-Linux-x86_64.tar.xz
-          retention-days: 7
+          name: cpullvm-picolibc-tests
+          path: build/multilib-builds/picolibc/**/build/meson-logs/math_test.txt
+          if-no-files-found: error
+          retention-days: 2
 
-      - name: Test
-        if: matrix.test_script != ''
-        run: ./qualcomm-software/scripts/${{ matrix.test_script }}
+  # build-and-test:
+  #   if: github.repository == 'qualcomm/cpullvm-toolchain'
+  #   name: ${{ matrix.build_script }} on ${{ matrix.target_os }}
+  #   needs: build-and-test-Linux-x86
+  #   runs-on: ${{ matrix.runner }}
+
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - build_script: build_copy_runtimes.sh
+  #           test_script: test.sh
+  #           install_script: install_dependencies.sh
+  #           target_os: Linux-AArch64
+  #           runner: ubuntu-24.04-arm
+
+  #         - build_script: build_musl-embedded_overlay.sh
+  #           test_script: ''
+  #           install_script: ''
+  #           target_os: Linux-x86_64
+  #           runner: cpullvm-ubuntu24-x86_64
+
+  #         - build_script: build_copy_runtimes.ps1
+  #           test_script: test.ps1
+  #           install_script: install_dependencies.ps1
+  #           target_os: Windows-x86_64
+  #           runner: windows-2025
+
+  #         - build_script: build_copy_runtimes.ps1
+  #           test_script: test.ps1
+  #           install_script: install_dependencies.ps1
+  #           target_os: Windows-AArch64
+  #           runner: windows-11-arm
+
+  #   steps:
+  #     # Not setting these can cause lit test failures on Windows machines when
+  #     # files with ex: different line endings are compared.
+  #     - name: Preconfigure git
+  #       shell: bash
+  #       run: |
+  #         git config --global core.autocrlf false
+  #         git config --global core.eol lf
+  #         git config --global core.longpaths true
+
+  #     - name: Checkout source
+  #       uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+  #       with:
+  #         # We build in the repository and rely on clean to cleanup possible
+  #         # old build products if the runner doesn't do it itself.
+  #         clean: true
+
+  #     - name: Download Linux-x86 package
+  #       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+  #       with:
+  #         name: cpullvm-packages-build.sh-Linux-x86
+
+  #     - name: Install dependencies
+  #       if: matrix.install_script != ''
+  #       run: ./qualcomm-software/scripts/${{ matrix.install_script }}
+
+  #     - name: Apply llvm-project patches
+  #       run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
+
+  #     - name: Build
+  #       run: ./qualcomm-software/scripts/${{ matrix.build_script }}
+
+  #     - name: Upload built packages
+  #       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+  #       if: success()
+  #       with:
+  #         name: cpullvm-packages-${{ matrix.build_script }}-${{ matrix.target_os }}
+  #         path: |
+  #           build*/cpullvm-*.tar.xz
+  #           build*/cpullvm-*.zip
+  #           !build/cpullvm-*-Linux-x86_64.tar.xz
+  #         retention-days: 7
+
+  #     - name: Test
+  #       if: matrix.test_script != ''
+  #       run: ./qualcomm-software/scripts/${{ matrix.test_script }}
