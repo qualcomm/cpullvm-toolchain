@@ -1,20 +1,17 @@
 # Test workflow to discover Python installations on GitHub-hosted Windows runners
-# This workflow is for diagnostic purposes only and will not be merged
 
 name: Test - Python Discovery
 
 on:
   workflow_dispatch:
   pull_request:
-    paths:
-      - '.github/workflows/test-python-discovery.yml'
 
 permissions:
   contents: read
 
 jobs:
   discover-python:
-    name: Discover Python on ${{ matrix.runner }}
+    name: Python on ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
     
     strategy:
@@ -25,263 +22,12 @@ jobs:
           - windows-11-arm
     
     steps:
-      - name: System Information
+      - name: List Python installations
         shell: pwsh
         run: |
-          Write-Host "========================================="
-          Write-Host "SYSTEM INFORMATION"
-          Write-Host "========================================="
-          Write-Host "Runner: ${{ matrix.runner }}"
-          Write-Host "OS: $env:OS"
-          Write-Host "Processor Architecture: $env:PROCESSOR_ARCHITECTURE"
-          Write-Host "Number of Processors: $env:NUMBER_OF_PROCESSORS"
+          Write-Host "Python installations on ${{ matrix.runner }}:"
           Write-Host ""
-      
-      - name: Find Python in PATH
-        shell: pwsh
-        run: |
-          Write-Host "========================================="
-          Write-Host "PYTHON IN PATH"
-          Write-Host "========================================="
-          
-          # Check default python command
-          try {
-            $pythonCmd = Get-Command python -ErrorAction Stop
-            Write-Host "python command: $($pythonCmd.Source)"
-            $version = & python --version 2>&1
-            Write-Host "  Version: $version"
-          } catch {
-            Write-Host "python command: NOT FOUND"
+          Get-ChildItem -Path "C:\hostedtoolcache\windows\Python\*\x64\python.exe" -ErrorAction SilentlyContinue | ForEach-Object {
+            $version = & $_.FullName --version 2>&1
+            Write-Host "$version"
           }
-          
-          # Check python3 command
-          try {
-            $python3Cmd = Get-Command python3 -ErrorAction Stop
-            Write-Host "python3 command: $($python3Cmd.Source)"
-            $version = & python3 --version 2>&1
-            Write-Host "  Version: $version"
-          } catch {
-            Write-Host "python3 command: NOT FOUND"
-          }
-          
-          Write-Host ""
-      
-      - name: Search hostedtoolcache
-        shell: pwsh
-        run: |
-          Write-Host "========================================="
-          Write-Host "PYTHON IN HOSTEDTOOLCACHE"
-          Write-Host "========================================="
-          
-          $toolcachePath = "C:\hostedtoolcache\windows\Python"
-          
-          if (Test-Path $toolcachePath) {
-            $pythonDirs = Get-ChildItem -Path $toolcachePath -Directory | Sort-Object Name
-            
-            Write-Host "Found $($pythonDirs.Count) Python version(s) in hostedtoolcache:"
-            Write-Host ""
-            
-            foreach ($dir in $pythonDirs) {
-              Write-Host "Version: $($dir.Name)"
-              
-              # Check for x64
-              $x64Path = Join-Path $dir.FullName "x64\python.exe"
-              if (Test-Path $x64Path) {
-                $version = & $x64Path --version 2>&1
-                $size = (Get-Item $x64Path).Length / 1MB
-                Write-Host "  x64: $x64Path"
-                Write-Host "       $version"
-                Write-Host "       Size: $([math]::Round($size, 2)) MB"
-                
-                # Check for pip
-                $pipPath = Join-Path $dir.FullName "x64\Scripts\pip.exe"
-                if (Test-Path $pipPath) {
-                  $pipVersion = & $pipPath --version 2>&1
-                  Write-Host "       pip: $pipVersion"
-                }
-                
-                # Check for psutil
-                try {
-                  $hasPsutil = & $x64Path -c "import psutil; print(psutil.__version__)" 2>&1
-                  Write-Host "       psutil: $hasPsutil"
-                } catch {
-                  Write-Host "       psutil: NOT INSTALLED"
-                }
-              }
-              
-              # Check for x86
-              $x86Path = Join-Path $dir.FullName "x86\python.exe"
-              if (Test-Path $x86Path) {
-                $version = & $x86Path --version 2>&1
-                Write-Host "  x86: $x86Path"
-                Write-Host "       $version"
-              }
-              
-              # Check for ARM64
-              $arm64Path = Join-Path $dir.FullName "arm64\python.exe"
-              if (Test-Path $arm64Path) {
-                $version = & $arm64Path --version 2>&1
-                Write-Host "  arm64: $arm64Path"
-                Write-Host "       $version"
-              }
-              
-              Write-Host ""
-            }
-          } else {
-            Write-Host "hostedtoolcache path not found: $toolcachePath"
-          }
-      
-      - name: Search Program Files
-        shell: pwsh
-        run: |
-          Write-Host "========================================="
-          Write-Host "PYTHON IN PROGRAM FILES"
-          Write-Host "========================================="
-          
-          $searchPaths = @(
-            "C:\Program Files\Python*",
-            "C:\Program Files (x86)\Python*",
-            "C:\Python*"
-          )
-          
-          $found = $false
-          foreach ($pattern in $searchPaths) {
-            $dirs = Get-ChildItem -Path $pattern -Directory -ErrorAction SilentlyContinue
-            foreach ($dir in $dirs) {
-              $found = $true
-              $pythonExe = Join-Path $dir.FullName "python.exe"
-              if (Test-Path $pythonExe) {
-                $version = & $pythonExe --version 2>&1
-                Write-Host "$pythonExe"
-                Write-Host "  $version"
-              } else {
-                Write-Host "$($dir.FullName) (no python.exe found)"
-              }
-            }
-          }
-          
-          if (-not $found) {
-            Write-Host "No Python installations found in Program Files or C:\"
-          }
-          Write-Host ""
-      
-      - name: Search with where.exe
-        shell: pwsh
-        run: |
-          Write-Host "========================================="
-          Write-Host "PYTHON FOUND BY WHERE.EXE"
-          Write-Host "========================================="
-          
-          $pythonPaths = where.exe python 2>$null
-          if ($pythonPaths) {
-            Write-Host "python:"
-            foreach ($path in $pythonPaths) {
-              Write-Host "  $path"
-            }
-          } else {
-            Write-Host "python: NOT FOUND"
-          }
-          
-          Write-Host ""
-          
-          $python3Paths = where.exe python3 2>$null
-          if ($python3Paths) {
-            Write-Host "python3:"
-            foreach ($path in $python3Paths) {
-              Write-Host "  $path"
-            }
-          } else {
-            Write-Host "python3: NOT FOUND"
-          }
-          Write-Host ""
-      
-      - name: Environment Variables
-        shell: pwsh
-        run: |
-          Write-Host "========================================="
-          Write-Host "PYTHON-RELATED ENVIRONMENT VARIABLES"
-          Write-Host "========================================="
-          
-          $pythonVars = Get-ChildItem Env: | Where-Object { $_.Name -like "*PYTHON*" -or $_.Name -like "*PY*" }
-          
-          if ($pythonVars) {
-            foreach ($var in $pythonVars) {
-              Write-Host "$($var.Name) = $($var.Value)"
-            }
-          } else {
-            Write-Host "No Python-related environment variables found"
-          }
-          Write-Host ""
-      
-      - name: PATH Contents
-        shell: pwsh
-        run: |
-          Write-Host "========================================="
-          Write-Host "PATH ENVIRONMENT VARIABLE"
-          Write-Host "========================================="
-          
-          $pathEntries = $env:PATH -split ';'
-          $pythonPaths = $pathEntries | Where-Object { $_ -like "*python*" -or $_ -like "*Python*" }
-          
-          if ($pythonPaths) {
-            Write-Host "Python-related entries in PATH:"
-            foreach ($entry in $pythonPaths) {
-              Write-Host "  $entry"
-            }
-          } else {
-            Write-Host "No Python-related entries in PATH"
-          }
-          Write-Host ""
-          Write-Host "First 10 PATH entries:"
-          for ($i = 0; $i -lt [Math]::Min(10, $pathEntries.Count); $i++) {
-            Write-Host "  $($pathEntries[$i])"
-          }
-          Write-Host ""
-      
-      - name: CMake Python Detection
-        shell: pwsh
-        run: |
-          Write-Host "========================================="
-          Write-Host "CMAKE PYTHON DETECTION"
-          Write-Host "========================================="
-          
-          # Create a minimal CMakeLists.txt to test Python detection
-          $cmakeContent = @"
-cmake_minimum_required(VERSION 3.20)
-project(PythonTest)
-
-find_package(Python3 COMPONENTS Interpreter)
-
-if(Python3_FOUND)
-  message(STATUS "Python3_FOUND: TRUE")
-  message(STATUS "Python3_EXECUTABLE: `${Python3_EXECUTABLE}")
-  message(STATUS "Python3_VERSION: `${Python3_VERSION}")
-  message(STATUS "Python3_VERSION_MAJOR: `${Python3_VERSION_MAJOR}")
-  message(STATUS "Python3_VERSION_MINOR: `${Python3_VERSION_MINOR}")
-  message(STATUS "Python3_VERSION_PATCH: `${Python3_VERSION_PATCH}")
-else()
-  message(STATUS "Python3_FOUND: FALSE")
-endif()
-"@
-          
-          $testDir = New-Item -ItemType Directory -Path "python-test" -Force
-          Set-Content -Path "$testDir\CMakeLists.txt" -Value $cmakeContent
-          
-          Push-Location $testDir
-          cmake . 2>&1 | Select-String -Pattern "Python"
-          Pop-Location
-          
-          Remove-Item -Recurse -Force $testDir
-          Write-Host ""
-      
-      - name: Summary
-        shell: pwsh
-        run: |
-          Write-Host "========================================="
-          Write-Host "SUMMARY"
-          Write-Host "========================================="
-          Write-Host "Runner: ${{ matrix.runner }}"
-          Write-Host "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
-          Write-Host ""
-          Write-Host "This diagnostic workflow completed successfully."
-          Write-Host "Review the output above to understand Python availability."
