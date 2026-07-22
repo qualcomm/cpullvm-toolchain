@@ -1,4 +1,4 @@
-From baa746ed9757e849eff8654f2c5a85824ca4140c Mon Sep 17 00:00:00 2001
+From 3544392e6e01ef158c5cfb2334c19ca0c154d825 Mon Sep 17 00:00:00 2001
 From: Sudharsan Veeravalli <svs@qti.qualcomm.com>
 Date: Tue, 9 Jun 2026 09:30:36 +0530
 Subject: [PATCH] LTO with LinkerScripts ELD changes
@@ -15,7 +15,7 @@ Signed-off-by: Sudharsan Veeravalli <svs@qti.qualcomm.com>
  include/eld/Input/BitcodeFile.h               |   8 +-
  include/eld/PluginAPI/LinkerWrapper.h         |   2 +-
  include/eld/PluginAPI/PluginADT.h             |   1 +
- lib/Core/Module.cpp                           |   4 +-
+ lib/Core/Module.cpp                           |  29 ++-
  lib/Input/BitcodeFile.cpp                     |  19 +-
  lib/LinkerWrapper/GnuLdDriver.cpp             |  10 +
  lib/LinkerWrapper/LinkerWrapper.cpp           |   6 +-
@@ -42,7 +42,7 @@ Signed-off-by: Sudharsan Veeravalli <svs@qti.qualcomm.com>
  .../ThinLTOWithLS.test                        |  60 +++++
  .../LTO/lto-with-linker-scripts/ltokeep.test  |  41 ++++
  .../ltosectionattribute.test                  |  39 ++++
- 37 files changed, 1325 insertions(+), 19 deletions(-)
+ 37 files changed, 1350 insertions(+), 19 deletions(-)
  create mode 100644 Plugins/AdvancedLTO/AdvancedLTO.cpp
  create mode 100644 Plugins/AdvancedLTO/AdvancedLTO.yaml
  create mode 100644 Plugins/AdvancedLTO/CMakeLists.txt
@@ -466,10 +466,56 @@ index 502ff400..4e1f1f6a 100644
    /// Return options set by --flto-options.
    const std::vector<std::string> &getLTOOptions() const;
 diff --git a/lib/Core/Module.cpp b/lib/Core/Module.cpp
-index 05732821..d3aac246 100644
+index 05732821..be4feceb 100644
 --- a/lib/Core/Module.cpp
 +++ b/lib/Core/Module.cpp
-@@ -640,7 +640,7 @@ void Module::addSymbol(ResolveInfo *R) {
+@@ -23,6 +23,7 @@
+ #include "eld/Readers/CommonELFSection.h"
+ #include "eld/Readers/ELFSection.h"
+ #include "eld/Readers/EhFrameHdrSection.h"
++#include "eld/Script/Plugin.h"
+ #include "eld/Support/Memory.h"
+ #include "eld/Support/MsgHandling.h"
+ #include "eld/Support/RegisterTimer.h"
+@@ -41,6 +42,21 @@
+ 
+ using namespace eld;
+ 
++namespace {
++
++constexpr llvm::StringRef AdvancedLTOPluginName = "AdvancedLTO";
++
++bool hasAdvancedLTOPlugin(const LinkerScript &Script) {
++  for (const Plugin *P : Script.getPlugins()) {
++    if (P->getType() == plugin::PluginBase::LinkerPlugin &&
++        P->getPluginType() == AdvancedLTOPluginName)
++      return true;
++  }
++  return false;
++}
++
++} // namespace
++
+ //===----------------------------------------------------------------------===//
+ // Module
+ //===----------------------------------------------------------------------===//
+@@ -418,6 +434,15 @@ bool Module::readPluginConfig() {
+     if (!readOnePluginConfig(Cfg, /*IsDefaultConfig=*/false))
+       return false;
+   }
++  if (ThisConfig.options().useDefaultPlugins() &&
++      ThisConfig.options().hasLTOLinkerScripts() &&
++      !hasAdvancedLTOPlugin(getScript())) {
++    getScript().addPlugin(plugin::PluginBase::LinkerPlugin,
++                          AdvancedLTOPluginName.str(),
++                          AdvancedLTOPluginName.str(), /*PluginOpts=*/"",
++                          ThisConfig.options().printTimingStats("Plugin"),
++                          /*IsDefaultPlugin=*/true, *this);
++  }
+   return true;
+ }
+ 
+@@ -640,7 +665,7 @@ void Module::addSymbol(ResolveInfo *R) {
  }
  
  LDSymbol *Module::addSymbolFromBitCode(
@@ -478,7 +524,7 @@ index 05732821..d3aac246 100644
      ResolveInfo::Desc Desc, ResolveInfo::Binding Binding,
      ResolveInfo::SizeType Size, ResolveInfo::Visibility Visibility,
      unsigned int PIdx) {
-@@ -671,6 +671,8 @@ LDSymbol *Module::addSymbolFromBitCode(
+@@ -671,6 +696,8 @@ LDSymbol *Module::addSymbolFromBitCode(
    if (!ResolvedResult.Info)
      return nullptr;
  
@@ -715,7 +761,7 @@ index 00000000..5d8bc672
 +    Library: AdvancedLTO
 diff --git a/test/Common/LTO/lto-with-linker-scripts/CheckWrapSymbolResolution.test b/test/Common/LTO/lto-with-linker-scripts/CheckWrapSymbolResolution.test
 new file mode 100644
-index 00000000..0af7832b
+index 00000000..0a5e6caa
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/CheckWrapSymbolResolution.test
 @@ -0,0 +1,64 @@
@@ -724,7 +770,7 @@ index 00000000..0af7832b
 +# RUN: %opt -mtriple=%triple %t/2.ll -o %t/2.o
 +# RUN: %opt -mtriple=%triple %t/3.ll -o %t/3.o
 +# RUN: %opt -mtriple=%triple %t/w.ll -o %t/w.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg %t/1.o %t/w.o %t/2.o %t/3.o \
++# RUN: %link %linkopts --lto-linker-scripts %t/1.o %t/w.o %t/2.o %t/3.o \
 +# RUN:   -T %t/script.t --wrap foo -t -o %t/out
 +# RUN: %objdump -Cx %t/out | %filecheck %s
 +
@@ -785,14 +831,14 @@ index 00000000..0af7832b
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/LTOAsmAlias.test b/test/Common/LTO/lto-with-linker-scripts/LTOAsmAlias.test
 new file mode 100644
-index 00000000..b9d4b6fd
+index 00000000..8d84d836
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/LTOAsmAlias.test
 @@ -0,0 +1,38 @@
 +# RUN: rm -rf %t && split-file %s %t
 +# RUN: %opt -mtriple=%triple %t/1.ll -o %t/1.o
 +# RUN: %llvm-mc -filetype=obj -triple=%triple %t/2.s -o %t/2.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg --gc-sections -e main -T %t/script.t \
++# RUN: %link %linkopts --lto-linker-scripts --gc-sections -e main -T %t/script.t \
 +# RUN:   %t/1.o %t/2.o -o %t/out
 +# RUN: %readelf -S -W %t/out | %filecheck --check-prefix=SECTIONS %s
 +# RUN: %readelf -s -W %t/out | %filecheck %s
@@ -829,7 +875,7 @@ index 00000000..b9d4b6fd
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/LTOAsmEmptySymbol.test b/test/Common/LTO/lto-with-linker-scripts/LTOAsmEmptySymbol.test
 new file mode 100644
-index 00000000..f160ec29
+index 00000000..14d0db24
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/LTOAsmEmptySymbol.test
 @@ -0,0 +1,46 @@
@@ -837,7 +883,7 @@ index 00000000..f160ec29
 +# RUN: %opt -mtriple=%triple %t/1.ll -o %t/1.o
 +# RUN: %opt -mtriple=%triple %t/2.ll -o %t/2.o
 +# RUN: %llvm-mc -filetype=obj -triple=%triple %t/3.s -o %t/3.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg --gc-sections -e main -T %t/script.t \
++# RUN: %link %linkopts --lto-linker-scripts --gc-sections -e main -T %t/script.t \
 +# RUN:   %t/1.o %t/2.o %t/3.o -o %t/out
 +# RUN: %readelf -s -W %t/out | %filecheck %s
 +
@@ -881,7 +927,7 @@ index 00000000..f160ec29
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/LTOKeepPreserveLocal.test b/test/Common/LTO/lto-with-linker-scripts/LTOKeepPreserveLocal.test
 new file mode 100644
-index 00000000..6f760f3e
+index 00000000..5b03542d
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/LTOKeepPreserveLocal.test
 @@ -0,0 +1,27 @@
@@ -891,7 +937,7 @@ index 00000000..6f760f3e
 +
 +# RUN: rm -rf %t && split-file %s %t
 +# RUN: %opt -mtriple=%triple %t/1.ll -o %t/1.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg %t/1.o -T %t/script.t -o %t/out -e main
++# RUN: %link %linkopts --lto-linker-scripts %t/1.o -T %t/script.t -o %t/out -e main
 +# RUN: %readelf -s %t/out | %filecheck --check-prefix=KEEP %s
 +
 +# KEEP: foo
@@ -914,7 +960,7 @@ index 00000000..6f760f3e
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/LTOKeepSymbol.test b/test/Common/LTO/lto-with-linker-scripts/LTOKeepSymbol.test
 new file mode 100644
-index 00000000..fc16b60f
+index 00000000..20a6528b
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/LTOKeepSymbol.test
 @@ -0,0 +1,62 @@
@@ -923,7 +969,7 @@ index 00000000..fc16b60f
 +
 +# RUN: rm -rf %t && split-file %s %t
 +# RUN: %opt -mtriple=%triple %t/1.ll -o %t/1.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg %t/1.o -plugin-opt=-function-sections \
++# RUN: %link %linkopts --lto-linker-scripts %t/1.o -plugin-opt=-function-sections \
 +# RUN:   -Map=%t/map.txt -T %t/script.t -o %t/out
 +# RUN: %filecheck %s --check-prefix=KEEP < %t/map.txt
 +
@@ -982,14 +1028,14 @@ index 00000000..fc16b60f
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/LTOPreemptSymbol.test b/test/Common/LTO/lto-with-linker-scripts/LTOPreemptSymbol.test
 new file mode 100644
-index 00000000..7ce9deb1
+index 00000000..ddc8d627
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/LTOPreemptSymbol.test
 @@ -0,0 +1,46 @@
 +# RUN: rm -rf %t && split-file %s %t
 +# RUN: %opt -mtriple=%triple %t/1.ll -o %t/1.o
 +# RUN: %llvm-mc -filetype=obj -triple=%triple %t/2.s -o %t/2.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg %t/1.o %t/2.o -Map=%t/map.txt -T %t/script.t -o %t/out
++# RUN: %link %linkopts --lto-linker-scripts %t/1.o %t/2.o -Map=%t/map.txt -T %t/script.t -o %t/out
 +# RUN: %filecheck %s < %t/map.txt
 +
 +# CHECK: .tcm
@@ -1034,7 +1080,7 @@ index 00000000..7ce9deb1
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/LTOSaveTemps.test b/test/Common/LTO/lto-with-linker-scripts/LTOSaveTemps.test
 new file mode 100644
-index 00000000..39c1ad93
+index 00000000..4fa78810
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/LTOSaveTemps.test
 @@ -0,0 +1,58 @@
@@ -1042,12 +1088,12 @@ index 00000000..39c1ad93
 +# RUN: %opt -mtriple=%triple -module-summary %t/1.ll -o %t/1.1.o
 +# RUN: %opt -mtriple=%triple -module-summary %t/2.ll -o %t/1.2.o
 +# RUN: %llvm-mc -filetype=obj -triple=%triple %t/3.s -o %t/1.3.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg --gc-sections -save-temps -e main \
++# RUN: %link %linkopts --lto-linker-scripts --gc-sections -save-temps -e main \
 +# RUN:   -T %t/script.t %t/1.1.o %t/1.2.o %t/1.3.o -o %t/1.out
 +# RUN: %readelf -S -W %t/1.out | %filecheck --check-prefix=SECTIONS %s
 +# RUN: %opt -mtriple=%triple %t/1.ll -o %t/2.1.o
 +# RUN: %opt -mtriple=%triple %t/2.ll -o %t/2.2.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg --gc-sections -save-temps -e main \
++# RUN: %link %linkopts --lto-linker-scripts --gc-sections -save-temps -e main \
 +# RUN:   -T %t/script.t %t/2.1.o %t/2.2.o %t/1.3.o -o %t/2.out
 +# RUN: %readelf -S -W %t/2.out | %filecheck --check-prefix=REGSECTIONS %s
 +
@@ -1098,13 +1144,13 @@ index 00000000..39c1ad93
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/LTOUsed.test b/test/Common/LTO/lto-with-linker-scripts/LTOUsed.test
 new file mode 100644
-index 00000000..6e924f32
+index 00000000..d1f6cba7
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/LTOUsed.test
 @@ -0,0 +1,16 @@
 +# RUN: rm -rf %t && split-file %s %t
 +# RUN: %opt -mtriple=%triple %t/used.ll -o %t/used.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg %t/used.o -e foo -o %t/out
++# RUN: %link %linkopts --lto-linker-scripts %t/used.o -e foo -o %t/out
 +# RUN: %readelf -s -W %t/out | %filecheck %s
 +
 +# CHECK: val
@@ -1120,13 +1166,13 @@ index 00000000..6e924f32
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/LocalsLinkerScriptSections.test b/test/Common/LTO/lto-with-linker-scripts/LocalsLinkerScriptSections.test
 new file mode 100644
-index 00000000..0232b61e
+index 00000000..969bbc92
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/LocalsLinkerScriptSections.test
 @@ -0,0 +1,42 @@
 +# RUN: rm -rf %t && split-file %s %t
 +# RUN: %opt -mtriple=%triple %t/1.ll -o %t/1.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg -e main -T %t/script.t \
++# RUN: %link %linkopts --lto-linker-scripts -e main -T %t/script.t \
 +# RUN:   -plugin-opt=O0 -plugin-opt=-data-sections -plugin-opt=-function-sections %t/1.o -o %t/out
 +# RUN: %readelf -S %t/out | %filecheck %s --check-prefix=SEC
 +
@@ -1168,14 +1214,14 @@ index 00000000..0232b61e
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/LocalsSameNameTwoFiles.test b/test/Common/LTO/lto-with-linker-scripts/LocalsSameNameTwoFiles.test
 new file mode 100644
-index 00000000..c1161391
+index 00000000..b8e708ea
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/LocalsSameNameTwoFiles.test
 @@ -0,0 +1,40 @@
 +# RUN: rm -rf %t && split-file %s %t
 +# RUN: %opt -mtriple=%triple %t/1.ll -o %t/1.o
 +# RUN: %opt -mtriple=%triple %t/2.ll -o %t/2.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg -T %t/script.t -plugin-opt=O0 \
++# RUN: %link %linkopts --lto-linker-scripts -T %t/script.t -plugin-opt=O0 \
 +# RUN:   -plugin-opt=-data-sections -plugin-opt=-function-sections %t/1.o %t/2.o -o %t/out
 +# RUN: %readelf -S -W %t/out | %filecheck %s --check-prefix=SEC
 +
@@ -1214,7 +1260,7 @@ index 00000000..c1161391
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/NamespaceOverride.test b/test/Common/LTO/lto-with-linker-scripts/NamespaceOverride.test
 new file mode 100644
-index 00000000..e2a430c9
+index 00000000..cbbb362d
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/NamespaceOverride.test
 @@ -0,0 +1,68 @@
@@ -1224,7 +1270,7 @@ index 00000000..e2a430c9
 +# RUN: rm -rf %t && split-file %s %t
 +# RUN: %opt -mtriple=%triple %t/A.ll -o %t/A.o
 +# RUN: %llvm-mc -filetype=obj -triple=%triple %t/B.s -o %t/B.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg -Map=%t/map.txt -T %t/script.t %t/A.o %t/B.o -o %t/out
++# RUN: %link %linkopts --lto-linker-scripts -Map=%t/map.txt -T %t/script.t %t/A.o %t/B.o -o %t/out
 +# RUN: %filecheck %s --check-prefix=MAP < %t/map.txt
 +
 +# MAP: .foo
@@ -1395,13 +1441,13 @@ index 00000000..f02fc32b
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/OutputSection.test b/test/Common/LTO/lto-with-linker-scripts/OutputSection.test
 new file mode 100644
-index 00000000..e55f01b4
+index 00000000..29c1633f
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/OutputSection.test
 @@ -0,0 +1,19 @@
 +# RUN: rm -rf %t && split-file %s %t
 +# RUN: %opt -mtriple=%triple %t/foo.ll -o %t/foo.foo.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg -T %t/script.t %t/foo.foo.o -e foo \
++# RUN: %link %linkopts --lto-linker-scripts -T %t/script.t %t/foo.foo.o -e foo \
 +# RUN:   -plugin-opt=-function-sections -o %t/out
 +# RUN: %readelf -S -s -W %t/out | %filecheck %s --check-prefix=ELF
 +
@@ -1420,13 +1466,13 @@ index 00000000..e55f01b4
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/SectionsWithNoSyms.test b/test/Common/LTO/lto-with-linker-scripts/SectionsWithNoSyms.test
 new file mode 100644
-index 00000000..20f5c6bb
+index 00000000..a21144bf
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/SectionsWithNoSyms.test
 @@ -0,0 +1,46 @@
 +# RUN: rm -rf %t && split-file %s %t
 +# RUN: %opt -mtriple=%triple %t/1.ll -o %t/1.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg -e main -T %t/script.t -plugin-opt=O0 \
++# RUN: %link %linkopts --lto-linker-scripts -e main -T %t/script.t -plugin-opt=O0 \
 +# RUN:   -plugin-opt=-data-sections -plugin-opt=-function-sections %t/1.o -o %t/out
 +# RUN: %readelf -S %t/out | %filecheck %s --check-prefix=SEC
 +# RUN: %readelf -s %t/out | %filecheck %s --check-prefix=SYMS
@@ -1472,7 +1518,7 @@ index 00000000..20f5c6bb
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/ThinLTOCaching.test b/test/Common/LTO/lto-with-linker-scripts/ThinLTOCaching.test
 new file mode 100644
-index 00000000..21a6c7c9
+index 00000000..d0566197
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/ThinLTOCaching.test
 @@ -0,0 +1,105 @@
@@ -1482,21 +1528,21 @@ index 00000000..21a6c7c9
 +# RUN: %llvm-mc -filetype=obj -triple=%triple %t/3.s -o %t/1.3.o
 +# RUN: cp -f %t/script.t %t/1.script.t
 +# RUN: rm -Rf %t/1.cache && mkdir %t/1.cache
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg --gc-sections --thinlto-cache-dir=%t/1.cache \
++# RUN: %link %linkopts --lto-linker-scripts --gc-sections --thinlto-cache-dir=%t/1.cache \
 +# RUN:   -plugin-opt=-function-sections -e main -T %t/1.script.t %t/1.1.o %t/1.2.o %t/1.3.o -o %t/1.out
 +# RUN: %readelf -S -W %t/1.out | %filecheck --check-prefix=SECTIONS %s
 +# RUN: ls %t/1.cache | %filecheck --check-prefix=LLVMCACHE-TWO --check-prefix=LLVMCACHE %s
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg --gc-sections --thinlto-cache-dir=%t/1.cache \
++# RUN: %link %linkopts --lto-linker-scripts --gc-sections --thinlto-cache-dir=%t/1.cache \
 +# RUN:   -plugin-opt=-function-sections -e main -T %t/1.script.t %t/1.1.o %t/1.2.o %t/1.3.o -o %t/1.out
 +# RUN: ls %t/1.cache | %filecheck --check-prefix=LLVMCACHE-TWO --check-prefix=LLVMCACHE %s
 +# RUN: %readelf -S -W %t/1.out | %filecheck --check-prefix=SECTIONS %s
 +# RUN: cp -f %t/script2.t %t/1.script.t
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg --gc-sections --thinlto-cache-dir=%t/1.cache \
++# RUN: %link %linkopts --lto-linker-scripts --gc-sections --thinlto-cache-dir=%t/1.cache \
 +# RUN:   -plugin-opt=-function-sections -e main -T %t/1.script.t %t/1.1.o %t/1.2.o %t/1.3.o -o %t/1.out
 +# RUN: %readelf -S -W %t/1.out | %filecheck --check-prefix=SECTIONS %s
 +# RUN: ls %t/1.cache | %filecheck --check-prefix=LLVMCACHE-TWO --check-prefix=LLVMCACHE %s
 +# RUN: cp -f %t/script2a.t %t/1.script.t
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg --gc-sections --thinlto-cache-dir=%t/1.cache \
++# RUN: %link %linkopts --lto-linker-scripts --gc-sections --thinlto-cache-dir=%t/1.cache \
 +# RUN:   -plugin-opt=-function-sections -e main -T %t/1.script.t %t/1.1.o %t/1.2.o %t/1.3.o -o %t/1.out
 +# RUN: %readelf -S -W %t/1.out | %filecheck --check-prefix=SECTIONS2 %s
 +# RUN: ls %t/1.cache | %filecheck --check-prefix=LLVMCACHE-TWO --check-prefix=LLVMCACHE %s
@@ -1505,14 +1551,14 @@ index 00000000..21a6c7c9
 +# RUN: %ar cr %t/1.lib.a %t/1.1.o
 +# RUN: cp -f %t/script3.t %t/1.script.t
 +# RUN: rm -Rf %t/1.cache && mkdir %t/1.cache
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg --gc-sections --thinlto-cache-dir=%t/1.cache \
++# RUN: %link %linkopts --lto-linker-scripts --gc-sections --thinlto-cache-dir=%t/1.cache \
 +# RUN:   -plugin-opt=-function-sections %emulation -e main -T %t/1.script.t %t/1.lib.a -o %t/1.out
 +# RUN: ls %t/1.cache | %filecheck --check-prefix=LLVMCACHE-TWO --check-prefix=LLVMCACHE %s
 +# RUN: rm %t/1.lib.a
 +# RUN: %ar cr %t/1.lib.a %t/1.1.o
 +# RUN: %ar cr %t/1.lib.a %t/1.2.o
 +# RUN: %ar cr %t/1.lib.a %t/1.3.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg --gc-sections --thinlto-cache-dir=%t/1.cache \
++# RUN: %link %linkopts --lto-linker-scripts --gc-sections --thinlto-cache-dir=%t/1.cache \
 +# RUN:   %emulation -e main -T %t/1.script.t %t/1.lib.a -o %t/1.out
 +# RUN: ls %t/1.cache | %filecheck --check-prefix=LLVMCACHE-TWO --check-prefix=LLVMCACHE %s
 +
@@ -1583,7 +1629,7 @@ index 00000000..21a6c7c9
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/ThinLTOSameFileNameArchive.test b/test/Common/LTO/lto-with-linker-scripts/ThinLTOSameFileNameArchive.test
 new file mode 100644
-index 00000000..74dcb8cb
+index 00000000..f35ec5fd
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/ThinLTOSameFileNameArchive.test
 @@ -0,0 +1,58 @@
@@ -1594,7 +1640,7 @@ index 00000000..74dcb8cb
 +# RUN: %opt -mtriple=%triple -module-hash -module-summary %t/b/1.ll -o %t/2/tmp/1.o
 +# RUN: %ar cr %t/2.a %t/1/tmp/1.o %t/2/tmp/1.o
 +# RUN: %llvm-mc -filetype=obj -triple=%triple %t/3.s -o %t/1.3.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg --gc-sections -plugin-opt=-function-sections \
++# RUN: %link %linkopts --lto-linker-scripts --gc-sections -plugin-opt=-function-sections \
 +# RUN:   -plugin-opt=-data-sections -e main -T %t/script.t %t/1.3.o %t/2.a -o %t/1.out
 +# RUN: %readelf -S -W %t/1.out | %filecheck --check-prefix=SECTIONS %s
 +# RUN: %readelf -s -W %t/1.out | %filecheck %s
@@ -1647,7 +1693,7 @@ index 00000000..74dcb8cb
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/ThinLTOWithLS.test b/test/Common/LTO/lto-with-linker-scripts/ThinLTOWithLS.test
 new file mode 100644
-index 00000000..f56e7c8c
+index 00000000..ca145edc
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/ThinLTOWithLS.test
 @@ -0,0 +1,60 @@
@@ -1655,7 +1701,7 @@ index 00000000..f56e7c8c
 +# RUN: %opt -mtriple=%triple -module-hash -module-summary %t/1.ll -o %t/1.1.o
 +# RUN: %opt -mtriple=%triple -module-hash -module-summary %t/2.ll -o %t/1.2.o
 +# RUN: %llvm-mc -filetype=obj -triple=%triple %t/3.s -o %t/1.3.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg --gc-sections -print-gc-sections \
++# RUN: %link %linkopts --lto-linker-scripts --gc-sections -print-gc-sections \
 +# RUN:   -plugin-opt=-function-sections -plugin-opt=-data-sections --save-temps -e main \
 +# RUN:   -T %t/script.t %t/1.1.o %t/1.2.o %t/1.3.o -o %t/1.out 2>&1 | \
 +# RUN:   %filecheck --check-prefix=GARBAGE %s
@@ -1713,7 +1759,7 @@ index 00000000..f56e7c8c
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/ltokeep.test b/test/Common/LTO/lto-with-linker-scripts/ltokeep.test
 new file mode 100644
-index 00000000..456b4142
+index 00000000..3456394a
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/ltokeep.test
 @@ -0,0 +1,41 @@
@@ -1723,7 +1769,7 @@ index 00000000..456b4142
 +# RUN: rm -rf %t && split-file %s %t
 +# RUN: %opt -mtriple=%triple %t/foo.ll -o %t/foo.o
 +# RUN: %llvm-mc -filetype=obj -triple=%triple %t/main.s -o %t/main.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg %t/foo.o %t/main.o -T %t/script.t -o %t/out
++# RUN: %link %linkopts --lto-linker-scripts %t/foo.o %t/main.o -T %t/script.t -o %t/out
 +# RUN: %readelf -S %t/out | %filecheck %s --check-prefix=SECTIONS
 +
 +# SECTIONS: .text.foo
@@ -1760,7 +1806,7 @@ index 00000000..456b4142
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/ltosectionattribute.test b/test/Common/LTO/lto-with-linker-scripts/ltosectionattribute.test
 new file mode 100644
-index 00000000..6df31753
+index 00000000..ae57cfd1
 --- /dev/null
 +++ b/test/Common/LTO/lto-with-linker-scripts/ltosectionattribute.test
 @@ -0,0 +1,39 @@
@@ -1768,7 +1814,7 @@ index 00000000..6df31753
 +# RUN: %opt -mtriple=%triple %t/1.ll -o %t/1.o
 +# RUN: %opt -mtriple=%triple %t/2.ll -o %t/2.o
 +# RUN: %llvm-mc -filetype=obj -triple=%triple %t/3.s -o %t/3.o
-+# RUN: %link %linkopts --lto-linker-scripts --plugin-config %p/AdvancedLTO.cfg %t/1.o %t/2.o %t/3.o -T %t/script.t -o %t/out
++# RUN: %link %linkopts --lto-linker-scripts %t/1.o %t/2.o %t/3.o -T %t/script.t -o %t/out
 +# RUN: %readelf -S -W %t/out | %filecheck %s
 +
 +# CHECK: .myfoo
