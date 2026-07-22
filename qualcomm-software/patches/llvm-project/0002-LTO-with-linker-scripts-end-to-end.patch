@@ -1,4 +1,4 @@
-From 7cee3ab60350842d50ade2b3748d637061b1a916 Mon Sep 17 00:00:00 2001
+From 23730bc9bbf31452ba3d10c9a9a9703f295f0ef5 Mon Sep 17 00:00:00 2001
 From: Sudharsan Veeravalli <svs@qti.qualcomm.com>
 Date: Sun, 19 Jul 2026 08:37:10 +0530
 Subject: [PATCH] LTO with linker scripts, end-to-end.
@@ -89,10 +89,10 @@ index 7e54e75752f3..0b206fcdb556 100644
  #include "DebugOptions.def"
  
 diff --git a/clang/include/clang/Options/Options.td b/clang/include/clang/Options/Options.td
-index 4afb089e8a51..630e57e454f2 100644
+index f5264d5ea12f..4fbe286f1823 100644
 --- a/clang/include/clang/Options/Options.td
 +++ b/clang/include/clang/Options/Options.td
-@@ -9970,3 +9970,10 @@ def wasm_opt : Flag<["--"], "wasm-opt">,
+@@ -9999,3 +9999,10 @@ def wasm_opt : Flag<["--"], "wasm-opt">,
    Group<m_Group>,
    HelpText<"Enable the wasm-opt optimizer (default)">,
    MarshallingInfoNegativeFlag<LangOpts<"NoWasmOpt">>;
@@ -104,7 +104,7 @@ index 4afb089e8a51..630e57e454f2 100644
 +          "during LTO.">,
 +  NegFlag<SetFalse, [], [ClangOption]>>;
 diff --git a/clang/lib/CodeGen/BackendUtil.cpp b/clang/lib/CodeGen/BackendUtil.cpp
-index 2b755fa916e5..267c1f0f8055 100644
+index 068b1b4c262c..5808a082c109 100644
 --- a/clang/lib/CodeGen/BackendUtil.cpp
 +++ b/clang/lib/CodeGen/BackendUtil.cpp
 @@ -25,6 +25,7 @@
@@ -115,7 +115,7 @@ index 2b755fa916e5..267c1f0f8055 100644
  #include "llvm/CodeGen/MachineModuleInfo.h"
  #include "llvm/CodeGen/TargetSubtargetInfo.h"
  #include "llvm/Config/llvm-config.h"
-@@ -1154,6 +1155,11 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
+@@ -1157,6 +1158,11 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
    if (!actionRequiresCodeGen(Action) && CodeGenOpts.VerifyModule)
      MPM.addPass(VerifierPass());
  
@@ -128,10 +128,10 @@ index 2b755fa916e5..267c1f0f8055 100644
        CodeGenOpts.FatLTO) {
      if (CodeGenOpts.PrepareForThinLTO && !CodeGenOpts.DisableLLVMPasses) {
 diff --git a/clang/lib/Driver/ToolChains/Clang.cpp b/clang/lib/Driver/ToolChains/Clang.cpp
-index 8c9b98795b19..d48f53472ce8 100644
+index 1178f625d117..e25d4be62d44 100644
 --- a/clang/lib/Driver/ToolChains/Clang.cpp
 +++ b/clang/lib/Driver/ToolChains/Clang.cpp
-@@ -6600,6 +6600,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
+@@ -6620,6 +6620,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
    Args.AddLastArg(CmdArgs, options::OPT_fconvergent_functions,
                    options::OPT_fno_convergent_functions);
  
@@ -152,10 +152,10 @@ index 000000000000..52ded692d071
 +// CHECK: @x = global i32 0, section ".bss"
 +int x;
 diff --git a/lld/ELF/Config.h b/lld/ELF/Config.h
-index 863f3223094b..24fe9852d915 100644
+index 1426aab12758..a817cd17c291 100644
 --- a/lld/ELF/Config.h
 +++ b/lld/ELF/Config.h
-@@ -374,6 +374,7 @@ struct Config {
+@@ -375,6 +375,7 @@ struct Config {
    bool ltoPGOWarnMismatch;
    bool ltoDebugPassManager;
    bool ltoEmitAsm;
@@ -164,10 +164,10 @@ index 863f3223094b..24fe9852d915 100644
    bool ltoValidateAllVtablesHaveTypeInfos;
    bool ltoWholeProgramVisibility;
 diff --git a/lld/ELF/Driver.cpp b/lld/ELF/Driver.cpp
-index 77821e8c813e..717d32e67a14 100644
+index 51d9e32419f9..7d32a6931d02 100644
 --- a/lld/ELF/Driver.cpp
 +++ b/lld/ELF/Driver.cpp
-@@ -1467,6 +1467,8 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
+@@ -1476,6 +1476,8 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
                                              OPT_no_lto_pgo_warn_mismatch, true);
    ctx.arg.ltoDebugPassManager = args.hasArg(OPT_lto_debug_pass_manager);
    ctx.arg.ltoEmitAsm = args.hasArg(OPT_lto_emit_asm);
@@ -214,7 +214,7 @@ index 05c0f3f1c445..ff0b98c146b4 100644
      int c = irSym.getComdatIndex();
      if (c != -1 && !keptComdats[c])
 diff --git a/lld/ELF/LTO.cpp b/lld/ELF/LTO.cpp
-index e40575bffec6..e061dca9cb0b 100644
+index a11681133373..59d52bb70f1b 100644
 --- a/lld/ELF/LTO.cpp
 +++ b/lld/ELF/LTO.cpp
 @@ -9,6 +9,7 @@
@@ -225,7 +225,7 @@ index e40575bffec6..e061dca9cb0b 100644
  #include "SymbolTable.h"
  #include "Symbols.h"
  #include "lld/Common/ErrorHandler.h"
-@@ -240,6 +241,8 @@ void BitcodeCompiler::add(BitcodeFile &f) {
+@@ -245,6 +246,8 @@ void BitcodeCompiler::add(BitcodeFile &f) {
  
    ArrayRef<Symbol *> syms = f.getSymbols();
    ArrayRef<lto::InputFile::Symbol> objSyms = obj.symbols();
@@ -234,7 +234,7 @@ index e40575bffec6..e061dca9cb0b 100644
    std::vector<lto::SymbolResolution> resols(syms.size());
  
    // Provide a resolution to the LTO API for each symbol.
-@@ -291,6 +294,12 @@ void BitcodeCompiler::add(BitcodeFile &f) {
+@@ -296,6 +299,12 @@ void BitcodeCompiler::add(BitcodeFile &f) {
      // (with --wrap) symbols because otherwise LTO would inline them while
      // their values are still not final.
      r.LinkerRedefined = sym->scriptDefined;
@@ -1537,7 +1537,7 @@ index 000000000000..4648390ad984
 +
 +#endif // LLVM_CODEGEN_ASSIGNSECTIONSTOGLOBALS_H
 diff --git a/llvm/include/llvm/LTO/LTO.h b/llvm/include/llvm/LTO/LTO.h
-index 32aa67118389..340a9ac4d50f 100644
+index cea66f99b99b..6882df591d09 100644
 --- a/llvm/include/llvm/LTO/LTO.h
 +++ b/llvm/include/llvm/LTO/LTO.h
 @@ -141,6 +141,7 @@ private:
@@ -1557,7 +1557,7 @@ index 32aa67118389..340a9ac4d50f 100644
  
    /// The purpose of this struct is to only expose the symbol information that
    /// an LTO client should need in order to do symbol resolution.
-@@ -701,6 +702,12 @@ struct SymbolResolution {
+@@ -709,6 +710,12 @@ struct SymbolResolution {
    /// Linker redefined version of the symbol which appeared in -wrap or -defsym
    /// linker option.
    unsigned LinkerRedefined : 1;
