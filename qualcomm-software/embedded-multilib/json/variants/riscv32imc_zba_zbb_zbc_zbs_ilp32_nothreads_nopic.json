@@ -3,7 +3,7 @@
         "common": {
             "TARGET_ARCH": "riscv32",
             "VARIANT": "riscv32imc_zba_zbb_zbc_zbs_ilp32_nothreads_nopic",
-            "COMPILE_FLAGS": "-march=rv32imc_zba_zbb_zbc_zbs -mabi=ilp32",
+            "COMPILE_FLAGS": "-march=rv32imc_zba_zbb_zbc_zbs -mabi=ilp32 -fcf-protection=none",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",
