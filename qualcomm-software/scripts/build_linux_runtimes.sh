@@ -108,6 +108,14 @@ fi
 
 CLANG_RESOURCE_DIR="$(clang --print-resource-dir)"
 
+# The resource dir's path relative to the directory containing the clang
+# binary. This is a property of the LLVM build (always <bin>/../lib/clang/<major>)
+# rather than of any particular install location, so it can be reused as-is
+# with clang's <CFGDIR> token when generating per-variant configuration files
+# below, regardless of whether TOOLS_PATH is an in-tree build's bin/ dir or
+# the final installed package's bin/ dir.
+CLANG_RESOURCE_DIR_REL="$(realpath --relative-to="${TOOLS_PATH}" "${CLANG_RESOURCE_DIR}")"
+
 # Variants to build and the basic set of compile flags to use for each. There's
 # surely more elegant ways of doing this, but this doesn't require any extra
 # dependencies and is intended as temporary code.
@@ -473,6 +481,7 @@ done
 # Also, while we use `*-linux-gnu` triples to build, we want to install these
 # in `*-linux-musl` directories.
 echo "Copying libraries to their final locations"
+mkdir -p "${BASE_INSTALL_DIR}/cfgs"
 for VARIANT in "${VARIANTS[@]}"; do
   VARIANT_TMP_SYSROOT="${BASE_BUILD_DIR}/${VARIANT}/sysroot"
   VARIANT_TARGET="$(get_target_from_flags ${VARIANT_BUILD_FLAGS[$VARIANT]})"
@@ -488,4 +497,49 @@ for VARIANT in "${VARIANTS[@]}"; do
   mv "${VARIANT_TMP_SYSROOT}/resource-dir/lib/temp" \
      "${VARIANT_TMP_SYSROOT}/resource-dir/lib/${VARIANT_TARGET_MUSL}/${VARIANT}"
   cp -r "${VARIANT_TMP_SYSROOT}/resource-dir" "${BASE_INSTALL_DIR}"
+
+  # Generate a clang configuration file for this variant so it can be used
+  # via `--config=<variant>.cfg` without needing to know the toolchain's
+  # internal layout. Paths are all relative to <CFGDIR> (the directory
+  # containing the .cfg file itself, i.e. the installed bin/ dir) so the
+  # file remains valid wherever the package is installed. See
+  # https://clang.llvm.org/docs/UsersManual.html#configuration-files
+  echo "Generating clang config for ${VARIANT}"
+  VARIANT_STDLIB_REL="../${VARIANT_TARGET_MUSL}/${VARIANT}"
+  VARIANT_RT_LIB_REL="${CLANG_RESOURCE_DIR_REL}/lib/${VARIANT_TARGET_MUSL}/${VARIANT}"
+  {
+    # The variant's build flags contain `--target=<triple>-gnu`; swap in the
+    # musl target instead so the emitted .cfg doesn't reference the gnu triple
+    for word in ${VARIANT_BUILD_FLAGS[$VARIANT]}; do
+      if [[ "${word}" == --target=* ]]; then
+        echo "--target=${VARIANT_TARGET_MUSL}"
+      else
+        echo "${word}"
+      fi
+    done
+    echo "-nostdinc"
+    echo "-nostdinc++"
+    echo "-isystem <CFGDIR>/${CLANG_RESOURCE_DIR_REL}/include"
+    echo "-cxx-isystem <CFGDIR>/${VARIANT_STDLIB_REL}/include/c++/v1"
+    echo "-cxx-isystem <CFGDIR>/${VARIANT_STDLIB_REL}/include/c++/v1/support/musl"
+    echo "-isystem <CFGDIR>/${VARIANT_STDLIB_REL}/include"
+    # The following are only applied when linking, and are appended after
+    # all user-specified linker inputs.
+    echo "\$-nostdlib"
+    echo "\$-L <CFGDIR>/${VARIANT_STDLIB_REL}/lib"
+    echo "\$-L <CFGDIR>/${VARIANT_RT_LIB_REL}"
+    echo "\$-Wl,--as-needed"
+    echo "\$-lc++"
+    echo "\$-lc++abi"
+    echo "\$-lunwind"
+    echo "\$-Wl,--no-as-needed"
+    echo "\$<CFGDIR>/${VARIANT_STDLIB_REL}/lib/crt1.o"
+    echo "\$<CFGDIR>/${VARIANT_STDLIB_REL}/lib/crti.o"
+    echo "\$<CFGDIR>/${VARIANT_STDLIB_REL}/lib/crtn.o"
+    echo "\$-Wl,--start-group"
+    echo "\$-lc"
+    echo "\$-lclang_rt.builtins"
+    echo "\$-Wl,--end-group"
+    echo "\$-Wl,--defsym,__dso_handle=0"
+  } > "${BASE_INSTALL_DIR}/cfgs/${VARIANT}.cfg"
 done

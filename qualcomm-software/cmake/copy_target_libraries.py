@@ -29,6 +29,23 @@ def move_folder(src_glob, dest):
     shutil.move(src_dir, dest)
 
 
+def move_files(src_glob, dest, exclude_names=()):
+    """
+    Move every file matched by `src_glob` into the `dest` directory,
+    skipping any whose basename is in `exclude_names`.
+    """
+
+    os.makedirs(dest, exist_ok=True)
+    matched = [
+        f for f in glob.glob(src_glob) if os.path.basename(f) not in exclude_names
+    ]
+    if not matched:
+        raise RuntimeError(f"No files matched glob '{src_glob}' (after exclusions)")
+
+    for src_file in matched:
+        shutil.move(src_file, os.path.join(dest, os.path.basename(src_file)))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -101,6 +118,15 @@ def main():
             ]
             for folder in linux_lib_folders:
                 move_folder(os.path.join(tmp, "*", folder), linux_lib_dir)
+
+            # Move the per-variant clang configuration files. These live in
+            # the distribution's bin/ directory alongside musl-embedded.cfg
+            # (which is not a linux-runtime variant cfg and must stay put).
+            move_files(
+                os.path.join(tmp, "*", "bin", "*.cfg"),
+                os.path.join(linux_lib_dir, "cfgs"),
+                exclude_names={"musl-embedded.cfg"},
+            )
 
 
 if __name__ == "__main__":

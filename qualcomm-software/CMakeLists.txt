@@ -776,11 +776,18 @@ if(ENABLE_LINUX_LIBRARIES)
         DESTINATION .
         COMPONENT llvm-toolchain-libs
         REGEX "resource-dir" EXCLUDE
+        REGEX "cfgs" EXCLUDE
     )
     # compiler-rt
     install(
         DIRECTORY ${LLVM_BINARY_DIR}/linux-libraries/resource-dir/.
         DESTINATION lib/clang/${LLVM_VERSION_MAJOR}
+        COMPONENT llvm-toolchain-libs
+    )
+    # per-variant clang configuration files
+    install(
+        DIRECTORY ${LLVM_BINARY_DIR}/linux-libraries/cfgs/.
+        DESTINATION bin
         COMPONENT llvm-toolchain-libs
     )
 endif()
