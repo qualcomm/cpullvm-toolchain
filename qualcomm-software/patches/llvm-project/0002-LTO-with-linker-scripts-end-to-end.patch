@@ -1,6 +1,6 @@
-From 23730bc9bbf31452ba3d10c9a9a9703f295f0ef5 Mon Sep 17 00:00:00 2001
+From a77d3ebf76cad823a460c42b3373a8001f2cb161 Mon Sep 17 00:00:00 2001
 From: Sudharsan Veeravalli <svs@qti.qualcomm.com>
-Date: Sun, 19 Jul 2026 08:37:10 +0530
+Date: Thu, 23 Jul 2026 10:27:42 +0530
 Subject: [PATCH] LTO with linker scripts, end-to-end.
 
 "LTO with linker scripts" is a set of features that makes LTO interact in a more predictable way with linker scripts: the semantics of linker script rules are much closer to non-LTO semantics.
@@ -18,7 +18,7 @@ RFC: https://discourse.llvm.org/t/rfc-lto-lld-lto-with-linker-scripts-implemente
  clang/test/CodeGen/lto-linker-scripts.c       |   4 +
  lld/ELF/Config.h                              |   1 +
  lld/ELF/Driver.cpp                            |   2 +
- lld/ELF/InputFiles.cpp                        |  12 +-
+ lld/ELF/InputFiles.cpp                        |  24 ++-
  lld/ELF/LTO.cpp                               |   9 ++
  lld/ELF/LinkerScript.cpp                      |  51 +++++-
  lld/ELF/LinkerScript.h                        |   5 +
@@ -48,10 +48,10 @@ RFC: https://discourse.llvm.org/t/rfc-lto-lld-lto-with-linker-scripts-implemente
  llvm/lib/Analysis/InlineCost.cpp              |  23 +++
  llvm/lib/CodeGen/AssignSectionsToGlobals.cpp  | 145 ++++++++++++++++++
  llvm/lib/CodeGen/CMakeLists.txt               |   1 +
- llvm/lib/LTO/LTO.cpp                          |  59 ++++++-
+ llvm/lib/LTO/LTO.cpp                          |  62 +++++++-
  llvm/lib/Object/IRSymtab.cpp                  |   2 +
  llvm/lib/Object/ModuleSymbolTable.cpp         |   2 +-
- 40 files changed, 1388 insertions(+), 15 deletions(-)
+ 40 files changed, 1403 insertions(+), 15 deletions(-)
  create mode 100644 clang/test/CodeGen/lto-linker-scripts.c
  create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/CheckWrapSymbolResolution.test
  create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmAlias.test
@@ -177,7 +177,7 @@ index 51d9e32419f9..7d32a6931d02 100644
    ctx.arg.ltoWholeProgramVisibility =
        args.hasFlag(OPT_lto_whole_program_visibility,
 diff --git a/lld/ELF/InputFiles.cpp b/lld/ELF/InputFiles.cpp
-index 05c0f3f1c445..ff0b98c146b4 100644
+index 05c0f3f1c445..51ce42f0682b 100644
 --- a/lld/ELF/InputFiles.cpp
 +++ b/lld/ELF/InputFiles.cpp
 @@ -1830,7 +1830,7 @@ BitcodeFile::BitcodeFile(Ctx &ctx, MemoryBufferRef mb, StringRef archiveName,
@@ -189,7 +189,7 @@ index 05c0f3f1c445..ff0b98c146b4 100644
    obj->setArchivePathAndName(archiveName, mb.getBufferIdentifier());
  
    Triple t(obj->getTargetTriple());
-@@ -1854,7 +1854,13 @@ static uint8_t mapVisibility(GlobalValue::VisibilityTypes gvVisibility) {
+@@ -1854,10 +1854,26 @@ static uint8_t mapVisibility(GlobalValue::VisibilityTypes gvVisibility) {
  static void createBitcodeSymbol(Ctx &ctx, Symbol *&sym,
                                  const lto::InputFile::Symbol &objSym,
                                  BitcodeFile &f) {
@@ -204,7 +204,29 @@ index 05c0f3f1c445..ff0b98c146b4 100644
    uint8_t type = objSym.isTLS() ? STT_TLS : STT_NOTYPE;
    uint8_t visibility = mapVisibility(objSym.getVisibility());
  
-@@ -1938,7 +1944,7 @@ void BitcodeFile::postParse() {
++  if (!objSym.isGlobal()) {
++    // Local symbols aren't inserted in the symbol table.
++    assert(!sym);
++    objSym.Name = ctx.uniqueSaver.save(objSym.getName());
++    sym = reinterpret_cast<Symbol *>(makeThreadLocalN<SymbolUnion>(1));
++    new (sym) Defined(ctx, &f, StringRef(), binding, visibility, type, 0, 0,
++                      nullptr);
++    return;
++  }
++
+   if (!sym) {
+     // Symbols can be duplicated in bitcode files because of '#include' and
+     // linkonce_odr. Use uniqueSaver to save symbol names for de-duplication.
+@@ -1920,6 +1936,8 @@ void BitcodeFile::parseLazy() {
+   numSymbols = obj->symbols().size();
+   symbols = std::make_unique<Symbol *[]>(numSymbols);
+   for (auto [i, irSym] : llvm::enumerate(obj->symbols())) {
++    if (!irSym.isGlobal())
++      continue;
+     // Symbols can be duplicated in bitcode files because of '#include' and
+     // linkonce_odr. Use uniqueSaver to save symbol names for de-duplication.
+     // Update objSym.Name to reference (via StringRef) the string saver's copy;
+@@ -1938,7 +1956,7 @@ void BitcodeFile::postParse() {
    for (auto [i, irSym] : llvm::enumerate(obj->symbols())) {
      const Symbol &sym = *symbols[i];
      if (sym.file == this || !sym.isDefined() || irSym.isUndefined() ||
@@ -1815,7 +1837,7 @@ index c572128b023c..69a692a9508b 100644
    BasicTargetTransformInfo.cpp
    BranchFolding.cpp
 diff --git a/llvm/lib/LTO/LTO.cpp b/llvm/lib/LTO/LTO.cpp
-index c8c5b0880819..e516754f5ce3 100644
+index c8c5b0880819..abe7a9b06e08 100644
 --- a/llvm/lib/LTO/LTO.cpp
 +++ b/llvm/lib/LTO/LTO.cpp
 @@ -627,13 +627,15 @@ void llvm::thinLTOInternalizeAndPromoteInIndex(
@@ -1856,7 +1878,17 @@ index c8c5b0880819..e516754f5ce3 100644
      File->ModuleSymIndices.push_back({Begin, File->Symbols.size()});
    }
  
-@@ -1032,9 +1040,15 @@ LTO::addRegularLTO(InputFile &Input, ArrayRef<SymbolResolution> InputRes,
+@@ -731,6 +739,9 @@ void LTO::addModuleToGlobalRes(ArrayRef<InputFile::Symbol> Syms,
+     assert(ResI != ResE);
+     SymbolResolution Res = *ResI++;
+ 
++    if (!Sym.isGlobal())
++      continue;
++
+     StringRef SymbolName = Sym.getName();
+     // Keep copies of symbols if the client of LTO says so.
+     if (GlobalResolutionSymbolSaver && !GlobalResolutions->contains(SymbolName))
+@@ -1032,9 +1043,15 @@ LTO::addRegularLTO(InputFile &Input, ArrayRef<SymbolResolution> InputRes,
    auto Skip = [&]() {
      while (MsymI != MsymE) {
        auto Flags = SymTab.getSymbolFlags(*MsymI);
@@ -1875,7 +1907,7 @@ index c8c5b0880819..e516754f5ce3 100644
        ++MsymI;
      }
    };
-@@ -1088,6 +1102,31 @@ LTO::addRegularLTO(InputFile &Input, ArrayRef<SymbolResolution> InputRes,
+@@ -1088,6 +1105,31 @@ LTO::addRegularLTO(InputFile &Input, ArrayRef<SymbolResolution> InputRes,
            GV->setDLLStorageClass(GlobalValue::DLLStorageClassTypes::
                                   DefaultStorageClass);
        }
@@ -1907,7 +1939,7 @@ index c8c5b0880819..e516754f5ce3 100644
      } else if (auto *AS =
                     dyn_cast_if_present<ModuleSymbolTable::AsmSymbol *>(Msym)) {
        // Collect non-prevailing symbols.
-@@ -1128,7 +1167,11 @@ LTO::addRegularLTO(InputFile &Input, ArrayRef<SymbolResolution> InputRes,
+@@ -1128,7 +1170,11 @@ LTO::addRegularLTO(InputFile &Input, ArrayRef<SymbolResolution> InputRes,
              if (!NonPrevailingAsmSymbols.count(Alias))
                NonPrevailingAsmSymbols.erase(Name);
            });
