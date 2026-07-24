@@ -343,9 +343,17 @@ endif()
 ##################################################################################################
 
 if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
+    set(libc_cfg_path ${CMAKE_CURRENT_BINARY_DIR}/${LLVM_TOOLCHAIN_C_LIBRARY}.cfg)
+
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/libc.cfg.in
+        ${libc_cfg_path}
+        @ONLY
+    )
+
     install(
         FILES
-        ${CMAKE_CURRENT_SOURCE_DIR}/${LLVM_TOOLCHAIN_C_LIBRARY}.cfg
+        ${libc_cfg_path}
         DESTINATION bin
         COMPONENT llvm-toolchain-${LLVM_TOOLCHAIN_C_LIBRARY}-configs
     )
