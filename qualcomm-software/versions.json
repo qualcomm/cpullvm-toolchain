@@ -17,13 +17,15 @@
     },
     "musl-embedded": {
       "url": "https://github.com/qualcomm/musl-embedded",
-      "tagType": "branch",
-      "tag": "main"
+      "tagType": "commithash",
+      "tag": "9eafd9adeff02200cecb6a8a745898e33301f4f6",
+      "trackingBranch": "main"
     },
     "eld": {
       "url": "https://github.com/qualcomm/eld",
-      "tagType": "branch",
-      "tag": "main"
+      "tagType": "commithash",
+      "tag": "cc213dc7949424454b0a6a644a280b392628dfa5",
+      "trackingBranch": "main"
     }
   }
 }

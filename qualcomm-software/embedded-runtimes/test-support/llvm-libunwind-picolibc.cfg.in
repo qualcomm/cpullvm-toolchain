@@ -31,9 +31,11 @@ config.substitutions.append(('%{compile_flags}',
 config.substitutions.append(('%{link_flags}',
     ' -nostdlib++ -L %{lib}'
     ' -lc++ -lc++abi -lunwind'
-    ' -nostdlib -L %{libc-lib}'
-    ' -lc -lm -lclang_rt.builtins'
+    ' -nostdlib -L %{libc-lib} -lm'
+    ' -Wl,--start-group'
+    ' -lc -lclang_rt.builtins'
     ' %{libc-extra-link-flags}'
+    ' -Wl,--end-group'
 ))
 config.substitutions.append(('%{exec}',
     '%{executor} --execdir %{temp} -- '

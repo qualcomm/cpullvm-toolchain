@@ -12,7 +12,7 @@ jobs:
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     strategy:
       matrix:
-        branch: [main]
+        branch: [main, release/23.x]
     env:
       UPSTREAM_REMOTE: https://github.com/llvm/llvm-project.git
     steps:

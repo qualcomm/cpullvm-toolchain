@@ -24,3 +24,4 @@ cd "${REPO_ROOT}"/build
 ninja check-all
 ninja check-llvm-toolchain
 ninja check-cxxabi
+ninja check-unwind

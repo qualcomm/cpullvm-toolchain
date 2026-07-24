@@ -98,6 +98,27 @@ def main():
 
     xfails = [
         XFail(
+            name="signal unwind picolibc",
+            testnames=[
+                "signal_unwind.pass.cpp",
+                "unwind_leaffunction.pass.cpp",
+            ],
+            result=NewResult.XFAILED,
+            project="libcxx",
+            variants=[
+                "aarch64a_tlsie",
+                "riscv64gc_lp64d_nopic",
+                "riscv64gc_lp64_nopic",
+                "riscv64gc_zba_zbb_lp64d_nopic",
+                "riscv64gc_zba_zbb_lp64_nopic",
+                "riscv64imac_lp64_nopic",
+                "riscv64imc_lp64_nothreads_nopic",
+            ],
+            description="picolibc semihost defines kill as a stub that calls _exit(128 + sig) "
+                "instead of delivering the signal to the registered handler, so signal-based "
+                "unwind tests cannot run on bare-metal targets.",
+        ),
+        XFail(
             name="no frwpi",
             testnames=[
                 "Clang :: Driver/ropi-rwpi.c",
@@ -119,6 +140,28 @@ def main():
             description="If the installed default multilib does not have a library available for -mcpu=cortex-r52, this test will fail.",
         ),
         XFail(
+            name="compiler-rt rv32 z_inx extendhftf2",
+            testnames=[
+                "extendhftf2_test.c",
+            ],
+            result=NewResult.XFAILED,
+            project="compiler-rt",
+            variants=[
+                "riscv32ima_zinx_xqci_ilp32_nopic",
+            ],
+            description="Possible QEMU zhinx bug in fneg.h/fsgnjn.h (not "
+                "compiler-rt/clang/picolibc):\n"
+                "(1) Only the 4th check, test__extendhftf2(-makeInf16(), "
+                "0xffff..), fails. The unary '-' on a _Float16 compiles "
+                "(correctly) to fneg.h; on RV32 zhinx QEMU does not flip the "
+                "sign bit, so +inf (0x7c00) is used instead of -inf (0xfc00) "
+                "and __extendhftf2 returns +inf (0x7fff..) vs expected -inf "
+                "(0xffff..). __extendhftf2 itself is bit-correct.\n"
+                "(2) Zinx-only: across all riscv32 variants only this "
+                "FP-in-GPR (zhinx) one fails; hardware-FP (ilp32f/ilp32d) and "
+                "library soft-float (non-zinx, incl. riscv32ima_xqci) all PASS.",
+        ),
+        XFail(
             name="picolibc rv32/64gc",
             testnames=[
                 "math_errhandling.test",
@@ -128,6 +171,7 @@ def main():
             project="picolibc",
             variants=[
                 "riscv32gc_ilp32d",
+                "riscv32ima_zinx_xqci_ilp32_nopic",
                 "riscv64gc_lp64d_nopic",
                 "riscv64gc_zba_zbb_lp64d_nopic",
                 "riscv64gc_lp64_nopic",
@@ -151,29 +195,6 @@ def main():
                 "riscv32imaf_zve32f_zvfh_zba_zbb_ilp32f_nothreads"
             ],
             description="Disable the tests for now while the issue is being fixed upstream (https://github.com/picolibc/picolibc/pull/1072).",
-        ),
-        XFail(
-            name="no hardware atomics cxxabi",
-            testnames=[
-                "test_exception_storage.pass.cpp",
-            ],
-            result=NewResult.XFAILED,
-            project="libcxx",
-            variants=[
-                "riscv32im_xqci_ilp32_nothreads_nopic",
-                "riscv32imc_ilp32_nothreads_nopic",
-                "riscv32imc_ilp32_scs_nothreads_nopic",
-                "riscv32imc_zba_zbb_zbc_zbs_ilp32_nothreads_nopic",
-                "riscv64imc_lp64_nothreads_nopic",
-                "riscv64imc_lp64_scs_nothreads_nopic",
-            ],
-            description="These variants are built without the RISC-V A (atomic) extension "
-                "so no hardware atomic instructions are available. "
-                "test_exception_storage.pass.cpp links against libc++, which pulls in "
-                "ios_base::xalloc() from ios.cpp. That function unconditionally uses "
-                "std::atomic<int>, which lowers to a __atomic_fetch_add_4 call on targets "
-                "without hardware atomics. This symbol has no provider on these targets "
-                "since compiler-rt's atomic.c requires lock-free hardware CAS to compile.",
         ),
         XFail(
             name="Insufficient RAM",
@@ -241,7 +262,7 @@ def main():
                          "on ARMv7-A/ARMv8 with NEON. Compiler bug; exclude until fixed.",
         ),
         XFail(
-            name="long-double-picolibc-aarch64",
+            name="long-double-picolibc-aarch64-riscv",
             testnames=[
                 "std/strings/string.conversions/stold.pass.cpp",
                 "std/strings/string.conversions/to_string.pass.cpp",
@@ -254,10 +275,25 @@ def main():
             project="libcxx",
             variants=[
                 "aarch64a_tlsie",
+                "riscv32imac_ilp32",
+                "riscv32imac_ilp32_nopic",
+                "riscv32imac_zba_zbb_ilp32",
+                "riscv32imac_zba_zbb_ilp32_nopic",
+                "riscv32imac_zcb_zcmp_ilp32_nopic",
+                "riscv32imac_zcb_zcmp_zba_zbb_ilp32_nopic",
+                "riscv32imafc_ilp32f",
+                "riscv32imafc_zba_zbb_ilp32f",
+                "riscv32imafc_zcb_zcmp_zba_zbb_ilp32f",
+                "riscv32gc_ilp32d",
+                "riscv64gc_lp64_nopic",
+                "riscv64gc_lp64d_nopic",
+                "riscv64gc_zba_zbb_lp64_nopic",
+                "riscv64gc_zba_zbb_lp64d_nopic",
+                "riscv64imac_lp64_nopic",
             ],
             description="Long double is 128-bit on AArch64 and conversion between 128-bit "
-                        "types and strings is broken in picolibc. ARM 32-bit is unaffected "
-                        "(64-bit long double).",
+                        "types and strings is broken. On RISC-V, picolibc does not support "
+                        "stdio for long doubles. ARM 32-bit is unaffected (64-bit long double).",
         ),
         XFail(
             name="aeabi-unwind-cpp-pr0-missing-arm",
@@ -320,11 +356,84 @@ def main():
                 "armv7m_soft_nofp",
                 "armv7m_soft_nofp_nopic",
                 "armv7m_hard_fpv5_d16_nopic",
+                "riscv32imac_ilp32",
+                "riscv32imac_ilp32_nopic",
+                "riscv32imac_zba_zbb_ilp32",
+                "riscv32imac_zba_zbb_ilp32_nopic",
+                "riscv32imac_zcb_zcmp_ilp32_nopic",
+                "riscv32imac_zcb_zcmp_zba_zbb_ilp32_nopic",
+                "riscv32imafc_ilp32f",
+                "riscv32imafc_zba_zbb_ilp32f",
+                "riscv32imafc_zcb_zcmp_zba_zbb_ilp32f",
             ],
             description="cas_non_power_of_2.pass.cpp tests atomic operations on structs of "
                         "sizes 3, 5, and 6 bytes, which require the generic (unsized) libcalls "
                         "__atomic_load / __atomic_compare_exchange.  These lock-based fallbacks "
-                        "are not provided by libclang_rt.builtins.a on our bare-metal ARM targets.",
+                        "are not provided by libclang_rt.builtins.a on our bare-metal ARM and "
+                        "RISCV32 targets.",
+        ),
+        XFail(
+            name="simd-riscv32",
+            testnames=[
+                "std/experimental/simd/",
+            ],
+            result=NewResult.EXCLUDE,
+            project="libcxx",
+            variants=[
+                "riscv32gc_ilp32d",
+                "riscv32imac_ilp32",
+                "riscv32imac_ilp32_nopic",
+                "riscv32imac_zba_zbb_ilp32",
+                "riscv32imac_zba_zbb_ilp32_nopic",
+                "riscv32imac_zcb_zcmp_ilp32_nopic",
+                "riscv32imac_zcb_zcmp_zba_zbb_ilp32_nopic",
+                "riscv32imafc_ilp32f",
+                "riscv32imafc_zba_zbb_ilp32f",
+                "riscv32imafc_zcb_zcmp_zba_zbb_ilp32f",
+            ],
+            description="std::experimental::simd is not implemented in libc for RISCV32 "
+                        "targets. The tests fail to compile because the <experimental/simd> "
+                         "header does not provide the required specialisations for RISCV32.",
+        ),
+        XFail(
+            name="cmath-soft-float-precision",
+            testnames=[
+                "std/numerics/c.math/cmath.pass.cpp",
+            ],
+            result=NewResult.XFAILED,
+            project="libcxx",
+            variants=[
+                "riscv32imac_ilp32",
+                "riscv32imac_ilp32_nopic",
+                "riscv32imac_zba_zbb_ilp32",
+                "riscv32imac_zba_zbb_ilp32_nopic",
+                "riscv32imac_zcb_zcmp_ilp32_nopic",
+                "riscv32imac_zcb_zcmp_zba_zbb_ilp32_nopic",
+                "riscv64imac_lp64_nopic",
+            ],
+            description="cmath.pass.cpp fails on soft-float builds where std::sqrt(long double) "
+                        "gives incorrect results. The 3-argument std::hypot precision assertion "
+                        "fails because it relies on sqrt(2) being accurate."
+                        "soft-nofp builds and RISC-V variants without the F (single-precision "
+                        "float) extension.",
+        ),
+        XFail(
+            name="string-replace-oom-riscv64",
+            testnames=[
+                "std/strings/basic.string/string.modifiers/string_replace/size_size_string_size_size.pass.cpp",
+            ],
+            result=NewResult.XFAILED,
+            project="libcxx",
+            variants=[
+                "riscv64gc_lp64_nopic",
+                "riscv64gc_lp64d_nopic",
+                "riscv64gc_zba_zbb_lp64_nopic",
+                "riscv64gc_zba_zbb_lp64d_nopic",
+                "riscv64imac_lp64_nopic",
+            ],
+            description="The string replace test exits with code 1 on riscv64 "
+                "bare-metal QEMU targets. The cause is unknown; riscv32 variants "
+                "pass.",
         ),
         XFail(
             name="no-c8rtomb-verify-picolibc",
