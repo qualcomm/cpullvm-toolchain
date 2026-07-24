@@ -76,6 +76,18 @@
 # CHECK-IM-XQCI-ILP32-NO-THREADS-NO-PIC: riscv32-unknown-elf/riscv32im_xqci_ilp32_nothreads_nopic{{$}}
 # CHECK-IM-XQCI-ILP32-NO-THREADS-NO-PIC-EMPTY:
 
+# Xqci + atomic variant test
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp_xqccmt0p1 -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=CHECK-IMA-XQCI-ILP32-NO-PIC
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqci_xqccmp_xqccmt0p1 -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=CHECK-IMA-XQCI-ILP32-NO-PIC
+# CHECK-IMA-XQCI-ILP32-NO-PIC: riscv32-unknown-elf/riscv32ima_xqci_ilp32_nopic{{$}}
+# CHECK-IMA-XQCI-ILP32-NO-PIC-EMPTY:
+
+# Xqci + atomic + z*inx variant test
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_zdinx_zfinx_zhinx_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp_xqccmt0p1 -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=CHECK-IMA-ZINX-XQCI-ILP32-NO-PIC
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_zdinx_zfinx_zhinx_xqci_xqccmp_xqccmt0p1 -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=CHECK-IMA-ZINX-XQCI-ILP32-NO-PIC
+# CHECK-IMA-ZINX-XQCI-ILP32-NO-PIC: riscv32-unknown-elf/riscv32ima_zinx_xqci_ilp32_nopic{{$}}
+# CHECK-IMA-ZINX-XQCI-ILP32-NO-PIC-EMPTY:
+
 # RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imafdzca_zcf -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # NOT-FOUND: warning: no multilib found matching flags
