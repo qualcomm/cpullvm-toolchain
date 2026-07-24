@@ -190,7 +190,13 @@ if(ENABLE_LIBC_TESTS OR ENABLE_COMPILER_RT_TESTS OR ENABLE_LIBCXX_TESTS)
         if(TARGET_ARCH MATCHES "^aarch64")
             find_program(QEMU_EXECUTABLE qemu-system-aarch64 REQUIRED)
         elseif(TARGET_ARCH MATCHES "^riscv32")
-            if(VARIANT MATCHES "^riscv32im_xqci_ilp32")
+            # Variants that use the Qualcomm 'xqci' extension require a
+            # dedicated QEMU build (qemu-system-riscv32-xqci). Detect them
+            # generically by looking for the 'xqci' token anywhere in the
+            # variant name, so new xqci variants don't require editing this
+            # file. The token is matched with word-like boundaries ('_' or
+            # start/end of string) to avoid accidental substring matches.
+            if(VARIANT MATCHES "(^|_)xqci(_|$)")
                 find_program(QEMU_EXECUTABLE qemu-system-riscv32-xqci)
                 if(NOT QEMU_EXECUTABLE)
                     message(STATUS "qemu-system-riscv32-xqci not found. Disabling QEMU tests for ${VARIANT}.")
