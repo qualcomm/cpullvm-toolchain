@@ -3,7 +3,7 @@
     "common": {
       "TARGET_ARCH": "riscv32",
       "VARIANT": "riscv32ima_xqci_ilp32_nopic",
-      "COMPILE_FLAGS": "-march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp_xqccmt0p1 -menable-experimental-extensions -mabi=ilp32 -fno-pic -fno-omit-frame-pointers",
+      "COMPILE_FLAGS": "-march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp_xqccmt0p1 -menable-experimental-extensions -mabi=ilp32 -fno-pic -fno-omit-frame-pointer",
       "ENABLE_EXCEPTIONS": "OFF",
       "ENABLE_RTTI": "OFF",
       "TEST_EXECUTOR": "qemu",
