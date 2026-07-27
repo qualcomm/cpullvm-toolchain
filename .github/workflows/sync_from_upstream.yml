@@ -1,6 +1,7 @@
 # This workflow fetches changes from relevant branches from the
 # llvm/llvm-project repository (upstream) into the corresponding branches
 # in the qualcomm/cpullvm-toolchain repository (downstream), keeping them in sync.
+# After syncing, it automatically merges the changes into the qualcomm-software branches.
 name: Sync from Upstream LLVM
 on:
   schedule:
@@ -40,3 +41,57 @@ jobs:
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - name: Push Changes
         run: git push origin ${{ matrix.branch }}
+
+  Run-Automerge:
+    runs-on: ubuntu-24.04
+    needs: Fetch-Upstream
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    permissions:
+      pull-requests: write
+    strategy:
+      matrix:
+        branches:
+          - from_branch: main
+            to_branch: qualcomm-software
+          - from_branch: release/23.x
+            to_branch: release/qualcomm-software/23.x
+    steps:
+      - name: Configure Access Token
+        uses: actions/create-github-app-token@f45685208fd9b88321d74015b5996fc8c3e43d18 # v1.0.0
+        id: generate-token
+        with:
+          app_id: ${{ secrets.SYNC_APP_ID }}
+          private_key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          # Explicitly limit permissions to only what's needed
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ matrix.branches.to_branch }}
+          token: ${{ steps.generate-token.outputs.token }}
+      - name: Configure Git Identity
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Fetch Branches
+        run: |
+          git remote set-branches --add origin ${{ matrix.branches.from_branch }}
+          git fetch origin ${{ matrix.branches.from_branch }}:${{ matrix.branches.from_branch }}
+          git pull --unshallow --ff-only origin ${{ matrix.branches.to_branch }}
+      - name: Run automerge
+        run: |
+          python3 qualcomm-software/ci/automerge.py \
+            --project-name ${{ github.repository }} \
+            --from-branch ${{ matrix.branches.from_branch }} \
+            --to-branch ${{ matrix.branches.to_branch }} \
+            --verbose
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+      - name: Update dependency repo versions
+        run: |
+          python3 qualcomm-software/ci/update_repo_versions.py \
+            --to-branch ${{ matrix.branches.to_branch }}
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
