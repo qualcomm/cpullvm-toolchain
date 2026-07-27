@@ -1,0 +1,57 @@
+# Copyright (c) 2025, Arm Limited and affiliates.
+# Part of the Arm Toolchain project, under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# Changes from Qualcomm Technologies, Inc. are provided under the following license:
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. 
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Run libc++ tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 22 * * 6'  # 3 PM PDT (UTC-7), Saturday
+  pull_request:
+    paths:
+      - '.github/workflows/libcxx-test.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    # Don't run on forks
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    name: test_libcxx.sh on Linux-x86_64
+    runs-on: cpullvm-ubuntu24-x86_64
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          # We build in the repository and rely on clean to cleanup possible
+          # old build products if the runner doesn't do it itself.
+          clean: true
+
+      - name: Apply llvm-project patches
+        run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
+
+      - name: Build toolchain
+        env:
+          EXTRA_CMAKE_ARGS: -DENABLE_LINUX_LIBRARIES=OFF
+        run: ./qualcomm-software/scripts/build.sh
+
+      # Upload in case it is helpful for debugging any failures
+      - name: Upload built packages
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: success()
+        with:
+          name: cpullvm-packages-build.sh-Linux-x86
+          path: build*/cpullvm-*.tar.xz
+          if-no-files-found: error
+          retention-days: 2
+
+      - name: Test
+        run: ./qualcomm-software/scripts/test_libcxx.sh
