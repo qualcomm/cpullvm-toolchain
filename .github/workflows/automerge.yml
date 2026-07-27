@@ -1,6 +1,13 @@
 # This workflow executes the automerge python script to automatically merge
 # changes from the `main` branch of upstream LLVM into the `qualcomm-software`
 # branch of the qualcomm/cpullvm-toolchain repository.
+#
+# Security Note: This workflow uses workflow_run trigger which is flagged by
+# security scanners as potentially insecure. We mitigate this by:
+# 1. Validating the triggering workflow completed successfully
+# 2. Validating it ran from the default branch
+# 3. Limiting GitHub App token permissions to only contents:write and pull-requests:write
+# 4. Restricting execution to the qualcomm/cpullvm-toolchain repository only
 name: Automerge
 on:
   workflow_run:
@@ -13,7 +20,12 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       pull-requests: write
-    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    # Validate that workflow_run was triggered by a successful workflow from the default branch
+    if: |
+      github.repository == 'qualcomm/cpullvm-toolchain' &&
+      (github.event_name == 'workflow_dispatch' || 
+       (github.event.workflow_run.conclusion == 'success' && 
+        github.event.workflow_run.head_branch == github.event.repository.default_branch))
     strategy:
       matrix:
         branches:
@@ -28,6 +40,10 @@ jobs:
         with:
           app_id: ${{ secrets.SYNC_APP_ID }}
           private_key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          # Explicitly limit permissions to only what's needed
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
