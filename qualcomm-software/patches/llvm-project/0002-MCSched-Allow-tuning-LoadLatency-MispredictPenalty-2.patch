@@ -1,0 +1,565 @@
+From d81e2b7d0f0e5b32713c175b54441186ab0c2aef Mon Sep 17 00:00:00 2001
+From: Sam Elliott <aelliott@qti.qualcomm.com>
+Date: Wed, 15 Jul 2026 16:18:20 -0700
+Subject: [PATCH 2/3] [MCSched] Allow tuning LoadLatency/MispredictPenalty
+ (#203139)
+
+This means an existing scheduling model can be tweaked at runtime to
+support an unknown processor rather than adding an entirely new model.
+
+This is done with TargetSubtargetInfo so that specific targets can
+override the relevant callbacks and the mechanism can eventually work
+with LTO.
+
+Also contains "[MCSchedule][NFC] Use constexpr for static constants
+(#209934)" from upstream which fixes a compilation error.
+
+(cherry picked from commit b6059b6ce21886c3f8644355ae9017cf3ba04aad)
+(cherry picked from commit 1f9891c05cd1faa3c1d27af444180fe2cb5f7786)
+---
+ llvm/include/llvm/CodeGen/BasicTTIImpl.h      |  4 +
+ llvm/include/llvm/CodeGen/TargetInstrInfo.h   |  3 +-
+ .../llvm/CodeGen/TargetSubtargetInfo.h        | 12 +++
+ llvm/include/llvm/MC/MCSchedule.h             | 12 +--
+ llvm/lib/CodeGen/EarlyIfConversion.cpp        | 15 ++--
+ llvm/lib/CodeGen/SelectOptimize.cpp           |  2 +-
+ llvm/lib/CodeGen/TargetInstrInfo.cpp          |  5 +-
+ llvm/lib/CodeGen/TargetSchedule.cpp           |  5 +-
+ .../AArch64/AArch64ConditionalCompares.cpp    |  6 +-
+ .../AArch64/AArch64TargetTransformInfo.cpp    |  2 +-
+ llvm/lib/Target/ARM/ARMSubtarget.cpp          |  4 -
+ llvm/lib/Target/ARM/ARMSubtarget.h            |  2 -
+ llvm/lib/Target/RISCV/RISCVISelLowering.cpp   |  2 +-
+ llvm/lib/Target/RISCV/RISCVSubtarget.cpp      | 29 +++++++-
+ llvm/lib/Target/RISCV/RISCVSubtarget.h        |  3 +
+ llvm/lib/Target/X86/X86CmovConversion.cpp     | 11 +--
+ .../CodeGen/RISCV/sched-model-load-latency.ll | 43 +++++++++++
+ .../RISCV/sched-model-mispredict-penalty.ll   | 74 +++++++++++++++++++
+ 18 files changed, 197 insertions(+), 37 deletions(-)
+ create mode 100644 llvm/test/CodeGen/RISCV/sched-model-load-latency.ll
+ create mode 100644 llvm/test/CodeGen/RISCV/sched-model-mispredict-penalty.ll
+
+diff --git a/llvm/include/llvm/CodeGen/BasicTTIImpl.h b/llvm/include/llvm/CodeGen/BasicTTIImpl.h
+index 46e18593430a..fcac359a1cac 100644
+--- a/llvm/include/llvm/CodeGen/BasicTTIImpl.h
++++ b/llvm/include/llvm/CodeGen/BasicTTIImpl.h
+@@ -845,6 +845,10 @@ public:
+         SimplifyAndSetOp);
+   }
+ 
++  InstructionCost getBranchMispredictPenalty() const override {
++    return getST()->getMispredictionPenalty();
++  }
++
+   std::optional<unsigned>
+   getCacheSize(TargetTransformInfo::CacheLevel Level) const override {
+     return std::optional<unsigned>(
+diff --git a/llvm/include/llvm/CodeGen/TargetInstrInfo.h b/llvm/include/llvm/CodeGen/TargetInstrInfo.h
+index 8f381c5efe2e..4749d06501cb 100644
+--- a/llvm/include/llvm/CodeGen/TargetInstrInfo.h
++++ b/llvm/include/llvm/CodeGen/TargetInstrInfo.h
+@@ -1916,7 +1916,8 @@ public:
+                                    SDNode *Node) const;
+ 
+   /// Return the default expected latency for a def based on its opcode.
+-  unsigned defaultDefLatency(const MCSchedModel &SchedModel,
++  unsigned defaultDefLatency(const TargetSubtargetInfo &STI,
++                             const MCSchedModel &SchedModel,
+                              const MachineInstr &DefMI) const;
+ 
+   /// Return true if this opcode has high latency to its result.
+diff --git a/llvm/include/llvm/CodeGen/TargetSubtargetInfo.h b/llvm/include/llvm/CodeGen/TargetSubtargetInfo.h
+index efd88fe012fd..db73a9675b71 100644
+--- a/llvm/include/llvm/CodeGen/TargetSubtargetInfo.h
++++ b/llvm/include/llvm/CodeGen/TargetSubtargetInfo.h
+@@ -148,6 +148,18 @@ public:
+     return nullptr;
+   }
+ 
++  /// Return the number of extra cycles the processor takes to recover from a
++  /// branch misprediction. Defaults to the value in the scheduling model.
++  virtual unsigned getMispredictionPenalty() const {
++    return getSchedModel().MispredictPenalty;
++  }
++
++  /// Return the expected latency of load instructions. Defaults to the value
++  /// in the scheduling model.
++  virtual unsigned getLoadLatency() const {
++    return getSchedModel().LoadLatency;
++  }
++
+   /// Configure the LibcallLoweringInfo for this subtarget. The libcalls will be
+   /// pre-configured with defaults based on RuntimeLibcallsInfo. This may be
+   /// used to override those decisions, such as disambiguating alternative
+diff --git a/llvm/include/llvm/MC/MCSchedule.h b/llvm/include/llvm/MC/MCSchedule.h
+index 7ed86df0a8ca..dcf07c1279cd 100644
+--- a/llvm/include/llvm/MC/MCSchedule.h
++++ b/llvm/include/llvm/MC/MCSchedule.h
+@@ -274,7 +274,7 @@ struct MCSchedModel {
+   // has a bandwidth limitation, then that can be naturally modeled by adding an
+   // out-of-order processor resource.
+   unsigned IssueWidth;
+-  static const unsigned DefaultIssueWidth = 1;
++  static constexpr unsigned DefaultIssueWidth = 1;
+ 
+   // MicroOpBufferSize is the number of micro-ops that the processor may buffer
+   // for out-of-order execution.
+@@ -291,7 +291,7 @@ struct MCSchedModel {
+   // estimate of highly machine specific characteristics such as the register
+   // renaming pool and reorder buffer.
+   unsigned MicroOpBufferSize;
+-  static const unsigned DefaultMicroOpBufferSize = 0;
++  static constexpr unsigned DefaultMicroOpBufferSize = 0;
+ 
+   // LoopMicroOpBufferSize is the number of micro-ops that the processor may
+   // buffer for optimized loop execution. More generally, this represents the
+@@ -299,23 +299,23 @@ struct MCSchedModel {
+   // unrolled to bring the count of micro-ops in the loop body closer to this
+   // number.
+   unsigned LoopMicroOpBufferSize;
+-  static const unsigned DefaultLoopMicroOpBufferSize = 0;
++  static constexpr unsigned DefaultLoopMicroOpBufferSize = 0;
+ 
+   // LoadLatency is the expected latency of load instructions.
+   unsigned LoadLatency;
+-  static const unsigned DefaultLoadLatency = 4;
++  static constexpr unsigned DefaultLoadLatency = 4;
+ 
+   // HighLatency is the expected latency of "very high latency" operations.
+   // See TargetInstrInfo::isHighLatencyDef().
+   // By default, this is set to an arbitrarily high number of cycles
+   // likely to have some impact on scheduling heuristics.
+   unsigned HighLatency;
+-  static const unsigned DefaultHighLatency = 10;
++  static constexpr unsigned DefaultHighLatency = 10;
+ 
+   // MispredictPenalty is the typical number of extra cycles the processor
+   // takes to recover from a branch misprediction.
+   unsigned MispredictPenalty;
+-  static const unsigned DefaultMispredictPenalty = 10;
++  static constexpr unsigned DefaultMispredictPenalty = 10;
+ 
+   bool PostRAScheduler; // default value is false
+ 
+diff --git a/llvm/lib/CodeGen/EarlyIfConversion.cpp b/llvm/lib/CodeGen/EarlyIfConversion.cpp
+index f17892307065..263efb70c994 100644
+--- a/llvm/lib/CodeGen/EarlyIfConversion.cpp
++++ b/llvm/lib/CodeGen/EarlyIfConversion.cpp
+@@ -820,7 +820,7 @@ namespace {
+ class EarlyIfConverter {
+   const TargetInstrInfo *TII = nullptr;
+   const TargetRegisterInfo *TRI = nullptr;
+-  MCSchedModel SchedModel;
++  const TargetSubtargetInfo *STI = nullptr;
+   MachineRegisterInfo *MRI = nullptr;
+   MachineDominatorTree *DomTree = nullptr;
+   MachineLoopInfo *Loops = nullptr;
+@@ -1099,8 +1099,8 @@ bool EarlyIfConverter::shouldConvertIf() {
+   if (EnableDataDependentBranchAnalysis)
+     DataDependent = isConditionDataDependent();
+ 
+-  unsigned CritLimit = DataDependent ? SchedModel.MispredictPenalty
+-                                     : SchedModel.MispredictPenalty / 2;
++  unsigned CritLimit = DataDependent ? STI->getMispredictionPenalty()
++                                     : STI->getMispredictionPenalty() / 2;
+ 
+   MachineBasicBlock &MBB = *IfConv.Head;
+   MachineOptimizationRemarkEmitter MORE(*MBB.getParent(), nullptr);
+@@ -1278,14 +1278,13 @@ bool EarlyIfConverter::run(MachineFunction &MF) {
+   LLVM_DEBUG(dbgs() << "********** EARLY IF-CONVERSION **********\n"
+                     << "********** Function: " << MF.getName() << '\n');
+ 
++  STI = &MF.getSubtarget();
+   // Only run if conversion if the target wants it.
+-  const TargetSubtargetInfo &STI = MF.getSubtarget();
+-  if (!STI.enableEarlyIfConversion())
++  if (!STI->enableEarlyIfConversion())
+     return false;
+ 
+-  TII = STI.getInstrInfo();
+-  TRI = STI.getRegisterInfo();
+-  SchedModel = STI.getSchedModel();
++  TII = STI->getInstrInfo();
++  TRI = STI->getRegisterInfo();
+   MRI = &MF.getRegInfo();
+   MinInstr = nullptr;
+ 
+diff --git a/llvm/lib/CodeGen/SelectOptimize.cpp b/llvm/lib/CodeGen/SelectOptimize.cpp
+index 399adf4467d8..ac2ebcc62005 100644
+--- a/llvm/lib/CodeGen/SelectOptimize.cpp
++++ b/llvm/lib/CodeGen/SelectOptimize.cpp
+@@ -1414,7 +1414,7 @@ SelectOptimizeImpl::computeInstCost(const Instruction *I) {
+ ScaledNumber<uint64_t>
+ SelectOptimizeImpl::getMispredictionCost(const SelectLike SI,
+                                          const Scaled64 CondCost) {
+-  uint64_t MispredictPenalty = TSchedModel.getMCSchedModel()->MispredictPenalty;
++  uint64_t MispredictPenalty = TSI->getMispredictionPenalty();
+ 
+   // Account for the default misprediction rate when using a branch
+   // (conservatively set to 25% by default).
+diff --git a/llvm/lib/CodeGen/TargetInstrInfo.cpp b/llvm/lib/CodeGen/TargetInstrInfo.cpp
+index f3666b05464b..92fc628e888e 100644
+--- a/llvm/lib/CodeGen/TargetInstrInfo.cpp
++++ b/llvm/lib/CodeGen/TargetInstrInfo.cpp
+@@ -1813,12 +1813,13 @@ unsigned TargetInstrInfo::getNumMicroOps(const InstrItineraryData *ItinData,
+ }
+ 
+ /// Return the default expected latency for a def based on it's opcode.
+-unsigned TargetInstrInfo::defaultDefLatency(const MCSchedModel &SchedModel,
++unsigned TargetInstrInfo::defaultDefLatency(const TargetSubtargetInfo &STI,
++                                            const MCSchedModel &SchedModel,
+                                             const MachineInstr &DefMI) const {
+   if (DefMI.isTransient())
+     return 0;
+   if (DefMI.mayLoad())
+-    return SchedModel.LoadLatency;
++    return STI.getLoadLatency();
+   if (isHighLatencyDef(DefMI.getOpcode()))
+     return SchedModel.HighLatency;
+   return 1;
+diff --git a/llvm/lib/CodeGen/TargetSchedule.cpp b/llvm/lib/CodeGen/TargetSchedule.cpp
+index 07a3205fbc64..b0544d1814d7 100644
+--- a/llvm/lib/CodeGen/TargetSchedule.cpp
++++ b/llvm/lib/CodeGen/TargetSchedule.cpp
+@@ -171,7 +171,8 @@ unsigned TargetSchedModel::computeOperandLatency(
+   const MachineInstr *UseMI, unsigned UseOperIdx) const {
+ 
+   const unsigned InstrLatency = computeInstrLatency(DefMI);
+-  const unsigned DefaultDefLatency = TII->defaultDefLatency(SchedModel, *DefMI);
++  const unsigned DefaultDefLatency =
++      TII->defaultDefLatency(*STI, SchedModel, *DefMI);
+ 
+   if (!hasInstrSchedModel() && !hasInstrItineraries())
+     return DefaultDefLatency;
+@@ -263,7 +264,7 @@ TargetSchedModel::computeInstrLatency(const MachineInstr *MI,
+     if (SCDesc->isValid())
+       return computeInstrLatency(*SCDesc);
+   }
+-  return TII->defaultDefLatency(SchedModel, *MI);
++  return TII->defaultDefLatency(*STI, SchedModel, *MI);
+ }
+ 
+ unsigned TargetSchedModel::
+diff --git a/llvm/lib/Target/AArch64/AArch64ConditionalCompares.cpp b/llvm/lib/Target/AArch64/AArch64ConditionalCompares.cpp
+index 4754f5c1bb5b..f490b5f94fe0 100644
+--- a/llvm/lib/Target/AArch64/AArch64ConditionalCompares.cpp
++++ b/llvm/lib/Target/AArch64/AArch64ConditionalCompares.cpp
+@@ -769,7 +769,7 @@ class AArch64ConditionalComparesImpl {
+   const MachineBranchProbabilityInfo *MBPI;
+   const TargetInstrInfo *TII;
+   const TargetRegisterInfo *TRI;
+-  MCSchedModel SchedModel;
++  const TargetSubtargetInfo *STI;
+   // Does the proceeded function has Oz attribute.
+   bool MinSize;
+   MachineRegisterInfo *MRI;
+@@ -902,7 +902,7 @@ bool AArch64ConditionalComparesImpl::shouldConvert() {
+   // the cost of a misprediction.
+   //
+   // Set a limit on the delay we will accept.
+-  unsigned DelayLimit = SchedModel.MispredictPenalty * 3 / 4;
++  unsigned DelayLimit = STI->getMispredictionPenalty() * 3 / 4;
+ 
+   // Instruction depths can be computed for all trace instructions above CmpBB.
+   unsigned HeadDepth =
+@@ -953,7 +953,7 @@ bool AArch64ConditionalComparesImpl::run(MachineFunction &MF) {
+ 
+   TII = MF.getSubtarget().getInstrInfo();
+   TRI = MF.getSubtarget().getRegisterInfo();
+-  SchedModel = MF.getSubtarget().getSchedModel();
++  STI = &MF.getSubtarget();
+   MRI = &MF.getRegInfo();
+   MinInstr = nullptr;
+   MinSize = MF.getFunction().hasMinSize();
+diff --git a/llvm/lib/Target/AArch64/AArch64TargetTransformInfo.cpp b/llvm/lib/Target/AArch64/AArch64TargetTransformInfo.cpp
+index 828bf2e3e8d0..f462ef8b2c29 100644
+--- a/llvm/lib/Target/AArch64/AArch64TargetTransformInfo.cpp
++++ b/llvm/lib/Target/AArch64/AArch64TargetTransformInfo.cpp
+@@ -555,7 +555,7 @@ AArch64TTIImpl::getPopcntSupport(unsigned TyWidth) const {
+ InstructionCost AArch64TTIImpl::getBranchMispredictPenalty() const {
+   // MispredictPenalty is defined per-CPU in AArch64Sched*.td (e.g.,
+   // AArch64SchedNeoverseV2.td).
+-  return ST->getSchedModel().MispredictPenalty;
++  return ST->getMispredictionPenalty();
+ }
+ 
+ static bool isUnpackedVectorVT(EVT VecVT) {
+diff --git a/llvm/lib/Target/ARM/ARMSubtarget.cpp b/llvm/lib/Target/ARM/ARMSubtarget.cpp
+index 4893d8d3a9ef..00ec0b749fb3 100644
+--- a/llvm/lib/Target/ARM/ARMSubtarget.cpp
++++ b/llvm/lib/Target/ARM/ARMSubtarget.cpp
+@@ -400,10 +400,6 @@ bool ARMSubtarget::isGVInGOT(const GlobalValue *GV) const {
+   return isTargetELF() && TM.isPositionIndependent() && !GV->isDSOLocal();
+ }
+ 
+-unsigned ARMSubtarget::getMispredictionPenalty() const {
+-  return SchedModel.MispredictPenalty;
+-}
+-
+ bool ARMSubtarget::enableMachineScheduler() const {
+   // The MachineScheduler can increase register usage, so we use more high
+   // registers and end up with more T2 instructions that cannot be converted to
+diff --git a/llvm/lib/Target/ARM/ARMSubtarget.h b/llvm/lib/Target/ARM/ARMSubtarget.h
+index 2a90f4223cbc..3d59d44bbd20 100644
+--- a/llvm/lib/Target/ARM/ARMSubtarget.h
++++ b/llvm/lib/Target/ARM/ARMSubtarget.h
+@@ -414,8 +414,6 @@ public:
+ 
+   bool isLittle() const { return IsLittle; }
+ 
+-  unsigned getMispredictionPenalty() const;
+-
+   /// Returns true if machine scheduler should be enabled.
+   bool enableMachineScheduler() const override;
+ 
+diff --git a/llvm/lib/Target/RISCV/RISCVISelLowering.cpp b/llvm/lib/Target/RISCV/RISCVISelLowering.cpp
+index 738aa6dcf780..5da5fdb6b41b 100644
+--- a/llvm/lib/Target/RISCV/RISCVISelLowering.cpp
++++ b/llvm/lib/Target/RISCV/RISCVISelLowering.cpp
+@@ -2085,7 +2085,7 @@ RISCVTargetLowering::getJumpConditionMergingParams(Instruction::BinaryOps Opc,
+   // spend eagerly computing the RHS condition should scale with how expensive a
+   // mispredicted branch is. A branch only costs the full penalty when actually
+   // mispredicted, so scale it down by an assumed misprediction rate (~25%).
+-  int BaseCost = Subtarget.getSchedModel().MispredictPenalty / 4;
++  int BaseCost = Subtarget.getMispredictionPenalty() / 4;
+   if (BrMergingBaseCostThresh.getNumOccurrences() > 1)
+     BaseCost = BrMergingBaseCostThresh;
+ 
+diff --git a/llvm/lib/Target/RISCV/RISCVSubtarget.cpp b/llvm/lib/Target/RISCV/RISCVSubtarget.cpp
+index 524a48750e98..0ba474abd448 100644
+--- a/llvm/lib/Target/RISCV/RISCVSubtarget.cpp
++++ b/llvm/lib/Target/RISCV/RISCVSubtarget.cpp
+@@ -19,11 +19,26 @@
+ #include "RISCVSelectionDAGInfo.h"
+ #include "RISCVTargetMachine.h"
+ #include "llvm/CodeGen/MachineFrameInfo.h"
++#include "llvm/MC/MCSchedule.h"
+ #include "llvm/MC/TargetRegistry.h"
++#include "llvm/Support/CommandLine.h"
+ #include "llvm/Support/ErrorHandling.h"
+ 
+ using namespace llvm;
+ 
++static cl::opt<unsigned> SchedMispredictPenalty(
++    "riscv-sched-mispredict-penalty", cl::Hidden,
++    cl::init(MCSchedModel::DefaultMispredictPenalty),
++    cl::cat(MCScheduleOptions),
++    cl::desc("Override the mispredict penalty (in cycles) in the scheduler "
++             "model. A non-negative value overrides the target default."));
++
++static cl::opt<unsigned> SchedLoadLatency(
++    "riscv-sched-load-latency", cl::Hidden,
++    cl::init(MCSchedModel::DefaultLoadLatency), cl::cat(MCScheduleOptions),
++    cl::desc("Override the load latency (in cycles) in the scheduler model. "
++             "A non-negative value overrides the target default."));
++
+ #define DEBUG_TYPE "riscv-subtarget"
+ 
+ #define GET_SUBTARGETINFO_TARGET_DESC
+@@ -187,10 +202,22 @@ unsigned RISCVSubtarget::getMaxBuildIntsCost() const {
+   // building integers (addi, slli, etc.) can be done in one cycle, so here we
+   // set the default cost to (LoadLatency + 1) if no threshold is provided.
+   return RISCVMaxBuildIntsCost == 0
+-             ? getSchedModel().LoadLatency + 1
++             ? getLoadLatency() + 1
+              : std::max<unsigned>(2, RISCVMaxBuildIntsCost);
+ }
+ 
++unsigned RISCVSubtarget::getMispredictionPenalty() const {
++  if (SchedMispredictPenalty.getNumOccurrences() > 0)
++    return SchedMispredictPenalty;
++  return getSchedModel().MispredictPenalty;
++}
++
++unsigned RISCVSubtarget::getLoadLatency() const {
++  if (SchedLoadLatency.getNumOccurrences() > 0)
++    return SchedLoadLatency;
++  return getSchedModel().LoadLatency;
++}
++
+ unsigned RISCVSubtarget::getMaxRVVVectorSizeInBits() const {
+   assert(hasVInstructions() &&
+          "Tried to get vector length without Zve or V extension support!");
+diff --git a/llvm/lib/Target/RISCV/RISCVSubtarget.h b/llvm/lib/Target/RISCV/RISCVSubtarget.h
+index c782445b4c1d..14c33ee8691e 100644
+--- a/llvm/lib/Target/RISCV/RISCVSubtarget.h
++++ b/llvm/lib/Target/RISCV/RISCVSubtarget.h
+@@ -396,6 +396,9 @@ public:
+   // pool if exceeded.
+   unsigned getMaxBuildIntsCost() const;
+ 
++  unsigned getMispredictionPenalty() const override;
++  unsigned getLoadLatency() const override;
++
+   unsigned getMaxLMULForFixedLengthVectors() const;
+   bool useRVVForFixedLengthVectors() const;
+ 
+diff --git a/llvm/lib/Target/X86/X86CmovConversion.cpp b/llvm/lib/Target/X86/X86CmovConversion.cpp
+index d2f0a9f72f6e..d35a746ceaec 100644
+--- a/llvm/lib/Target/X86/X86CmovConversion.cpp
++++ b/llvm/lib/Target/X86/X86CmovConversion.cpp
+@@ -116,6 +116,7 @@ private:
+   MachineRegisterInfo *MRI = nullptr;
+   const TargetInstrInfo *TII = nullptr;
+   const TargetRegisterInfo *TRI = nullptr;
++  const TargetSubtargetInfo *STI = nullptr;
+   MachineLoopInfo *MLI = nullptr;
+   TargetSchedModel TSchedModel;
+ 
+@@ -181,11 +182,11 @@ bool X86CmovConversionImpl::runOnMachineFunction(MachineFunction &MF) {
+                     << "**********\n");
+ 
+   bool Changed = false;
+-  const TargetSubtargetInfo &STI = MF.getSubtarget();
++  STI = &MF.getSubtarget();
+   MRI = &MF.getRegInfo();
+-  TII = STI.getInstrInfo();
+-  TRI = STI.getRegisterInfo();
+-  TSchedModel.init(&STI);
++  TII = STI->getInstrInfo();
++  TRI = STI->getRegisterInfo();
++  TSchedModel.init(STI);
+ 
+   // Before we handle the more subtle cases of register-register CMOVs inside
+   // of potentially hot loops, we want to quickly remove all CMOVs (ForceAll) or
+@@ -546,7 +547,7 @@ bool X86CmovConversionImpl::checkForProfitableCmovCandidates(
+   //   To be conservative, the gain of such CMOV transformation should cover at
+   //   at least 25% of branch-misprediction-penalty.
+   //===--------------------------------------------------------------------===//
+-  unsigned MispredictPenalty = TSchedModel.getMCSchedModel()->MispredictPenalty;
++  unsigned MispredictPenalty = STI->getMispredictionPenalty();
+   CmovGroups TempGroups;
+   std::swap(TempGroups, CmovInstGroups);
+   for (auto &Group : TempGroups) {
+diff --git a/llvm/test/CodeGen/RISCV/sched-model-load-latency.ll b/llvm/test/CodeGen/RISCV/sched-model-load-latency.ll
+new file mode 100644
+index 000000000000..e18c615a8df4
+--- /dev/null
++++ b/llvm/test/CodeGen/RISCV/sched-model-load-latency.ll
+@@ -0,0 +1,43 @@
++; Test that -riscv-sched-load-latency overrides the scheduler model's LoadLatency
++; field, and that the override affects code generation decisions that depend on
++; LoadLatency (specifically RISC-V's getMaxBuildIntsCost, which uses
++; LoadLatency to decide how many instructions can be used to materialize a
++; large integer constant inline vs. using the constant pool).
++;
++; rocket-rv64 has LoadLatency=3, so getMaxBuildIntsCost() returns 4 by
++; default. The constant 0x800000007bbbbbbb requires exactly 4 MatInt
++; instructions, so it is materialized inline under the default model.
++;
++; With -riscv-sched-load-latency=2, RISCVSubtarget::getLoadLatency() returns 2, making
++; getMaxBuildIntsCost() return 3. Since 4 > 3, the constant is too expensive
++; to build inline and falls back to the constant pool.
++;
++; RUN: llc -mtriple=riscv64 -mcpu=rocket-rv64 -verify-machineinstrs < %s \
++; RUN:   | FileCheck %s --check-prefix=DEFAULT
++; RUN: llc -mtriple=riscv64 -mcpu=rocket-rv64 -riscv-sched-load-latency=2 \
++; RUN:   -verify-machineinstrs < %s \
++; RUN:   | FileCheck %s --check-prefix=LOWLATENCY
++
++; With default LoadLatency=3 (maxCost=4), the 4-instruction constant is built
++; inline using the MatInt sequence.
++; DEFAULT-LABEL: large_int:
++; DEFAULT:       # %bb.0:
++; DEFAULT-NEXT:    lui a0, 506812
++; DEFAULT-NEXT:    addi a0, a0, -1093
++; DEFAULT-NEXT:    slli a1, a0, 63
++; DEFAULT-NEXT:    add a0, a0, a1
++; DEFAULT-NEXT:    ret
++
++; With -riscv-sched-load-latency=2 (maxCost=3), the 4-instruction sequence exceeds
++; the cost threshold, so the constant is loaded from the constant pool.
++; LOWLATENCY-LABEL: large_int:
++; LOWLATENCY:       # %bb.0:
++; LOWLATENCY-NEXT:    lui a0, %hi(.LCPI0_0)
++; LOWLATENCY-NEXT:    ld a0, %lo(.LCPI0_0)(a0)
++; LOWLATENCY-NEXT:    ret
++
++define i64 @large_int() {
++  ; 0x800000007bbbbbbb = -9223372034778874949
++  ; Requires exactly 4 MatInt instructions: lui, addi, slli, add
++  ret i64 -9223372034778874949
++}
+diff --git a/llvm/test/CodeGen/RISCV/sched-model-mispredict-penalty.ll b/llvm/test/CodeGen/RISCV/sched-model-mispredict-penalty.ll
+new file mode 100644
+index 000000000000..492a5ef21775
+--- /dev/null
++++ b/llvm/test/CodeGen/RISCV/sched-model-mispredict-penalty.ll
+@@ -0,0 +1,74 @@
++; Test that -riscv-sched-mispredict-penalty overrides the scheduler model's
++; MispredictPenalty field, and that the override affects code generation
++; decisions that depend on MispredictPenalty (specifically SelectOptimize,
++; which weighs the cost of branch mispredictions against the benefit of
++; out-of-order execution when deciding whether to convert select instructions
++; to conditional branches).
++;
++; sifive-p550 is an out-of-order core with SelectOptimize enabled. For a
++; select in an inner loop, SelectOptimize calculates:
++;
++;   BranchCost = PredictedPathCost + MispredictCost
++;   MispredictCost = max(MispredictPenalty, CondCost) * MispredictRate / 100
++;
++; When MispredictCost is very large (high penalty), BranchCost >> SelectCost
++; and the select is kept as-is. When MispredictCost is small (low penalty),
++; BranchCost < SelectCost and the select is converted to a conditional branch.
++;
++; The -select-opti-loop-cycle-gain-threshold=1 flag lowers the minimum
++; absolute gain requirement so that the gain between the two cases is visible.
++; It does not affect which direction MispredictPenalty pushes the decision.
++;
++; RUN: opt -passes='require<profile-summary>,function(select-optimize)' \
++; RUN:   -mtriple=riscv64 -mcpu=sifive-p550 \
++; RUN:   -riscv-sched-mispredict-penalty=10000 \
++; RUN:   -select-opti-loop-cycle-gain-threshold=1 \
++; RUN:   -S < %s \
++; RUN:   | FileCheck %s --check-prefix=HIGHPENALTY
++; RUN: opt -passes='require<profile-summary>,function(select-optimize)' \
++; RUN:   -mtriple=riscv64 -mcpu=sifive-p550 \
++; RUN:   -riscv-sched-mispredict-penalty=0 \
++; RUN:   -select-opti-loop-cycle-gain-threshold=1 \
++; RUN:   -S < %s \
++; RUN:   | FileCheck %s --check-prefix=LOWPENALTY
++
++; With a very high mispredict penalty (10000 cycles), BranchCost is dominated
++; by misprediction cost. SelectOptimize keeps the select instruction because
++; the misprediction risk makes branches unprofitable.
++; HIGHPENALTY-LABEL: @sum_filtered(
++; HIGHPENALTY:         %cond = icmp slt i64 %v, 0
++; HIGHPENALTY-NEXT:    %sel = select i1 %cond, i64 %v, i64 0
++
++; With a zero mispredict penalty, branch mispredictions carry no cost.
++; BranchCost (= PredictedPathCost only) is less than SelectCost (which
++; must speculatively compute both paths). The select is converted to a
++; conditional branch + phi.
++; LOWPENALTY-LABEL: @sum_filtered(
++; LOWPENALTY:          %cond = icmp slt i64 %v, 0
++; LOWPENALTY-NEXT:     %cond.frozen = freeze i1 %cond
++; LOWPENALTY-NEXT:     br i1 %cond.frozen, label %select.end, label %select.false
++
++define i64 @sum_filtered(ptr %p, i64 %n) {
++entry:
++  %entry.cmp = icmp sgt i64 %n, 0
++  br i1 %entry.cmp, label %loop.ph, label %exit
++
++loop.ph:
++  br label %loop
++
++loop:
++  %i = phi i64 [ 0, %loop.ph ], [ %i.next, %loop ]
++  %acc = phi i64 [ 0, %loop.ph ], [ %acc.next, %loop ]
++  %ptr = getelementptr i64, ptr %p, i64 %i
++  %v = load i64, ptr %ptr
++  %cond = icmp slt i64 %v, 0
++  %sel = select i1 %cond, i64 %v, i64 0
++  %acc.next = add i64 %acc, %sel
++  %i.next = add i64 %i, 1
++  %cmp = icmp ne i64 %i.next, %n
++  br i1 %cmp, label %loop, label %exit
++
++exit:
++  %result = phi i64 [ 0, %entry ], [ %acc.next, %loop ]
++  ret i64 %result
++}
+-- 
+2.54.0
+

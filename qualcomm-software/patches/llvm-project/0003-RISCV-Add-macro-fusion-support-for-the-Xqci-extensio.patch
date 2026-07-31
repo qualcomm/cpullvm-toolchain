@@ -1,0 +1,325 @@
+From 00a2e251042dea093ca6bd44272c1a5c7fc8f293 Mon Sep 17 00:00:00 2001
+From: Pankaj Gode <pgode@qti.qualcomm.com>
+Date: Wed, 29 Jul 2026 01:36:45 +0530
+Subject: [PATCH 3/3] [RISCV] Add macro fusion support for the Xqci extension
+ instructions (#209542)
+
+Add macro fusion definitions for the Qualcomm Xqci extension covering
+movimm-alu, movimm-mul, movimm-ldst, movimm-jump, movimm-longlogical,
+movimm-mov, mov-mov, mov-longlogical fusions.
+
+The fusion definitions live in a new RISCVMacroFusionXQCI.td which is
+included from RISCVMacroFusion.td. A MIR test and the feature list test
+are updated accordingly.
+
+To accomodate additional features, increased MAX_SUBTARGET_FEATURES to
+448 (from 384).
+
+(cherry picked from commit 6084459105d2d022122508cfbcae990d7516488b)
+
+Also Contains:
+
+[RISCV] Fix Xqci Fusions with Frame Indexes
+
+Pre-RA, the ADDI can contain a frame index rather than a register, which
+causes `getReg()` to assert. These were missing the `CheckIsRegOperand`
+that most other fusions have.
+
+(cherry picked from commit c9f2ba22849e50df1277db8225a6410ba9ddcb5e)
+---
+ .../llvm/TargetParser/SubtargetFeature.h      |   2 +-
+ llvm/lib/Target/RISCV/RISCVMacroFusion.td     |   4 +
+ llvm/lib/Target/RISCV/RISCVMacroFusionXQCI.td | 111 ++++++++++++++++
+ llvm/test/CodeGen/RISCV/features-info.ll      |   6 +
+ .../test/CodeGen/RISCV/macro-fusions-xqci.mir | 119 ++++++++++++++++++
+ 5 files changed, 241 insertions(+), 1 deletion(-)
+ create mode 100644 llvm/lib/Target/RISCV/RISCVMacroFusionXQCI.td
+ create mode 100644 llvm/test/CodeGen/RISCV/macro-fusions-xqci.mir
+
+diff --git a/llvm/include/llvm/TargetParser/SubtargetFeature.h b/llvm/include/llvm/TargetParser/SubtargetFeature.h
+index 3c136b27374d..96820371fa3d 100644
+--- a/llvm/include/llvm/TargetParser/SubtargetFeature.h
++++ b/llvm/include/llvm/TargetParser/SubtargetFeature.h
+@@ -33,7 +33,7 @@ namespace llvm {
+ class raw_ostream;
+ class Triple;
+ 
+-const unsigned MAX_SUBTARGET_WORDS = 6;
++const unsigned MAX_SUBTARGET_WORDS = 7;
+ const unsigned MAX_SUBTARGET_FEATURES = MAX_SUBTARGET_WORDS * 64;
+ 
+ /// Container class for subtarget features.
+diff --git a/llvm/lib/Target/RISCV/RISCVMacroFusion.td b/llvm/lib/Target/RISCV/RISCVMacroFusion.td
+index ca02aaa7980f..cf11cbac583e 100644
+--- a/llvm/lib/Target/RISCV/RISCVMacroFusion.td
++++ b/llvm/lib/Target/RISCV/RISCVMacroFusion.td
+@@ -267,3 +267,7 @@ def TuneFusionShiftBitExtract
+                        return false;
+                    }]>,
+                  ]>;
++
++
++// Xqci macro fusions.
++include "RISCVMacroFusionXQCI.td"
+diff --git a/llvm/lib/Target/RISCV/RISCVMacroFusionXQCI.td b/llvm/lib/Target/RISCV/RISCVMacroFusionXQCI.td
+new file mode 100644
+index 000000000000..2fedb06bb300
+--- /dev/null
++++ b/llvm/lib/Target/RISCV/RISCVMacroFusionXQCI.td
+@@ -0,0 +1,111 @@
++//==---- RISCVMacroFusionXQCI.td - Macro Fusions for XQCI -----*- tablegen-*-=//
++//
++// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
++// See https://llvm.org/LICENSE.txt for license information.
++// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
++//
++//===----------------------------------------------------------------------===//
++
++// ===---------------------------------------------------------------------===//
++// The following definitions describe macro fusion predicators applicable to
++// Xqci instructions.
++
++defvar LoadImmOp = [LUI, QC_E_LI, QC_LI];
++// 48-bit load store
++defvar LongLoadStoreXqciOp = [QC_E_LB, QC_E_LBU, QC_E_LH, QC_E_LHU, QC_E_LW,
++                              QC_E_SB, QC_E_SH, QC_E_SW];
++// 48-bit logical operations
++defvar LongAccumXqciOp = [QC_E_XORAI, QC_E_ORAI, QC_E_ANDAI, QC_E_ADDAI];
++
++// Fuse load-immediate/move-immediate followed by arithmetic/logic.
++def TuneMOVIMMALUXqciFusion
++  : SimpleFusion<"xqci-movimm-alu", "HasMOVIMMALUXqciFusion",
++                 "Enable MOVIMM + ALU operations macrofusion",
++                 CheckAny<[
++                   CheckAll<[
++                     CheckOpcode<[ADDI]>,
++                     CheckIsRegOperand<1>,
++                     CheckRegOperand<1, X0>
++                   ]>,
++                   CheckOpcode<LoadImmOp>,
++                   CheckOpcode<[AUIPC]>,
++                 ]>,
++                 CheckOpcode<[
++                   ADD, ADDI, SUB, MUL,
++                   AND, ANDI, ANDN, OR, ORI, ORN, XOR, XORI, XNOR,
++                   QC_E_ANDI, QC_E_ORI, QC_E_XORI,
++                   SLLI, SRLI, SRAI, QC_LI, QC_E_LI,
++                   MAX, MAXU, MIN, MINU
++                 ]>>;
++
++// Fuse load-immediate/move-immediate followed by multiply.
++def TuneMOVIMMMULXqciFusion
++  : SimpleFusion<"xqci-movimm-mul", "HasMOVIMMMULXqciFusion",
++                 "Enable MOVIMM + multiply macrofusion",
++                 CheckAny<[
++                   CheckAll<[
++                     CheckOpcode<[ADDI]>,
++                     CheckIsRegOperand<1>,
++                     CheckRegOperand<1, X0>
++                   ]>,
++                   CheckOpcode<LoadImmOp>,
++                 ]>,
++                 CheckOpcode<[MUL]>>;
++
++// Fuse load-immediate/move-immediate followed by long load/store.
++def TuneMOVIMMLoadStoreXqciFusion
++  : SimpleFusion<"xqci-movimm-ldst", "HasMOVIMMLoadStoreXqciFusion",
++                 "Enable MOVIMM + long Load/Store macrofusion",
++                 CheckAny<[
++                   CheckAll<[
++                     CheckOpcode<[ADDI]>,
++                     CheckIsRegOperand<1>,
++                     CheckRegOperand<1, X0>
++                   ]>,
++                   CheckOpcode<LoadImmOp>,
++                 ]>,
++                 CheckOpcode<LongLoadStoreXqciOp>>;
++
++// Fuse load-immediate/move-immediate followed by a jump.
++def TuneMOVIMMJumpXqciFusion
++  : SimpleFusion<"xqci-movimm-jump", "HasMOVIMMJumpXqciFusion",
++                 "Enable MOVIMM + Jump macrofusion",
++                 CheckAny<[
++                   CheckAll<[
++                     CheckOpcode<[ADDI]>,
++                     CheckIsRegOperand<1>,
++                     CheckRegOperand<1, X0>
++                   ]>,
++                   CheckOpcode<LoadImmOp>,
++                 ]>,
++                 CheckOpcode<[JALR]>>;
++
++// The destination register of the first operation is the same as the
++// destination register of the second operation.
++
++// Fuse load-immediate/move-immediate followed by long accumulate operation.
++def TuneMOVIMMLongAccumXciFusion
++  : SimpleFusion<"xqci-movimm-longlogical", "HasMOVIMMLongAccumXqciFusion",
++                 "Enable MOVIMM + long accumulate macrofusion",
++                 CheckAny<[
++                   CheckAll<[
++                     CheckOpcode<[ADDI]>,
++                     CheckIsRegOperand<1>,
++                     CheckRegOperand<1, X0>
++                   ]>,
++                   CheckOpcode<LoadImmOp>,
++                 ]>,
++                 CheckOpcode<LongAccumXqciOp>,
++                 epilog=[TieReg<0, 0>]>;
++
++// Fuse move followed by long accumulate operation.
++def TuneMovALUXqciFusion
++  : SimpleFusion<"xqci-mov-longlogical", "HasMovALUXqciFusion",
++                 "Enable MOV + long accumulate macrofusion",
++                 CheckAll<[
++                   CheckOpcode<[ADDI]>,
++                   CheckIsImmOperand<2>,
++                   CheckImmOperand<2, 0>,
++                 ]>,
++                 CheckOpcode<LongAccumXqciOp>,
++                 epilog=[TieReg<0, 0>]>;
+diff --git a/llvm/test/CodeGen/RISCV/features-info.ll b/llvm/test/CodeGen/RISCV/features-info.ll
+index 142e6b269493..a6ac7487a816 100644
+--- a/llvm/test/CodeGen/RISCV/features-info.ll
++++ b/llvm/test/CodeGen/RISCV/features-info.ll
+@@ -72,6 +72,12 @@
+ ; CHECK-NEXT:   fusion-shift-bit-extract         - Enable SLLI+SRLI/SRAI macrofusion.
+ ; CHECK-NEXT:   fusion-shifted-zextw             - Enable SLLI+SRLI to be fused when computing (shifted) word zero extension.
+ ; CHECK-NEXT:   fusion-shxadd-load               - Enable SH(1|2|3)ADD(.UW) + load macrofusion.
++; CHECK-NEXT:   fusion-xqci-mov-longlogical      - Enable MOV + long accumulate macrofusion.
++; CHECK-NEXT:   fusion-xqci-movimm-alu           - Enable MOVIMM + ALU operations macrofusion.
++; CHECK-NEXT:   fusion-xqci-movimm-jump          - Enable MOVIMM + Jump macrofusion.
++; CHECK-NEXT:   fusion-xqci-movimm-ldst          - Enable MOVIMM + long Load/Store macrofusion.
++; CHECK-NEXT:   fusion-xqci-movimm-longlogical   - Enable MOVIMM + long accumulate macrofusion.
++; CHECK-NEXT:   fusion-xqci-movimm-mul           - Enable MOVIMM + multiply macrofusion.
+ ; CHECK-NEXT:   fusion-zexth                     - Enable SLLI+SRLI to be fused to zero extension of halfword.
+ ; CHECK-NEXT:   fusion-zextw                     - Enable SLLI+SRLI to be fused to zero extension of word.
+ ; CHECK-NEXT:   h                                - 'H' (Hypervisor).
+diff --git a/llvm/test/CodeGen/RISCV/macro-fusions-xqci.mir b/llvm/test/CodeGen/RISCV/macro-fusions-xqci.mir
+new file mode 100644
+index 000000000000..2aa4edae7780
+--- /dev/null
++++ b/llvm/test/CodeGen/RISCV/macro-fusions-xqci.mir
+@@ -0,0 +1,119 @@
++# REQUIRES: asserts
++# RUN: llc -mtriple=riscv32-linux-gnu -x=mir < %s \
++# RUN:   -debug-only=machine-scheduler -start-before=machine-scheduler 2>&1 \
++# RUN:   -mattr=+xqcilia,+xqcili,+xqcilo,+zmmul,+fusion-xqci-movimm-alu \
++# RUN:   -mattr=+fusion-xqci-movimm-mul,+fusion-xqci-movimm-ldst \
++# RUN:   -mattr=+fusion-xqci-movimm-jump \
++# RUN:   -mattr=+fusion-xqci-movimm-longlogical \
++# RUN:   -mattr=+fusion-xqci-mov-longlogical \
++# RUN:   | FileCheck %s
++
++# CHECK: movimm_alu_xqci:%bb.0
++# CHECK: Macro fuse: {{.*}}LUI - QC_E_ANDI
++---
++name: movimm_alu_xqci
++tracksRegLiveness: true
++body:             |
++  bb.0.entry:
++    liveins: $x10
++    %1:gprnox0 = COPY $x10
++    %2:gprnox0 = LUI 1
++    %3:gprnox0 = XORI %1, 2
++    %4:gprnox0 = QC_E_ANDI %2, 3
++    $x10 = COPY %3
++    $x11 = COPY %4
++    PseudoRET
++...
++
++# CHECK: movimm_mul_xqci:%bb.0
++# CHECK: Macro fuse: {{.*}}QC_LI - MUL
++name: movimm_mul_xqci
++tracksRegLiveness: true
++body:             |
++  bb.0.entry:
++    liveins: $x10
++    %1:gpr = COPY $x10
++    %2:gprnox0 = QC_LI 1
++    %3:gpr = XORI %1, 2
++    %4:gpr = MUL %2, %1
++    $x10 = COPY %3
++    $x11 = COPY %4
++    PseudoRET
++...
++
++# CHECK: movimm_ldst_xqci:%bb.0
++# CHECK: Macro fuse: {{.*}}QC_LI - QC_E_LW
++name: movimm_ldst_xqci
++tracksRegLiveness: true
++body:             |
++  bb.0.entry:
++    liveins: $x10
++    %1:gpr = COPY $x10
++    %2:gprnox0 = QC_LI 100
++    %3:gpr = XORI %1, 2
++    %4:gpr = QC_E_LW %2, 0
++    $x10 = COPY %3
++    $x11 = COPY %4
++    PseudoRET
++...
++
++# CHECK: movimm_jump_xqci:%bb.0
++# CHECK: Macro fuse: {{.*}}QC_E_LI - JALR
++name: movimm_jump_xqci
++tracksRegLiveness: true
++body:             |
++  bb.0.entry:
++    liveins: $x10
++    %1:gpr = COPY $x10
++    %2:gprnox0 = QC_E_LI 1
++    %3:gpr = XORI %1, 2
++    %4:gpr = JALR %2, 0
++    $x10 = COPY %3
++    $x11 = COPY %4
++    PseudoRET
++...
++
++# CHECK: movimm_longaccum_xqci:%bb.0
++# CHECK: Macro fuse: {{.*}}QC_LI - QC_E_XORAI
++name: movimm_longaccum_xqci
++tracksRegLiveness: true
++body:             |
++  bb.0.entry:
++    liveins: $x10
++    $x11 = QC_LI 1
++    $x12 = XORI $x10, 2
++    $x11 = QC_E_XORAI $x11, 3
++    $x13 = COPY $x12
++    $x10 = COPY $x11
++    PseudoRET
++...
++
++# CHECK: mov_longaccum_xqci:%bb.0
++# CHECK: Macro fuse: {{.*}}ADDI - QC_E_XORAI
++name: mov_longaccum_xqci
++tracksRegLiveness: true
++body:             |
++  bb.0.entry:
++    liveins: $x10
++    $x11 = ADDI $x10, 0
++    $x12 = XORI $x10, 2
++    $x11 = QC_E_XORAI $x11, 3
++    $x13 = COPY $x12
++    $x10 = COPY $x11
++...
++
++# CHECK: movimm_alu_xqci_frameindex
++## No Reg in the ADDI, needs to not crash
++name: movimm_alu_xqci_frameindex
++tracksRegLiveness: true
++stack:
++  - { id: 0, size: 4, alignment: 4 }
++body:             |
++  bb.0.entry:
++    liveins: $x10
++    %1:gpr = COPY $x10
++    %2:gpr = ADDI %stack.0, 0
++    %3:gpr = ADD %2, %1
++    $x10 = COPY %3
++    PseudoRET implicit $x10
++...
+-- 
+2.54.0
+
