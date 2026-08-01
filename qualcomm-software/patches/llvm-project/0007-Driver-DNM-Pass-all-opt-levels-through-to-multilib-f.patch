@@ -1,0 +1,86 @@
+From 71dd6a18d50307fbc200153486f24ad5effe9d1e Mon Sep 17 00:00:00 2001
+From: Jonathon Penix <jpenix@qti.qualcomm.com>
+Date: Sat, 1 Aug 2026 17:48:19 -0700
+Subject: [PATCH] [Driver][DNM] Pass all opt levels through to multilib for all
+ targets
+
+Previously, only -Oz and -Os were passed through for only Arm/AArch64 targets.
+We'd like this to include other optimization levels and need it to support
+RISC-V as well.
+
+Note also that -O4 and -Ofast are mapped to -O3 in keeping with the driver
+logic elsewhere.
+
+This should not be merged as-is as it is missing tests and needs to go through
+community review.
+
+For prototyping, our cpullvm multilib tests are enough and we don't yet know
+if we want these sorts of changes.
+---
+ clang/lib/Driver/ToolChain.cpp | 36 ++++++++++++----------------------
+ 1 file changed, 12 insertions(+), 24 deletions(-)
+
+diff --git a/clang/lib/Driver/ToolChain.cpp b/clang/lib/Driver/ToolChain.cpp
+index 703a3f8819cb..ae5be0d7e4fb 100644
+--- a/clang/lib/Driver/ToolChain.cpp
++++ b/clang/lib/Driver/ToolChain.cpp
+@@ -217,18 +217,6 @@ static void getAArch64MultilibFlags(const Driver &D,
+   if (ABIArg) {
+     Result.push_back(ABIArg->getAsString(Args));
+   }
+-
+-  if (const Arg *A = Args.getLastArg(options::OPT_O_Group);
+-      A && A->getOption().matches(options::OPT_O)) {
+-    switch (A->getValue()[0]) {
+-    case 's':
+-      Result.push_back("-Os");
+-      break;
+-    case 'z':
+-      Result.push_back("-Oz");
+-      break;
+-    }
+-  }
+ }
+ 
+ static void getARMMultilibFlags(const Driver &D, const llvm::Triple &Triple,
+@@ -305,18 +293,6 @@ static void getARMMultilibFlags(const Driver &D, const llvm::Triple &Triple,
+     if (Endian->getOption().matches(options::OPT_mbig_endian))
+       Result.push_back(Endian->getAsString(Args));
+   }
+-
+-  if (const Arg *A = Args.getLastArg(options::OPT_O_Group);
+-      A && A->getOption().matches(options::OPT_O)) {
+-    switch (A->getValue()[0]) {
+-    case 's':
+-      Result.push_back("-Os");
+-      break;
+-    case 'z':
+-      Result.push_back("-Oz");
+-      break;
+-    }
+-  }
+ }
+ 
+ static void getRISCVMultilibFlags(const Driver &D, const llvm::Triple &Triple,
+@@ -381,6 +357,18 @@ ToolChain::getMultilibFlags(const llvm::opt::ArgList &Args) const {
+ 
+   processMultilibCustomFlags(Result, Args);
+ 
++  // Pass through the opt level.
++  if (const Arg *A = Args.getLastArg(options::OPT_O_Group)) {
++    if (A->getOption().matches(options::OPT_O)) {
++      Result.push_back(std::string("-O") + A->getValue()[0]);
++    } else if (A->getOption().matches(options::OPT_O0)) {
++      Result.push_back("-O0");
++    } else if (A->getOption().matches(options::OPT_O4) ||
++               A->getOption().matches(options::OPT_Ofast)) {
++      Result.push_back("-O3");
++    }
++  }
++
+   // Include fno-exceptions and fno-rtti
+   // to improve multilib selection
+   if (getRTTIMode() == ToolChain::RTTIMode::RM_Disabled)
+-- 
+2.43.0
+

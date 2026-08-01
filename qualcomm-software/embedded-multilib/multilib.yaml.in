@@ -225,3 +225,17 @@ Mappings:
 - Match: -Oz
   Flags:
   - -Os
+
+# FIXME: if we go forward with something like this, it'd be better to define
+# a custom multilib flag mapping to size/speed libraries, map to them here, and
+# use those in the multilib.json `flags`
+# Ex:
+#   * -O2/-O3 -> -fmultilib-flag=speed
+#   * -Os/-Oz -> -fmultilib-flag=size
+# It'd give people a better way to force override the library they are selecting
+# without actually having to touch the opt flags.
+# But, this is good enough for prototyping and the equivalent -Os/z handling is
+# already in place.
+- Match: -O2
+  Flags:
+  - -O3
