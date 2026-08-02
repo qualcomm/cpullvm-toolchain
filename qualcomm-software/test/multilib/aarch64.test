@@ -5,8 +5,19 @@
 
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf | FileCheck %s --check-prefix=CHECK-AARCH64
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 | FileCheck %s --check-prefix=CHECK-AARCH64
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -Oz | FileCheck %s --check-prefix=CHECK-AARCH64
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -Os | FileCheck %s --check-prefix=CHECK-AARCH64
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -O1 | FileCheck %s --check-prefix=CHECK-AARCH64
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -Og | FileCheck %s --check-prefix=CHECK-AARCH64
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -O0 | FileCheck %s --check-prefix=CHECK-AARCH64
 # CHECK-AARCH64: aarch64-none-elf/aarch64a_tlsie{{$}}
 # CHECK-AARCH64-EMPTY:
+
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -O2 | FileCheck %s --check-prefix=CHECK-AARCH64-SPEED
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -O3 | FileCheck %s --check-prefix=CHECK-AARCH64-SPEED
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -Ofast | FileCheck %s --check-prefix=CHECK-AARCH64-SPEED
+# CHECK-AARCH64-SPEED: aarch64-none-elf/aarch64a_tlsie_speed{{$}}
+# CHECK-AARCH64-SPEED-EMPTY:
 
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.3a -mbranch-protection=pac-ret+leaf | FileCheck %s --check-prefix=CHECK-PACRET
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.3a -mbranch-protection=pac-ret+leaf | FileCheck %s --check-prefix=CHECK-PACRET
@@ -23,17 +34,34 @@
 # CHECK-PACRET-BKEY-BTI: aarch64-none-elf/aarch64a_pacret_bkey_bti_tlsie{{$}}
 # CHECK-PACRET-BKEY-BTI-EMPTY:
 
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -O2 | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI-SPEED
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -O3 | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI-SPEED
+# CHECK-PACRET-BKEY-BTI-SPEED: aarch64-none-elf/aarch64a_pacret_bkey_bti_tlsie_speed{{$}}
+# CHECK-PACRET-BKEY-BTI-SPEED-EMPTY:
+
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8+nofp+nosimd -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53+nofp+nosimd -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
 # CHECK-NOFP: aarch64-none-elf/aarch64a_soft_nofp_tlsie{{$}}
 # CHECK-NOFP-EMPTY:
 
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8+nofp+nosimd -mabi=aapcs-soft -O3 | FileCheck %s --check-prefix=CHECK-NOFP-SPEED
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53+nofp+nosimd -mabi=aapcs-soft -O3 | FileCheck %s --check-prefix=CHECK-NOFP-SPEED
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mabi=aapcs-soft -O3 | FileCheck %s --check-prefix=CHECK-NOFP-SPEED
+# CHECK-NOFP-SPEED: aarch64-none-elf/aarch64a_soft_nofp_tlsie_speed{{$}}
+# CHECK-NOFP-SPEED-EMPTY:
+
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
 # CHECK-NOFP-PACRET-BTI: aarch64-none-elf/aarch64a_soft_nofp_pacret_bti{{$}}
 # CHECK-NOFP-PACRET-BTI-EMPTY:
+
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -O3 | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI-SPEED
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -O3 | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI-SPEED
+# RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -O3 | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI-SPEED
+# CHECK-NOFP-PACRET-BTI-SPEED: aarch64-none-elf/aarch64a_soft_nofp_pacret_bti_speed{{$}}
+# CHECK-NOFP-PACRET-BTI-SPEED-EMPTY:
 
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BKEY-BTI
 # RUN: %clang -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BKEY-BTI
