@@ -23,6 +23,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/zephyr-twister-tests.yml'
+      # DNM: temporary change to trigger this workflow
+      - '.github/actions/fetch-linux-toolchain/action.yml'
 
 permissions:
   contents: read
