@@ -418,24 +418,6 @@ def main():
                         "float) extension.",
         ),
         XFail(
-            name="string-replace-oom-riscv64",
-            testnames=[
-                "std/strings/basic.string/string.modifiers/string_replace/size_size_string_size_size.pass.cpp",
-            ],
-            result=NewResult.XFAILED,
-            project="libcxx",
-            variants=[
-                "riscv64gc_lp64_nopic",
-                "riscv64gc_lp64d_nopic",
-                "riscv64gc_zba_zbb_lp64_nopic",
-                "riscv64gc_zba_zbb_lp64d_nopic",
-                "riscv64imac_lp64_nopic",
-            ],
-            description="The string replace test exits with code 1 on riscv64 "
-                "bare-metal QEMU targets. The cause is unknown; riscv32 variants "
-                "pass.",
-        ),
-        XFail(
             name="no-c8rtomb-verify-picolibc",
             testnames=[
                 "std/strings/c.strings/no_c8rtomb_mbrtoc8.verify.cpp",
