@@ -7,6 +7,7 @@ llvm_canonicalize_cmake_booleans(
 
 if(LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL)
   set(EMBEDDED_LIBS_DIR_SUFFIX "/${LLVM_TOOLCHAIN_C_LIBRARY}")
+  set(LLVM_TOOLCHAIN_LIBC_CFG " --config=${LLVM_TOOLCHAIN_C_LIBRARY}.cfg")
 endif()
 
 configure_lit_site_cfg(

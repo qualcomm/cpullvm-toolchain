@@ -343,7 +343,12 @@ endif()
 ##################################################################################################
 
 if(NOT LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc)
-    set(libc_cfg_path ${CMAKE_CURRENT_BINARY_DIR}/${LLVM_TOOLCHAIN_C_LIBRARY}.cfg)
+    # Place <libc>.cfg in the same directory as where clang will end up so that
+    # it can be used in builds in the same way as final installs.
+    set(
+        libc_cfg_path
+        ${CMAKE_CURRENT_BINARY_DIR}/llvm/bin/${LLVM_TOOLCHAIN_C_LIBRARY}.cfg
+    )
 
     configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/libc.cfg.in

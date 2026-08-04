@@ -13,7 +13,7 @@ config.python_executable = "@Python3_EXECUTABLE@"
 config.test_exec_root = "@CMAKE_CURRENT_BINARY_DIR@"
 llvm_embedded_libs_dir = "@LLVM_BINARY_DIR@/lib/clang-runtimes@EMBEDDED_LIBS_DIR_SUFFIX@"
 config.substitutions.append(("%llvm_embedded_libs_dir", llvm_embedded_libs_dir))
-config.substitutions.append(("%clang_with_sysroot", "%clang --sysroot=" + llvm_embedded_libs_dir))
+config.substitutions.append(("%clang_with_libc_cfg", "%clang" + @LLVM_TOOLCHAIN_LIBC_CFG@))
 
 import lit.llvm
 lit.llvm.initialize(lit_config, config)

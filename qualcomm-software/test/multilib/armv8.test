@@ -1,24 +1,24 @@
-# RUN: %clang_with_sysroot -print-multi-directory --target=arm-none-eabi -march=armv8a -mfloat-abi=softfp -mfpu=neon-fp-armv8 | FileCheck %s --check-prefix=CHECK-ARMV8-SOFT-NEON
-# RUN: %clang_with_sysroot -print-multi-directory --target=arm-none-eabi -march=armv8a -mfloat-abi=softfp -mthumb -mfpu=neon-fp-armv8 | FileCheck %s --check-prefix=CHECK-ARMV8-SOFT-NEON
-# RUN: %clang_with_sysroot -print-multi-directory --target=arm-none-eabi -march=armv8a -mfloat-abi=softfp -marm -mfpu=neon-fp-armv8 | FileCheck %s --check-prefix=CHECK-ARMV8-SOFT-NEON
-# RUN: %clang_with_sysroot -print-multi-directory --target=arm-none-eabi -march=armv8a -mfloat-abi=softfp -mthumb -mfpu=neon-fp-armv8 -munaligned-access | FileCheck %s --check-prefix=CHECK-ARMV8-SOFT-NEON
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv8a -mfloat-abi=softfp -mfpu=neon-fp-armv8 | FileCheck %s --check-prefix=CHECK-ARMV8-SOFT-NEON
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv8a -mfloat-abi=softfp -mthumb -mfpu=neon-fp-armv8 | FileCheck %s --check-prefix=CHECK-ARMV8-SOFT-NEON
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv8a -mfloat-abi=softfp -marm -mfpu=neon-fp-armv8 | FileCheck %s --check-prefix=CHECK-ARMV8-SOFT-NEON
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv8a -mfloat-abi=softfp -mthumb -mfpu=neon-fp-armv8 -munaligned-access | FileCheck %s --check-prefix=CHECK-ARMV8-SOFT-NEON
 # CHECK-ARMV8-SOFT-NEON: arm-none-eabi/armv8_soft_neon{{$}}
 # CHECK-ARMV8-SOFT-NEON-EMPTY:
 
-# RUN: %clang_with_sysroot -print-multi-directory --target=arm-none-eabi -march=armv8a -mthumb -mfloat-abi=softfp -mfpu=none | FileCheck %s --check-prefix=CHECK-ARMV7-SOFT-NOFP
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv8a -mthumb -mfloat-abi=softfp -mfpu=none | FileCheck %s --check-prefix=CHECK-ARMV7-SOFT-NOFP
 # CHECK-ARMV7-SOFT-NOFP: arm-none-eabi/armv7a_soft_nofp{{$}}
 # CHECK-ARMV7-SOFT-NOFP-EMPTY:
 
-# RUN: %clang_with_sysroot -print-multi-directory --target=arm-none-eabi -march=armv8a -mthumb -mfloat-abi=softfp -mfpu=neon | FileCheck %s --check-prefix=CHECK-ARMV7-SOFT-NEON
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv8a -mthumb -mfloat-abi=softfp -mfpu=neon | FileCheck %s --check-prefix=CHECK-ARMV7-SOFT-NEON
 # CHECK-ARMV7-SOFT-NEON: arm-none-eabi/armv7a_soft_neon{{$}}
 # CHECK-ARMV7-SOFT-NEON-EMPTY:
 
-# RUN: %clang_with_sysroot -print-multi-directory --target=arm-none-eabi -march=armv8a -mthumb -mfloat-abi=hard -mfpu=vfpv3 | FileCheck %s --check-prefix=CHECK-ARMV7-HARD-VFPV3
-# RUN: %clang_with_sysroot -print-multi-directory --target=arm-none-eabi -march=armv8a -mfloat-abi=hard -mfpu=neon | FileCheck %s --check-prefix=CHECK-ARMV7-HARD-VFPV3
-# RUN: %clang_with_sysroot -print-multi-directory --target=arm-none-eabi -march=armv8a -marm -mfloat-abi=hard -mfpu=neon | FileCheck %s --check-prefix=CHECK-ARMV7-HARD-VFPV3
-# RUN: %clang_with_sysroot -print-multi-directory --target=arm-none-eabi -march=armv8a -mthumb -mfloat-abi=hard -mfpu=neon | FileCheck %s --check-prefix=CHECK-ARMV7-HARD-VFPV3
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv8a -mthumb -mfloat-abi=hard -mfpu=vfpv3 | FileCheck %s --check-prefix=CHECK-ARMV7-HARD-VFPV3
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv8a -mfloat-abi=hard -mfpu=neon | FileCheck %s --check-prefix=CHECK-ARMV7-HARD-VFPV3
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv8a -marm -mfloat-abi=hard -mfpu=neon | FileCheck %s --check-prefix=CHECK-ARMV7-HARD-VFPV3
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv8a -mthumb -mfloat-abi=hard -mfpu=neon | FileCheck %s --check-prefix=CHECK-ARMV7-HARD-VFPV3
 # CHECK-ARMV7-HARD-VFPV3: arm-none-eabi/armv7a_hard_vfpv3{{$}}
 # CHECK-ARMV7-HARD-VFPV3-EMPTY:
 
-# RUN: %clang_with_sysroot -print-multi-directory --target=arm-none-eabi -march=armv8a -mfloat-abi=softfp -mthumb -mfpu=neon-fp-armv8 -mno-unaligned-access 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv8a -mfloat-abi=softfp -mthumb -mfpu=neon-fp-armv8 -mno-unaligned-access 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # NOT-FOUND: warning: no multilib found matching flags
