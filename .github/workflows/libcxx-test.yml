@@ -9,7 +9,6 @@
 
 name: Run libc++ tests
 
-# DNM: temp change to trigger workflow
 on:
   workflow_dispatch:
   schedule:
