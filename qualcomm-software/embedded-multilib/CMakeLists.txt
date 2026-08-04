@@ -80,14 +80,15 @@ foreach(arg
     endif()
 endforeach()
 
-find_package(Python3 REQUIRED COMPONENTS Interpreter) # needed by fetch_*.cmake
+find_package(Python3 REQUIRED COMPONENTS Interpreter) # needed by fetch_repo.cmake
 
 include(ExternalProject)
+include(${TOOLCHAIN_SOURCE_DIR}/cmake/fetch_repo.cmake)
 if(C_LIBRARY STREQUAL picolibc)
-    include(${TOOLCHAIN_SOURCE_DIR}/cmake/fetch_picolibc.cmake)
+    fetch_repo(picolibc)
     list(APPEND passthrough_dirs "-DFETCHCONTENT_SOURCE_DIR_PICOLIBC=${FETCHCONTENT_SOURCE_DIR_PICOLIBC}")
 elseif(C_LIBRARY STREQUAL musl-embedded)
-    include(${TOOLCHAIN_SOURCE_DIR}/cmake/fetch_musl-embedded.cmake)
+    fetch_repo(musl-embedded)
     list(APPEND passthrough_dirs "-DFETCHCONTENT_SOURCE_DIR_MUSL-EMBEDDED=${FETCHCONTENT_SOURCE_DIR_MUSL-EMBEDDED}")
 endif()
 
