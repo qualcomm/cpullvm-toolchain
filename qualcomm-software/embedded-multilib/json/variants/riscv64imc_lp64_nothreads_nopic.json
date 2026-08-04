@@ -3,7 +3,7 @@
         "common": {
             "TARGET_ARCH": "riscv64",
             "VARIANT": "riscv64imc_lp64_nothreads_nopic",
-            "COMPILE_FLAGS": "-march=rv64imc -mabi=lp64 -mcmodel=medany",
+            "COMPILE_FLAGS": "-march=rv64imc -mabi=lp64 -mcmodel=medany -fcf-protection=none",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",

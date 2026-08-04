@@ -91,3 +91,15 @@
 # RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imafdzca_zcf -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # NOT-FOUND: warning: no multilib found matching flags
+
+
+## Check that we only find libraries for `-fcf-protection=none`
+
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac -mabi=ilp32 -fno-pic -fcf-protection=none | FileCheck %s --check-prefix=FCF-FOUND
+# FCF-FOUND: riscv32-unknown-elf/riscv32imac_ilp32_nopic{{$}}
+# FCF-FOUND-EMPTY:
+
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac -mabi=ilp32 -fno-pic -fcf-protection=branch 2>&1 | FileCheck %s --check-prefix=FCF-NOT-FOUND
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac -mabi=ilp32 -fno-pic -fcf-protection=return 2>&1 | FileCheck %s --check-prefix=FCF-NOT-FOUND
+# RUN: %clang -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac -mabi=ilp32 -fno-pic -fcf-protection=all 2>&1 | FileCheck %s --check-prefix=FCF-NOT-FOUND
+# FCF-NOT-FOUND: warning: no multilib found matching flags
