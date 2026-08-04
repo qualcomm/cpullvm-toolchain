@@ -501,11 +501,11 @@ for VARIANT in "${VARIANTS[@]}"; do
      "${VARIANT_TMP_SYSROOT}/resource-dir/lib/${VARIANT_TARGET_MUSL}/${VARIANT}"
   cp -r "${VARIANT_TMP_SYSROOT}/resource-dir" "${BASE_INSTALL_DIR}"
 
-  # Generate a clang configuration file for this variant so it can be used
-  # via `--config=<variant>.cfg` without needing to know the toolchain's
+  # Generate a clang configuration file for this variant so it can be used via
+  # `--config=musl_linux_<variant>.cfg` without needing to know the toolchain's
   # internal layout. Paths are all relative to <CFGDIR> (the directory
-  # containing the .cfg file itself, i.e. the installed bin/ dir) so the
-  # file remains valid wherever the package is installed. See
+  # containing the .cfg file itself, i.e. the installed bin/ dir) so the file
+  # remains valid wherever the package is installed. See
   # https://clang.llvm.org/docs/UsersManual.html#configuration-files
   echo "Generating clang config for ${VARIANT}"
   VARIANT_STDLIB_REL="../${VARIANT_TARGET_MUSL}/${VARIANT}"
@@ -544,5 +544,5 @@ for VARIANT in "${VARIANTS[@]}"; do
     echo "\$-lclang_rt.builtins"
     echo "\$-Wl,--end-group"
     echo "\$-Wl,--defsym,__dso_handle=0"
-  } > "${BASE_INSTALL_DIR}/cfgs/${VARIANT}.cfg"
+  } > "${BASE_INSTALL_DIR}/cfgs/musl_linux_${VARIANT}.cfg"
 done
