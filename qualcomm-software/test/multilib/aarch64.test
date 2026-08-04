@@ -3,44 +3,44 @@
 # Should also revisit whether there are relevant tests we can reuse even without
 # the original multilib.
 
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf | FileCheck %s --check-prefix=CHECK-AARCH64
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -munaligned-access | FileCheck %s --check-prefix=CHECK-AARCH64
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 | FileCheck %s --check-prefix=CHECK-AARCH64
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf | FileCheck %s --check-prefix=CHECK-AARCH64
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -munaligned-access | FileCheck %s --check-prefix=CHECK-AARCH64
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 | FileCheck %s --check-prefix=CHECK-AARCH64
 # CHECK-AARCH64: aarch64-none-elf/aarch64a_tlsie{{$}}
 # CHECK-AARCH64-EMPTY:
 
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -march=armv8.3a -mbranch-protection=pac-ret+leaf | FileCheck %s --check-prefix=CHECK-PACRET
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.3a -mbranch-protection=pac-ret+leaf | FileCheck %s --check-prefix=CHECK-PACRET
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.3a -mbranch-protection=pac-ret+leaf | FileCheck %s --check-prefix=CHECK-PACRET
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.3a -mbranch-protection=pac-ret+leaf | FileCheck %s --check-prefix=CHECK-PACRET
 # CHECK-PACRET: aarch64-none-elf/aarch64a_pacret{{$}}
 # CHECK-PACRET-EMPTY:
 
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mbranch-protection=pac-ret+leaf+bti | FileCheck %s --check-prefix=CHECK-PACRET-BTI
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a -mbranch-protection=pac-ret+leaf+bti | FileCheck %s --check-prefix=CHECK-PACRET-BTI
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mbranch-protection=pac-ret+leaf+bti | FileCheck %s --check-prefix=CHECK-PACRET-BTI
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a -mbranch-protection=pac-ret+leaf+bti | FileCheck %s --check-prefix=CHECK-PACRET-BTI
 # CHECK-PACRET-BTI: aarch64-none-elf/aarch64a_pacret_bti{{$}}
 # CHECK-PACRET-BTI-EMPTY:
 
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI
 # CHECK-PACRET-BKEY-BTI: aarch64-none-elf/aarch64a_pacret_bkey_bti_tlsie{{$}}
 # CHECK-PACRET-BKEY-BTI-EMPTY:
 
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -march=armv8+nofp+nosimd -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53+nofp+nosimd -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8+nofp+nosimd -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53+nofp+nosimd -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
 # CHECK-NOFP: aarch64-none-elf/aarch64a_soft_nofp_tlsie{{$}}
 # CHECK-NOFP-EMPTY:
 
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
 # CHECK-NOFP-PACRET-BTI: aarch64-none-elf/aarch64a_soft_nofp_pacret_bti{{$}}
 # CHECK-NOFP-PACRET-BTI-EMPTY:
 
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BKEY-BTI
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BKEY-BTI
-# RUN: %clang_with_sysroot -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BKEY-BTI
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BKEY-BTI
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BKEY-BTI
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BKEY-BTI
 # CHECK-NOFP-PACRET-BKEY-BTI: aarch64-none-elf/aarch64a_soft_nofp_pacret_bkey_bti{{$}}
 # CHECK-NOFP-PACRET-BKEY-BTI-EMPTY:
 
-# RUN: %clang_with_sysroot -print-multi-directory -print-multi-directory --target=aarch64-none-elf -mno-unaligned-access 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
+# RUN: %clang_with_libc_cfg -print-multi-directory -print-multi-directory --target=aarch64-none-elf -mno-unaligned-access 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # NOT-FOUND: warning: no multilib found matching flags
