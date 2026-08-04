@@ -1,0 +1,4 @@
+# Config file to select @LLVM_TOOLCHAIN_C_LIBRARY@ libraries for multilib
+# matching.
+# Generated from libc.cfg.in.
+--sysroot <CFGDIR>/../lib/clang-runtimes/@LLVM_TOOLCHAIN_C_LIBRARY@

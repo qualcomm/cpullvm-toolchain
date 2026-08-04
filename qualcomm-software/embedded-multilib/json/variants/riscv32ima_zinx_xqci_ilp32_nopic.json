@@ -1,0 +1,27 @@
+{
+  "args": {
+    "common": {
+      "TARGET_ARCH": "riscv32",
+      "VARIANT": "riscv32ima_zinx_xqci_ilp32_nopic",
+      "COMPILE_FLAGS": "-march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_zdinx_zfinx_zhinx_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp_xqccmt0p1 -menable-experimental-extensions -mabi=ilp32 -fno-pic -fno-omit-frame-pointer -fcf-protection=none",
+      "ENABLE_EXCEPTIONS": "OFF",
+      "ENABLE_RTTI": "OFF",
+      "TEST_EXECUTOR": "qemu",
+      "QEMU_MACHINE": "virt",
+      "QEMU_CPU": "rv32,zcd=false,d=false,a=true,zawrs=true,zacas=true,zabha=true,zcb=true,zcmp=false,zilsd=true,zclsd=true,f=false,zfa=false,zdinx=true,zfinx=true,zhinx=true,xqci=true,xqccmp=true,zca=true,xqccmt=true",
+      "QEMU_PARAMS": "-bios none",
+      "FLASH_ADDRESS": "0x80000000",
+      "FLASH_SIZE": "0x00400000",
+      "RAM_ADDRESS": "0x80400000",
+      "RAM_SIZE": "0x00a00000",
+      "LIBRARY_BUILD_TYPE": "minsizerelease"
+    },
+    "picolibc": {
+      "ENABLE_CXX_LIBS": "ON",
+      "ENABLE_LIBC_TESTS": "ON",
+      "ENABLE_COMPILER_RT_TESTS": "ON",
+      "ENABLE_LIBCXX_TESTS": "ON"
+    }
+  }
+}
+

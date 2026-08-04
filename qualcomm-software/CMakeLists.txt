@@ -299,8 +299,10 @@ include(ExternalProject)
 include(FetchContent)
 include(ProcessorCount)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_repo.cmake)
+
 # Check out and patch eld
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_eld.cmake)
+fetch_repo(eld)
 
 # Check out and patch picolibc or musl-embedded if required.
 #
@@ -314,13 +316,13 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_eld.cmake)
 # If you want to stop cmake updating the repos then run
 # cmake . -DFETCHCONTENT_FULLY_DISCONNECTED=ON
 if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc)
-    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_picolibc.cmake)
+    fetch_repo(picolibc)
 endif()
 if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded OR ENABLE_LINUX_LIBRARIES)
-    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_musl-embedded.cmake)
+    fetch_repo(musl-embedded)
 endif()
 if(ENABLE_LINUX_LIBRARIES)
-    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_musl.cmake)
+    fetch_repo(musl)
 endif()
 
 ##################################################################################################
@@ -343,9 +345,17 @@ endif()
 ##################################################################################################
 
 if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
+    set(libc_cfg_path ${CMAKE_CURRENT_BINARY_DIR}/${LLVM_TOOLCHAIN_C_LIBRARY}.cfg)
+
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/libc.cfg.in
+        ${libc_cfg_path}
+        @ONLY
+    )
+
     install(
         FILES
-        ${CMAKE_CURRENT_SOURCE_DIR}/${LLVM_TOOLCHAIN_C_LIBRARY}.cfg
+        ${libc_cfg_path}
         DESTINATION bin
         COMPONENT llvm-toolchain-${LLVM_TOOLCHAIN_C_LIBRARY}-configs
     )

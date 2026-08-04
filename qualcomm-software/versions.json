@@ -11,7 +11,7 @@
       "tag": "01254932e8e81085817ed61fd858648584ffe37c"
     },
     "musl": {
-      "url": "https://git.musl-libc.org/git/musl",
+      "url": "git://git.musl-libc.org/musl",
       "tagType": "tag",
       "tag": "v1.2.5"
     },
@@ -24,7 +24,7 @@
     "eld": {
       "url": "https://github.com/qualcomm/eld",
       "tagType": "commithash",
-      "tag": "5605b4ffbdb524db8cb1ccacda6e0096f1d13253",
+      "tag": "9bd434040b99bb5543019ac1981c49826e859b71",
       "trackingBranch": "main"
     }
   }

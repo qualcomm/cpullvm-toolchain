@@ -118,6 +118,7 @@ set(TEMP_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/tmp_install")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 include(ExternalProject)
+include(${TOOLCHAIN_SOURCE_DIR}/cmake/fetch_repo.cmake)
 
 # If a compiler launcher such as ccache has been set, it should be
 # passed down to each subproject build.
@@ -190,7 +191,13 @@ if(ENABLE_LIBC_TESTS OR ENABLE_COMPILER_RT_TESTS OR ENABLE_LIBCXX_TESTS)
         if(TARGET_ARCH MATCHES "^aarch64")
             find_program(QEMU_EXECUTABLE qemu-system-aarch64 REQUIRED)
         elseif(TARGET_ARCH MATCHES "^riscv32")
-            if(VARIANT MATCHES "^riscv32im_xqci_ilp32")
+            # Variants that use the Qualcomm 'xqci' extension require a
+            # dedicated QEMU build (qemu-system-riscv32-xqci). Detect them
+            # generically by looking for the 'xqci' token anywhere in the
+            # variant name, so new xqci variants don't require editing this
+            # file. The token is matched with word-like boundaries ('_' or
+            # start/end of string) to avoid accidental substring matches.
+            if(VARIANT MATCHES "(^|_)xqci(_|$)")
                 find_program(QEMU_EXECUTABLE qemu-system-riscv32-xqci)
                 if(NOT QEMU_EXECUTABLE)
                     message(STATUS "qemu-system-riscv32-xqci not found. Disabling QEMU tests for ${VARIANT}.")
@@ -449,7 +456,7 @@ ExternalProject_Add(
 ###############################################################################
 
 if(C_LIBRARY STREQUAL picolibc)
-    include(${TOOLCHAIN_SOURCE_DIR}/cmake/fetch_picolibc.cmake)
+    fetch_repo(picolibc)
     include(${CMAKE_CURRENT_SOURCE_DIR}/to_meson_list.cmake)
 
     # For building picolibc use Meson.
@@ -643,7 +650,7 @@ if(C_LIBRARY STREQUAL musl-embedded)
         message(FATAL_ERROR "Only Arm and AArch64 targets are supported for musl-embedded")
     endif()
 
-    include(${TOOLCHAIN_SOURCE_DIR}/cmake/fetch_musl-embedded.cmake)
+    fetch_repo(musl-embedded)
 
     include(ProcessorCount)
     set(make_flags)
