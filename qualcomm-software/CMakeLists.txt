@@ -70,6 +70,12 @@ option(
     PREBUILT_TARGET_LIBRARIES
     "Target libraries are prebuilt so no need to build them"
 )
+set(
+    PREBUILT_TARGET_LIBRARIES_INFO_DIR
+    "${CMAKE_CURRENT_BINARY_DIR}/copied-library-info" CACHE STRING
+    "Directory where supplemental information about the prebuilt libraries
+    (licenses, revisions) can be found."
+)
 set(TARGET_LIBRARIES_DIR
     "lib/clang-runtimes" CACHE STRING
     "Directory containing the target libraries."
@@ -315,12 +321,32 @@ fetch_repo(eld)
 #
 # If you want to stop cmake updating the repos then run
 # cmake . -DFETCHCONTENT_FULLY_DISCONNECTED=ON
-fetch_repo(${LLVM_TOOLCHAIN_C_LIBRARY})
-if(ENABLE_LINUX_LIBRARIES)
-    if(NOT LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
-        fetch_repo(musl-embedded)
+if(NOT PREBUILT_TARGET_LIBRARIES)
+    fetch_repo(${LLVM_TOOLCHAIN_C_LIBRARY})
+    if(ENABLE_LINUX_LIBRARIES)
+        if(NOT LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
+            fetch_repo(musl-embedded)
+        endif()
+        fetch_repo(musl)
     endif()
-    fetch_repo(musl)
+else()
+    # fetch_repo normally sets `<repo>_URL` which is used elsewhere. Since
+    # prebuilt runtimes are used and the repos won't be cloned, set these
+    # variables based on the copied runtimes.
+    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/version_txt_utils.cmake)
+    get_version_txt_name(${LLVM_TOOLCHAIN_C_LIBRARY} version_txt_name)
+    set(version_txt_path "${PREBUILT_TARGET_LIBRARIES_INFO_DIR}/${version_txt_name}")
+    get_url_from_version_txt(
+        ${version_txt_path}
+        ${LLVM_TOOLCHAIN_C_LIBRARY}
+        ${LLVM_TOOLCHAIN_C_LIBRARY}_URL
+    )
+    if(ENABLE_LINUX_LIBRARIES)
+        if(NOT LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
+            get_url_from_version_txt(${version_txt_path} musl-embedded musl-embedded_URL)
+        endif()
+        get_url_from_version_txt(${version_txt_path} musl musl_URL)
+    endif()
 endif()
 
 ##################################################################################################
@@ -509,24 +535,20 @@ add_custom_target(
     -Dmusl_SOURCE_DIR=${musl_SOURCE_DIR}
     -Dmusl_URL=${musl_URL}
     -DENABLE_LINUX_LIBRARIES=${ENABLE_LINUX_LIBRARIES}
+    -DPREBUILT_TARGET_LIBRARIES=${PREBUILT_TARGET_LIBRARIES}
+    -DPREBUILT_TARGET_LIBRARIES_INFO_DIR=${PREBUILT_TARGET_LIBRARIES_INFO_DIR}
     -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_version_txt.cmake
     BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/VERSION.txt
 )
-if(NOT (LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc))
-    install(
-        FILES "${CMAKE_CURRENT_BINARY_DIR}/VERSION.txt"
-        DESTINATION .
-        RENAME VERSION_${LLVM_TOOLCHAIN_C_LIBRARY}.txt
-        COMPONENT llvm-toolchain-third-party-licenses
-    )
-else()
-    install(
-        FILES "${CMAKE_CURRENT_BINARY_DIR}/VERSION.txt"
-        DESTINATION .
-        COMPONENT llvm-toolchain-third-party-licenses
-    )
-endif()
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/version_txt_utils.cmake)
+get_version_txt_name(${LLVM_TOOLCHAIN_C_LIBRARY} final_version_txt_name)
+install(
+    FILES "${CMAKE_CURRENT_BINARY_DIR}/VERSION.txt"
+    DESTINATION .
+    RENAME ${final_version_txt_name}
+    COMPONENT llvm-toolchain-third-party-licenses
+)
 
 # Groups all the targets that comprise the toolchain.
 add_custom_target(llvm-toolchain ALL)
@@ -819,15 +841,27 @@ install(
     COMPONENT llvm-toolchain-docs
 )
 
-if(LLVM_TOOLCHAIN_C_LIBRARY MATCHES "^picolibc")
-    string(APPEND LIBC_LICENSE_FILES " - Picolibc: third-party-licenses/COPYING.NEWLIB, third-party-licenses/COPYING.picolibc\n")
-endif()
-if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded OR ENABLE_LINUX_LIBRARIES)
-    string(APPEND LIBC_LICENSE_FILES " - musl-embedded: third-party-licenses/musl-embedded-COPYRIGHT.txt\n")
-    if(ENABLE_LINUX_LIBRARIES)
-        string(APPEND LIBC_LICENSE_FILES " - musl: third-party-licenses/musl-COPYRIGHT.txt\n")
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_libc_license_info.cmake)
+set(libc_names_to_process ${LLVM_TOOLCHAIN_C_LIBRARY})
+if(ENABLE_LINUX_LIBRARIES)
+    if(NOT ${LLVM_TOOLCHAIN_C_LIBRARY} STREQUAL musl-embedded)
+        list(APPEND libc_names_to_process musl-embedded)
     endif()
+    list(APPEND libc_names_to_process musl)
 endif()
+
+foreach(clib_name IN LISTS libc_names_to_process)
+    get_libc_license_display_name(${clib_name} display_name)
+    get_libc_license_files(${clib_name} license_file_list)
+    set(license_paths "")
+    while(license_file_list)
+        list(POP_FRONT license_file_list src_file dest_file)
+        list(APPEND license_paths "third-party-licenses/${dest_file}")
+    endwhile()
+    list(JOIN license_paths ", " license_paths_str)
+    string(APPEND LIBC_LICENSE_FILES " - ${display_name}: ${license_paths_str}\n")
+endforeach()
+
 configure_file(cmake/THIRD-PARTY-LICENSES.txt.in THIRD-PARTY-LICENSES.txt @ONLY)
 
 if(NOT LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL)
@@ -865,27 +899,6 @@ list(APPEND third_party_license_files
     ${CMAKE_CURRENT_LIST_DIR}/ATfE-LICENSE.txt ATfE-LICENSE.txt
 )
 
-if(LLVM_TOOLCHAIN_C_LIBRARY MATCHES "^picolibc")
-    list(APPEND third_party_license_files
-        ${${LLVM_TOOLCHAIN_C_LIBRARY}_SOURCE_DIR}/COPYING.NEWLIB           COPYING.NEWLIB
-        ${${LLVM_TOOLCHAIN_C_LIBRARY}_SOURCE_DIR}/COPYING.picolibc         COPYING.picolibc
-    )
-elseif(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
-    list(APPEND third_party_license_files
-        ${musl-embedded_SOURCE_DIR}/COPYRIGHT musl-embedded-COPYRIGHT.txt
-    )
-endif()
-if(ENABLE_LINUX_LIBRARIES)
-    list(APPEND third_party_license_files
-        ${musl_SOURCE_DIR}/COPYRIGHT musl-COPYRIGHT.txt)
-
-    # We added this above if musl-embedded was selected.
-    if(NOT LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
-        list(APPEND third_party_license_files
-             ${musl-embedded_SOURCE_DIR}/COPYRIGHT musl-embedded-COPYRIGHT.txt)
-    endif()
-endif()
-
 while(third_party_license_files)
     list(POP_FRONT third_party_license_files source_file destination_name)
     install(
@@ -895,6 +908,31 @@ while(third_party_license_files)
         RENAME ${destination_name}
     )
 endwhile()
+
+# Handle C library licenses separately. These need to be handled differently as
+# the licenses should either be copied from the repo or from a separate location
+# depending on whether they were built from source or copied.
+foreach(clib_name IN LISTS libc_names_to_process)
+    if(PREBUILT_TARGET_LIBRARIES)
+        set(license_src_dir ${PREBUILT_TARGET_LIBRARIES_INFO_DIR}/third-party-licenses)
+    else()
+        set(license_src_dir ${${clib_name}_SOURCE_DIR})
+    endif()
+    get_libc_license_files(${clib_name} license_file_list)
+    while(license_file_list)
+        list(POP_FRONT license_file_list src_file dest_file)
+        # Licenses copied from a distribution will already have been renamed.
+        if(PREBUILT_TARGET_LIBRARIES)
+            set(src_file ${dest_file})
+        endif()
+        install(
+            FILES ${license_src_dir}/${src_file}
+            DESTINATION ${third_party_license_files_install_dir}
+            COMPONENT llvm-toolchain-third-party-licenses
+            RENAME ${dest_file}
+        )
+    endwhile()
+endforeach()
 
 # LLVM-style install
 # To use it:

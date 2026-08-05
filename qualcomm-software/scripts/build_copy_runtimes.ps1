@@ -27,7 +27,12 @@ $env:CXX = 'clang-cl'
 mkdir $buildDir -Force
 cd $buildDir
 
-python3 ..\qualcomm-software\cmake\copy_target_libraries.py --include-linux-libraries --distribution-file=cpullvm-*.tar.xz --build-dir=$buildDir
+python3 ..\qualcomm-software\cmake\copy_target_libraries.py `
+  --include-linux-libraries `
+  --distribution-file=cpullvm-*.tar.xz `
+  --build-dir=$buildDir `
+  --include-library-info `
+  --library-info-dest-dir=$buildDir\copied-library-info
 
 $extraCmakeArgs = @()
 if ($env:EXTRA_CMAKE_ARGS) {

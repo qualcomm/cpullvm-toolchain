@@ -29,6 +29,31 @@ def move_folder(src_glob, dest):
     shutil.move(src_dir, dest)
 
 
+def move_files(src_glob, dest):
+    """
+    Move the files given by `src_glob` to `dest`. `src_glob` is treated
+    as a glob. It must match at least one file and all matching files are
+    moved.
+    """
+
+    files = glob.glob(src_glob)
+    if not files:
+        raise RuntimeError(f"No files matching '{src_glob}' found")
+    for f in files:
+        shutil.move(f, dest)
+
+
+def recreate_folder(dir):
+    """
+    Create the directory pointed to by `dir`. It is deleted first if it
+    already exists.
+    """
+
+    if os.path.isdir(dir):
+        shutil.rmtree(dir)
+    os.makedirs(dir)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -47,7 +72,22 @@ def main():
         action="store_true",
         help="Whether to copy Linux libraries in addition to embedded libraries",
     )
+    parser.add_argument(
+        "--include-library-info",
+        action="store_true",
+        help="Whether to copy files containing information about the libraries (VERSION.txt, license files).",
+    )
+    parser.add_argument(
+        "--library-info-dest-dir",
+        help="Destination directory for library info files (required if --include-library-info is set)",
+    )
     args = parser.parse_args()
+
+    if args.include_library_info and args.library_info_dest_dir is None:
+        parser.error("--library-info-dest is required when --include-library-info is set")
+
+    if args.library_info_dest_dir is not None and not args.include_library_info:
+        parser.error("--library-info-dest requires --include-library-info")
 
     # Find the distribution. This is a glob because scripts may not
     # know the version number and we can't rely on the Windows shell to
@@ -65,13 +105,15 @@ def main():
     if os.path.isdir(destination):
         shutil.rmtree(destination)
 
+    if args.include_library_info:
+        # This directory is our own construct, assume we don't need to preserve anything.
+        recreate_folder(args.library_info_dest_dir)
+
     if args.include_linux_libraries:
         # The "linux-libraries" build folder is our own construct, so assume
         # there is nothing we need to preserve.
         linux_lib_dir = os.path.join(args.build_dir, "llvm", "linux-libraries")
-        if os.path.isdir(linux_lib_dir):
-            shutil.rmtree(linux_lib_dir)
-        os.makedirs(linux_lib_dir)
+        recreate_folder(linux_lib_dir)
 
     with tempfile.TemporaryDirectory(
         dir=args.build_dir,
@@ -85,6 +127,10 @@ def main():
         # will be deleted automatically when the tmp object goes out of
         # scope.
         move_folder(os.path.join(tmp, "*", "lib", "clang-runtimes"), lib_dir)
+
+        if args.include_library_info:
+            move_folder(os.path.join(tmp, "*", "third-party-licenses"), args.library_info_dest_dir)
+            move_files(os.path.join(tmp, "*", "VERSION*.txt"), args.library_info_dest_dir)
 
         if args.include_linux_libraries:
             # Move the entire resource directory

@@ -25,7 +25,12 @@ export CXX=clang++
 mkdir -p "${REPO_ROOT}"/build
 cd "${REPO_ROOT}"/build
 
-python3 ../qualcomm-software/cmake/copy_target_libraries.py --include-linux-libraries --distribution-file=cpullvm-*.tar.xz --build-dir=$PWD
+python3 ../qualcomm-software/cmake/copy_target_libraries.py \
+  --include-linux-libraries \
+  --distribution-file=cpullvm-*.tar.xz \
+  --build-dir=$PWD \
+  --include-library-info \
+  --library-info-dest-dir=$PWD/copied-library-info
 
 cmake ../qualcomm-software \
  -GNinja \
