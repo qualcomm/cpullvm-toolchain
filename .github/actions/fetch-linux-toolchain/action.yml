@@ -30,6 +30,18 @@ inputs:
     description: Directory to extract the toolchain into.
     required: false
     default: /opt/cpullvm
+  job-name:
+    description: >
+      Name of the nightly.yml job that must have succeeded for a run to be selected.
+      Only used when run-id is not specified.
+    required: false
+    default: 'build.sh on Linux-x86_64'
+  max-age-days:
+    description: >
+      How many days back to search for a passing run. Defaults to 7 to match the
+      artifact retention period in nightly.yml. Only used when run-id is not specified.
+    required: false
+    default: '7'
 
 runs:
   using: composite
@@ -38,24 +50,46 @@ runs:
       id: latest
       if: inputs.run-id == ''
       uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+      env:
+        JOB_NAME: ${{ inputs.job-name }}
+        MAX_AGE_DAYS: ${{ inputs.max-age-days }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          const resp = await github.rest.actions.listWorkflowRuns({
-            owner: 'qualcomm',
-            repo: 'cpullvm-toolchain',
-            workflow_id: 'nightly.yml',
-            event: 'schedule',
-            status: 'success',
-            per_page: 1,
-          });
-          if (!resp.data.workflow_runs?.length) {
-            core.setFailed('No successful nightly runs found in qualcomm/cpullvm-toolchain');
-            return;
+          const JOB_NAME = process.env.JOB_NAME;
+          const MAX_AGE_MS = parseInt(process.env.MAX_AGE_DAYS, 10) * 24 * 60 * 60 * 1000;
+          const cutoff = new Date(Date.now() - MAX_AGE_MS);
+          let page = 1;
+          while (true) {
+            const resp = await github.rest.actions.listWorkflowRuns({
+              owner: 'qualcomm',
+              repo: 'cpullvm-toolchain',
+              workflow_id: 'nightly.yml',
+              event: 'schedule',
+              status: 'completed',
+              per_page: 10,
+              page,
+            });
+            if (!resp.data.workflow_runs?.length) break;
+            for (const run of resp.data.workflow_runs) {
+              if (new Date(run.created_at) < cutoff) {
+                throw new Error(`No completed nightly run found where '${JOB_NAME}' succeeded within the last ${process.env.MAX_AGE_DAYS} day(s)`);
+              }
+              const jobs = await github.rest.actions.listJobsForWorkflowRun({
+                owner: 'qualcomm',
+                repo: 'cpullvm-toolchain',
+                run_id: run.id,
+              });
+              const Job = jobs.data.jobs.find(j => j.name === JOB_NAME);
+              if (Job?.conclusion === 'success') {
+                core.info(`Using run id=${run.id}, number=${run.run_number}`);
+                core.setOutput('run_id', String(run.id));
+                return;
+              }
+            }
+            page++;
           }
-          const run = resp.data.workflow_runs[0];
-          core.info(`Using run id=${run.id}, number=${run.run_number}`);
-          core.setOutput('run_id', String(run.id));
+          throw new Error(`No completed nightly run found where '${JOB_NAME}' succeeded within the last ${process.env.MAX_AGE_DAYS} day(s)`);
 
     - name: Download toolchain artifact
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
