@@ -99,10 +99,10 @@ def use_lldb_substitutions(config):
     build_script = os.path.join(build_script, "build.py")
     build_script_args = [
         build_script,
-        (
-            "--compiler=clang" if config.enable_remote else "--compiler=any"
-        ),  # Default to best compiler
+        "--compiler=" + config.test_compiler,
+        *(["--triple=" + config.test_triple] if config.test_triple else []),
         "--arch=" + str(config.lldb_bitness),
+        "--verbose",
     ]
     if config.lldb_lit_tools_dir:
         build_script_args.append("--tools-dir={0}".format(config.lldb_lit_tools_dir))

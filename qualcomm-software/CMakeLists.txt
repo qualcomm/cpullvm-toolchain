@@ -258,11 +258,9 @@ set(LLDB_ENABLE_PYTHON ON CACHE BOOL "")
 if (NOT CMAKE_HOST_WIN32)
   set(LLDB_ENABLE_DYNAMIC_SCRIPTINTERPRETERS ON CACHE BOOL "")
 endif()
-# LLDB tests don't work on x86 because clang defaults to AArch64 target triple.
-# See https://github.com/llvm/llvm-project/issues/203090 .  Using a clang
-# wrapper works around a few of the failures; we don't have any good workaround
-# for the rest.
-set(LLDB_INCLUDE_TESTS OFF CACHE BOOL "")
+set(LLDB_INCLUDE_TESTS ON CACHE BOOL "")
+#set(LLDB_TEST_COMPILER "${CMAKE_BINARY_DIR}/lldb-clang-wrapper.sh" CACHE STRING "" FORCE)
+set(LLDB_TEST_TRIPLE "x86_64-unknown-linux-gnu" CACHE STRING "" FORCE)
 
 # Default to a release build
 # (CMAKE_BUILD_TYPE is a special CMake variable so if you want to set
@@ -474,6 +472,14 @@ else()
     endif()
 endif()
 set(CPACK_PACKAGE_FILE_NAME ${PACKAGE_FILE_NAME})
+
+# Set LLDB_TEST_COMPILER to point to a wrapper script on x86-64 Linux hosts, to fix the default target.
+# (Do this late so CMake variables to detect host are configured.)
+#if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64")
+#  set(LLDB_TEST_COMPILER "${CMAKE_BINARY_DIR}/lldb-clang-wrapper.sh" CACHE STRING "" FORCE)
+#  configure_file(lldb-clang-wrapper.sh.in lldb-clang-wrapper.sh @ONLY)
+#  message(STATUS "Overriding LLDB_TEST_COMPILER: ${LLDB_TEST_COMPILER}")
+#endif()
 
 # Including CPack again after llvm CMakeLists.txt included it
 # resets CPACK_PACKAGE_VERSION to the default MAJOR.MINOR.PATCH format.

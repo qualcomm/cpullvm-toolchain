@@ -287,6 +287,27 @@ if(WIN32 AND LLDB_ENABLE_LIBXML2)
 endif()
 set(LLDB_TEST_USE_LLDB_SERVER ${LLDB_TEST_USE_LLDB_SERVER_DEFAULT} CACHE BOOL "If ON, run the test suites against the lldb-server backend on Windows")
 
+if (TARGET clang)
+  set(LLDB_DEFAULT_TEST_COMPILER "${LLVM_TOOLS_BINARY_DIR}/clang${CMAKE_EXECUTABLE_SUFFIX}")
+else()
+  set(LLDB_DEFAULT_TEST_COMPILER "")
+endif()
+
+if (DEFINED LLVM_TARGET_TRIPLE)
+  set(default_lldb_test_triple ${LLVM_TARGET_TRIPLE})
+else()
+  set(default_lldb_test_triple ${LLVM_HOST_TRIPLE})
+endif()
+
+set(LLDB_TEST_COMPILER "${LLDB_DEFAULT_TEST_COMPILER}" CACHE PATH "C Compiler to use for building LLDB test inferiors")
+set(LLDB_TEST_TRIPLE
+  ${default_lldb_test_triple}
+  CACHE STRING "The target triple used to build test inferiors.")
+
+if ("${LLDB_TEST_COMPILER}" STREQUAL "")
+  message(FATAL_ERROR "LLDB test compiler not specified. Tests will not run.")
+endif()
+
 # These values are not canonicalized within LLVM.
 llvm_canonicalize_cmake_booleans(
   LLDB_BUILD_INTEL_PT

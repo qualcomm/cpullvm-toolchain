@@ -52,6 +52,7 @@ class MinidumpSizeOfImageTestCase(TestBase):
         subprocess.check_call(
             [
                 self.getCompiler(),
+                *("--target=" + self.getTriple() if self.getTriple() else []),
                 "-shared",
                 "-fPIC",
                 "-Wl,-T," + lds,
