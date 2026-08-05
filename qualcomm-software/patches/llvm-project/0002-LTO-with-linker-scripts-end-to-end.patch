@@ -1,6 +1,6 @@
-From 0efeadfcf1da658802751a70fcc93e27e7315ecc Mon Sep 17 00:00:00 2001
+From d8d5832ebdc977829576731abdba5c3f1a93c95b Mon Sep 17 00:00:00 2001
 From: Sudharsan Veeravalli <svs@qti.qualcomm.com>
-Date: Mon, 3 Aug 2026 11:17:05 +0530
+Date: Mon, 10 Aug 2026 12:46:44 +0530
 Subject: [PATCH] LTO with linker scripts, end-to-end.
 
 "LTO with linker scripts" is a set of features that makes LTO interact in a more predictable way with linker scripts: the semantics of linker script rules are much closer to non-LTO semantics.
@@ -25,7 +25,6 @@ RFC: https://discourse.llvm.org/t/rfc-lto-lld-lto-with-linker-scripts-implemente
  lld/ELF/Options.td                            |   5 +
  .../CheckWrapSymbolResolution.test            |  67 ++++++++
  .../lto-with-linker-scripts/LTOAsmAlias.test  |  41 +++++
- .../LTOAsmEmptySymbol.test                    |  51 ++++++
  .../LTOKeepSymbol.test                        |  63 ++++++++
  .../LTOPreemptSymbol.test                     |  53 +++++++
  .../lto-with-linker-scripts/LTOSaveTemps.test |  63 ++++++++
@@ -51,11 +50,10 @@ RFC: https://discourse.llvm.org/t/rfc-lto-lld-lto-with-linker-scripts-implemente
  llvm/lib/LTO/LTO.cpp                          |  55 ++++++-
  llvm/lib/Object/IRSymtab.cpp                  |   2 +
  llvm/lib/Object/ModuleSymbolTable.cpp         |   2 +-
- 40 files changed, 1397 insertions(+), 14 deletions(-)
+ 39 files changed, 1346 insertions(+), 14 deletions(-)
  create mode 100644 clang/test/CodeGen/lto-linker-scripts.c
  create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/CheckWrapSymbolResolution.test
  create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmAlias.test
- create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmEmptySymbol.test
  create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOKeepSymbol.test
  create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOPreemptSymbol.test
  create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOSaveTemps.test
@@ -89,10 +87,10 @@ index 7e54e75752f3..0b206fcdb556 100644
  #include "DebugOptions.def"
  
 diff --git a/clang/include/clang/Options/Options.td b/clang/include/clang/Options/Options.td
-index 1478624265f7..e0efca57022c 100644
+index cf66ee3e52f2..183e29d79eac 100644
 --- a/clang/include/clang/Options/Options.td
 +++ b/clang/include/clang/Options/Options.td
-@@ -10006,3 +10006,10 @@ def wasm_opt : Flag<["--"], "wasm-opt">,
+@@ -10026,3 +10026,10 @@ def wasm_opt : Flag<["--"], "wasm-opt">,
    Group<m_Group>,
    HelpText<"Enable the wasm-opt optimizer (default)">,
    MarshallingInfoNegativeFlag<LangOpts<"NoWasmOpt">>;
@@ -128,10 +126,10 @@ index 068b1b4c262c..5808a082c109 100644
        CodeGenOpts.FatLTO) {
      if (CodeGenOpts.PrepareForThinLTO && !CodeGenOpts.DisableLLVMPasses) {
 diff --git a/clang/lib/Driver/ToolChains/Clang.cpp b/clang/lib/Driver/ToolChains/Clang.cpp
-index 94f9a26aac39..d62b7a15c23d 100644
+index 85fe99dbf8b6..616c70a470b0 100644
 --- a/clang/lib/Driver/ToolChains/Clang.cpp
 +++ b/clang/lib/Driver/ToolChains/Clang.cpp
-@@ -6624,6 +6624,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
+@@ -6591,6 +6591,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
    Args.AddLastArg(CmdArgs, options::OPT_fconvergent_functions,
                    options::OPT_fno_convergent_functions);
  
@@ -152,7 +150,7 @@ index 000000000000..52ded692d071
 +// CHECK: @x = global i32 0, section ".bss"
 +int x;
 diff --git a/lld/ELF/Config.h b/lld/ELF/Config.h
-index bd74699eda23..5e6a697bf6a4 100644
+index 54e0aa58591a..c06b2ba85bf4 100644
 --- a/lld/ELF/Config.h
 +++ b/lld/ELF/Config.h
 @@ -375,6 +375,7 @@ struct Config {
@@ -164,10 +162,10 @@ index bd74699eda23..5e6a697bf6a4 100644
    bool ltoValidateAllVtablesHaveTypeInfos;
    bool ltoWholeProgramVisibility;
 diff --git a/lld/ELF/Driver.cpp b/lld/ELF/Driver.cpp
-index 314c6c06995d..92c4a65977f1 100644
+index 0393410b35d4..c123bc87c8c5 100644
 --- a/lld/ELF/Driver.cpp
 +++ b/lld/ELF/Driver.cpp
-@@ -1477,6 +1477,8 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
+@@ -1478,6 +1478,8 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
                                              OPT_no_lto_pgo_warn_mismatch, true);
    ctx.arg.ltoDebugPassManager = args.hasArg(OPT_lto_debug_pass_manager);
    ctx.arg.ltoEmitAsm = args.hasArg(OPT_lto_emit_asm);
@@ -177,10 +175,10 @@ index 314c6c06995d..92c4a65977f1 100644
    ctx.arg.ltoWholeProgramVisibility =
        args.hasFlag(OPT_lto_whole_program_visibility,
 diff --git a/lld/ELF/InputFiles.cpp b/lld/ELF/InputFiles.cpp
-index 05c0f3f1c445..a4aec40dd1c0 100644
+index 23649d620071..d8d7fb248247 100644
 --- a/lld/ELF/InputFiles.cpp
 +++ b/lld/ELF/InputFiles.cpp
-@@ -1830,7 +1830,7 @@ BitcodeFile::BitcodeFile(Ctx &ctx, MemoryBufferRef mb, StringRef archiveName,
+@@ -1833,7 +1833,7 @@ BitcodeFile::BitcodeFile(Ctx &ctx, MemoryBufferRef mb, StringRef archiveName,
  
    MemoryBufferRef mbref(mb.getBuffer(), name);
  
@@ -189,7 +187,7 @@ index 05c0f3f1c445..a4aec40dd1c0 100644
    obj->setArchivePathAndName(archiveName, mb.getBufferIdentifier());
  
    Triple t(obj->getTargetTriple());
-@@ -1854,10 +1854,26 @@ static uint8_t mapVisibility(GlobalValue::VisibilityTypes gvVisibility) {
+@@ -1857,10 +1857,26 @@ static uint8_t mapVisibility(GlobalValue::VisibilityTypes gvVisibility) {
  static void createBitcodeSymbol(Ctx &ctx, Symbol *&sym,
                                  const lto::InputFile::Symbol &objSym,
                                  BitcodeFile &f) {
@@ -217,7 +215,7 @@ index 05c0f3f1c445..a4aec40dd1c0 100644
    if (!sym) {
      // Symbols can be duplicated in bitcode files because of '#include' and
      // linkonce_odr. Use uniqueSaver to save symbol names for de-duplication.
-@@ -1920,6 +1936,8 @@ void BitcodeFile::parseLazy() {
+@@ -1923,6 +1939,8 @@ void BitcodeFile::parseLazy() {
    numSymbols = obj->symbols().size();
    symbols = std::make_unique<Symbol *[]>(numSymbols);
    for (auto [i, irSym] : llvm::enumerate(obj->symbols())) {
@@ -226,7 +224,7 @@ index 05c0f3f1c445..a4aec40dd1c0 100644
      // Symbols can be duplicated in bitcode files because of '#include' and
      // linkonce_odr. Use uniqueSaver to save symbol names for de-duplication.
      // Update objSym.Name to reference (via StringRef) the string saver's copy;
-@@ -1938,7 +1956,7 @@ void BitcodeFile::postParse() {
+@@ -1941,7 +1959,7 @@ void BitcodeFile::postParse() {
    for (auto [i, irSym] : llvm::enumerate(obj->symbols())) {
      const Symbol &sym = *symbols[i];
      if (sym.file == this || !sym.isDefined() || irSym.isUndefined() ||
@@ -513,63 +511,6 @@ index 000000000000..14a556b05af4
 +#--- script.t
 +SECTIONS {
 +foo : { *(.text.*) }
-+}
-diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmEmptySymbol.test b/lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmEmptySymbol.test
-new file mode 100644
-index 000000000000..39f8613b8159
---- /dev/null
-+++ b/lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmEmptySymbol.test
-@@ -0,0 +1,51 @@
-+# REQUIRES: aarch64
-+# RUN: rm -rf %t && split-file %s %t
-+# RUN: llvm-as %t/1.ll -o %t/1.o
-+# RUN: llvm-as %t/2.ll -o %t/2.o
-+# RUN: llvm-mc -filetype=obj -triple=aarch64-unknown-linux-gnu %t/3.s -o %t/3.o
-+# RUN: ld.lld -m aarch64elf --lto-linker-scripts --gc-sections -e main -T %t/script.t \
-+# RUN:   %t/1.o %t/2.o %t/3.o -o %t/out
-+# RUN: llvm-readelf -s -W %t/out | FileCheck %s
-+
-+# CHECK: FUNC GLOBAL DEFAULT {{.*}} foo
-+
-+#--- 1.ll
-+target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
-+target triple = "aarch64-unknown-linux-gnu"
-+
-+module asm ".xword ."
-+
-+define i32 @foo(i32 %x) nounwind section ".text.foo" {
-+  %r = add i32 %x, 2
-+  ret i32 %r
-+}
-+
-+#--- 2.ll
-+target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
-+target triple = "aarch64-unknown-linux-gnu"
-+
-+module asm ".xword ."
-+module asm ".weak foo"
-+module asm ".equ foo,bar"
-+
-+@llvm.compiler.used = appending global [1 x ptr] [ptr @bar], section "llvm.metadata"
-+
-+define internal i32 @bar(i32 %x) nounwind section ".text.bar" {
-+  %r = add i32 %x, 1
-+  ret i32 %r
-+}
-+
-+#--- 3.s
-+.text
-+.section .text.main,"ax",@progbits
-+.globl main
-+.type main,@function
-+main:
-+  .xword foo
-+  ret
-+.size main, .-main
-+
-+#--- script.t
-+SECTIONS {
-+  .text : { *(.text.*) }
 +}
 diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/LTOKeepSymbol.test b/lld/test/ELF/lto/lto-with-linker-scripts/LTOKeepSymbol.test
 new file mode 100644

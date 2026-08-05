@@ -1,11 +1,11 @@
-From 481178e17bda8e5003e95ebe9bcec56e3f0a9cd0 Mon Sep 17 00:00:00 2001
+From 5a88c479cfef665f37046441d3244c0918f29ad0 Mon Sep 17 00:00:00 2001
 From: Sudharsan Veeravalli <svs@qti.qualcomm.com>
 Date: Tue, 9 Jun 2026 09:30:36 +0530
 Subject: [PATCH] LTO with LinkerScripts ELD changes
 
 Signed-off-by: Sudharsan Veeravalli <svs@qti.qualcomm.com>
 ---
- Plugins/AdvancedLTO/AdvancedLTO.cpp           | 205 ++++++++++++++++++
+ Plugins/AdvancedLTO/AdvancedLTO.cpp           | 243 ++++++++++++++++++
  Plugins/AdvancedLTO/CMakeLists.txt            |  30 +++
  Plugins/CMakeLists.txt                        |   3 +-
  include/eld/Config/GeneralOptions.h           |   7 +-
@@ -19,32 +19,34 @@ Signed-off-by: Sudharsan Veeravalli <svs@qti.qualcomm.com>
  lib/LinkerWrapper/GnuLdDriver.cpp             |  10 +
  lib/LinkerWrapper/LinkerWrapper.cpp           |   6 +-
  lib/LinkerWrapper/PluginADT.cpp               |   4 +
- lib/Object/ObjectLinker.cpp                   |  56 ++++-
+ lib/Object/ObjectLinker.cpp                   |  56 +++-
  lib/Readers/BitcodeReader.cpp                 |   4 +-
- .../CheckWrapSymbolResolution.test            |  64 ++++++
- .../lto-with-linker-scripts/LTOAsmAlias.test  |  38 ++++
+ .../CheckWrapSymbolResolution.test            |  64 +++++
+ .../InputSectionOrder.test                    | 132 ++++++++++
+ .../lto-with-linker-scripts/LTOAsmAlias.test  |  38 +++
  .../LTOAsmEmptySymbol.test                    |  46 ++++
  .../LTOGlobalLocalSameName.test               |  33 +++
- .../LTOKeepPreserveLocal.test                 |  27 +++
- .../LTOKeepSymbol.test                        |  62 ++++++
+ .../LTOKeepPreserveLocal.test                 |  27 ++
+ .../LTOKeepSymbol.test                        |  62 +++++
  .../LTOPreemptSymbol.test                     |  46 ++++
  .../lto-with-linker-scripts/LTOSaveTemps.test |  58 +++++
  .../LTO/lto-with-linker-scripts/LTOUsed.test  |  16 ++
- .../LocalsLinkerScriptSections.test           |  42 ++++
- .../LocalsSameNameTwoFiles.test               |  40 ++++
- .../NamespaceOverride.test                    |  68 ++++++
- .../lto-with-linker-scripts/NoCrossRefs.test  | 101 +++++++++
+ .../LocalsLinkerScriptSections.test           |  42 +++
+ .../LocalsSameNameTwoFiles.test               |  40 +++
+ .../NamespaceOverride.test                    |  68 +++++
+ .../lto-with-linker-scripts/NoCrossRefs.test  | 101 ++++++++
  .../OutputSection.test                        |  19 ++
  .../SectionsWithNoSyms.test                   |  46 ++++
- .../ThinLTOCaching.test                       | 105 +++++++++
+ .../ThinLTOCaching.test                       | 105 ++++++++
  .../ThinLTOSameFileNameArchive.test           |  58 +++++
  .../ThinLTOWithLS.test                        |  60 +++++
- .../LTO/lto-with-linker-scripts/ltokeep.test  |  41 ++++
- .../ltosectionattribute.test                  |  39 ++++
- 36 files changed, 1395 insertions(+), 18 deletions(-)
+ .../LTO/lto-with-linker-scripts/ltokeep.test  |  41 +++
+ .../ltosectionattribute.test                  |  39 +++
+ 37 files changed, 1565 insertions(+), 18 deletions(-)
  create mode 100644 Plugins/AdvancedLTO/AdvancedLTO.cpp
  create mode 100644 Plugins/AdvancedLTO/CMakeLists.txt
  create mode 100644 test/Common/LTO/lto-with-linker-scripts/CheckWrapSymbolResolution.test
+ create mode 100644 test/Common/LTO/lto-with-linker-scripts/InputSectionOrder.test
  create mode 100644 test/Common/LTO/lto-with-linker-scripts/LTOAsmAlias.test
  create mode 100644 test/Common/LTO/lto-with-linker-scripts/LTOAsmEmptySymbol.test
  create mode 100644 test/Common/LTO/lto-with-linker-scripts/LTOGlobalLocalSameName.test
@@ -67,10 +69,10 @@ Signed-off-by: Sudharsan Veeravalli <svs@qti.qualcomm.com>
 
 diff --git a/Plugins/AdvancedLTO/AdvancedLTO.cpp b/Plugins/AdvancedLTO/AdvancedLTO.cpp
 new file mode 100644
-index 00000000..ec726963
+index 00000000..5b540590
 --- /dev/null
 +++ b/Plugins/AdvancedLTO/AdvancedLTO.cpp
-@@ -0,0 +1,205 @@
+@@ -0,0 +1,243 @@
 +//===- AdvancedLTO.cpp----------------------------------------------------===//
 +// Part of the eld Project, under the BSD License
 +// See https://github.com/qualcomm/eld/LICENSE.txt for license information.
@@ -86,10 +88,12 @@ index 00000000..ec726963
 +#include "llvm/BinaryFormat/ELF.h"
 +#include "llvm/IR/GlobalValue.h"
 +#include "llvm/LTO/LTO.h"
++#include <cassert>
 +#include <cerrno>
 +#include <cstdint>
 +#include <cstdlib>
 +#include <memory>
++#include <optional>
 +#include <string>
 +#include <unordered_map>
 +
@@ -116,6 +120,7 @@ index 00000000..ec726963
 +  }
 +
 +  LTOModule *CreateLTOModule(BitcodeFile BCF, LTOModuleHash Hash) override {
++    LastBitcodeFile = BCF;
 +    auto Data = std::make_unique<ModuleData>(BCF);
 +    LTOModule *M = reinterpret_cast<LTOModule *>(Data.get());
 +    Modules[M] = std::move(Data);
@@ -244,6 +249,40 @@ index 00000000..ec726963
 +    }
 +  }
 +
++  void ActBeforeSectionMerging() override {
++    if (!getLinker()->getLinkerScript().hasSectionsCommand() ||
++        getLinker()->getLinkMode() == LinkerWrapper::PartialLink ||
++        FilesByHash.empty())
++      return;
++
++    auto ExpSort = getLinker()->sortInputSectionsForSectionMerging(
++        [&](const Section &A, const Section &B) {
++          InputFile RMInputA = A.getRuleMatchingInput();
++          InputFile RMInputB = B.getRuleMatchingInput();
++          assert(RMInputA.getInputFile() && RMInputB.getInputFile() &&
++                 "rule-matching inputs must be valid");
++
++          if (RMInputA.isInternal() && !RMInputB.isInternal())
++            return false;
++          if (!RMInputA.isInternal() && RMInputB.isInternal())
++            return true;
++
++          auto getEffectiveOrdinal = [&](const Section &S) -> uint32_t {
++            InputFile IF = S.getInputFile();
++            if (IF.isLTOGeneratedObject() && !S.hasOldInputFile()) {
++              assert(LastBitcodeFile.has_value() &&
++                     "LTO-generated objects require a last bitcode input");
++              return LastBitcodeFile->getOrdinal();
++            }
++            return S.getRuleMatchingInput().getOrdinal();
++          };
++
++          return getEffectiveOrdinal(A) < getEffectiveOrdinal(B);
++        },
++        "AdvancedLTO: sort input sections by original input ordinal");
++    ELDEXP_REPORT_AND_RETURN_VOID_IF_ERROR(getLinker(), ExpSort);
++  }
++
 +private:
 +  ModuleData *importModule(LTOModule &M) {
 +    auto *ID = &M;
@@ -271,6 +310,7 @@ index 00000000..ec726963
 +  bool TraceLTO = false;
 +  std::unordered_map<LTOModule *, std::unique_ptr<ModuleData>> Modules;
 +  std::unordered_map<uint64_t, eld::BitcodeFile *> FilesByHash;
++  std::optional<BitcodeFile> LastBitcodeFile;
 +};
 +
 +} // namespace
@@ -322,10 +362,10 @@ index f7369496..cd4096d5 100644
 +add_subdirectory(HelloWorldPlugin)
 +add_subdirectory(AdvancedLTO)
 diff --git a/include/eld/Config/GeneralOptions.h b/include/eld/Config/GeneralOptions.h
-index 934cef00..f2a83b42 100644
+index a3a8c1d0..f8f0308d 100644
 --- a/include/eld/Config/GeneralOptions.h
 +++ b/include/eld/Config/GeneralOptions.h
-@@ -405,6 +405,10 @@ public:
+@@ -410,6 +410,10 @@ public:
  
    bool hasFatLTOObjects() const { return FatLTOObjects; }
  
@@ -336,7 +376,7 @@ index 934cef00..f2a83b42 100644
    void setLTOOptions(llvm::StringRef OptionType);
  
    void addLTOCodeGenOptions(std::string O);
-@@ -1285,7 +1289,8 @@ private:
+@@ -1288,7 +1292,8 @@ private:
    uint32_t GPSize = 8;               // -G, --gpsize
    bool Lto = false;
    bool FatLTOObjects = false;                    // --fat-lto-objects
@@ -347,7 +387,7 @@ index 934cef00..f2a83b42 100644
    bool BPageAlignSegments = true;   // Does the linker need to align segments to
                                      // a page.
 diff --git a/include/eld/Core/Module.h b/include/eld/Core/Module.h
-index e7ea5a67..04b74d43 100644
+index 8d225a6c..458df868 100644
 --- a/include/eld/Core/Module.h
 +++ b/include/eld/Core/Module.h
 @@ -335,7 +335,7 @@ public:
@@ -360,10 +400,10 @@ index e7ea5a67..04b74d43 100644
                                   ResolveInfo::Binding Binding,
                                   ResolveInfo::SizeType Size,
 diff --git a/include/eld/Driver/GnuLinkerOptions.td b/include/eld/Driver/GnuLinkerOptions.td
-index 1544e5ec..f65ee1a2 100644
+index 84de5d72..1025aa2b 100644
 --- a/include/eld/Driver/GnuLinkerOptions.td
 +++ b/include/eld/Driver/GnuLinkerOptions.td
-@@ -1272,6 +1272,14 @@ defm no_fat_lto_objects
+@@ -1285,6 +1285,14 @@ defm no_fat_lto_objects
      : mDashDeprWithOpt<"no-fat-lto-objects", "no_fat_lto_objects", "Ignore "
                         ".llvm.lto section in fat LTO objects">,
        Group<grp_ltooptions>;
@@ -378,7 +418,7 @@ index 1544e5ec..f65ee1a2 100644
  defm ffat_lto_objects : mDashDeprAlias<"ffat-lto-objects", "fat_lto_objects",
                                         "Alias for --fat-lto-objects">,
                          Group<grp_ltooptions>;
-@@ -1430,6 +1438,16 @@ def : J<"plugin-opt=jobs=">,
+@@ -1443,6 +1451,16 @@ def : J<"plugin-opt=jobs=">,
        HelpText<"Alias for --thinlto-jobs=">,
        Group<grp_ltooptions>;
  
@@ -454,7 +494,7 @@ index 502ff400..4e1f1f6a 100644
    /// Return options set by --flto-options.
    const std::vector<std::string> &getLTOOptions() const;
 diff --git a/lib/Core/Module.cpp b/lib/Core/Module.cpp
-index 05732821..be4feceb 100644
+index 874fce22..ba891eae 100644
 --- a/lib/Core/Module.cpp
 +++ b/lib/Core/Module.cpp
 @@ -23,6 +23,7 @@
@@ -487,7 +527,7 @@ index 05732821..be4feceb 100644
  //===----------------------------------------------------------------------===//
  // Module
  //===----------------------------------------------------------------------===//
-@@ -418,6 +434,15 @@ bool Module::readPluginConfig() {
+@@ -422,6 +438,15 @@ bool Module::readPluginConfig() {
      if (!readOnePluginConfig(Cfg, /*IsDefaultConfig=*/false))
        return false;
    }
@@ -503,7 +543,7 @@ index 05732821..be4feceb 100644
    return true;
  }
  
-@@ -640,7 +665,7 @@ void Module::addSymbol(ResolveInfo *R) {
+@@ -644,7 +669,7 @@ void Module::addSymbol(ResolveInfo *R) {
  }
  
  LDSymbol *Module::addSymbolFromBitCode(
@@ -512,7 +552,7 @@ index 05732821..be4feceb 100644
      ResolveInfo::Desc Desc, ResolveInfo::Binding Binding,
      ResolveInfo::SizeType Size, ResolveInfo::Visibility Visibility,
      unsigned int PIdx) {
-@@ -671,6 +696,8 @@ LDSymbol *Module::addSymbolFromBitCode(
+@@ -675,6 +700,8 @@ LDSymbol *Module::addSymbolFromBitCode(
    if (!ResolvedResult.Info)
      return nullptr;
  
@@ -563,10 +603,10 @@ index 4ea85643..76443ced 100644
    switch (t.getArch()) {
    case llvm::Triple::aarch64:
 diff --git a/lib/LinkerWrapper/GnuLdDriver.cpp b/lib/LinkerWrapper/GnuLdDriver.cpp
-index 2da0517a..8eb2a386 100644
+index a76aa265..a886f68c 100644
 --- a/lib/LinkerWrapper/GnuLdDriver.cpp
 +++ b/lib/LinkerWrapper/GnuLdDriver.cpp
-@@ -679,6 +679,13 @@ bool GnuLdDriver::processOptions(llvm::opt::InputArgList &Args) {
+@@ -688,6 +688,13 @@ bool GnuLdDriver::processOptions(llvm::opt::InputArgList &Args) {
    Config.addCommandLine(Table->getOptionName(T::fat_lto_objects),
                          fatLTOObjects);
  
@@ -580,7 +620,7 @@ index 2da0517a..8eb2a386 100644
    // --save-temps
    Config.options().setSaveTemps(Args.hasArg(T::save_temps));
  
-@@ -1787,6 +1794,9 @@ bool GnuLdDriver::processLTOOptions(llvm::lto::Config &Conf,
+@@ -1805,6 +1812,9 @@ bool GnuLdDriver::processLTOOptions(llvm::lto::Config &Conf,
      Config.options().setThinLTOJobs(S);
    }
  
@@ -632,7 +672,7 @@ index af7daae2..e4d535e4 100644
    return Config.options().getUnparsedLTOOptions();
  }
 diff --git a/lib/Object/ObjectLinker.cpp b/lib/Object/ObjectLinker.cpp
-index 130c563b..c046994f 100644
+index 219f3af4..f77a63cf 100644
 --- a/lib/Object/ObjectLinker.cpp
 +++ b/lib/Object/ObjectLinker.cpp
 @@ -32,6 +32,7 @@
@@ -643,7 +683,7 @@ index 130c563b..c046994f 100644
  #include "eld/Object/SectionMap.h"
  #include "eld/PluginAPI/LinkerPlugin.h"
  #include "eld/PluginAPI/OutputSectionIteratorPlugin.h"
-@@ -3042,28 +3043,57 @@ bool ObjectLinker::finalizeLtoSymbolResolution(
+@@ -3070,28 +3071,57 @@ bool ObjectLinker::finalizeLtoSymbolResolution(
  
    bool HasSectionsCmd =
        ThisModule->getScript().linkerScriptHasSectionsCommand();
@@ -706,7 +746,7 @@ index 130c563b..c046994f 100644
          // If a symbol needs to be preserved, because its being referenced
          // from regular object files, set the VisibletoRegularObj property
          // appropriately.
-@@ -3084,7 +3114,8 @@ bool ObjectLinker::finalizeLtoSymbolResolution(
+@@ -3112,7 +3142,8 @@ bool ObjectLinker::finalizeLtoSymbolResolution(
            WrapSymbolName = WrapSymbolName.drop_front(7);
          llvm::StringMap<std::string>::iterator RenameSym =
              ThisConfig.options().renameMap().find(WrapSymbolName);
@@ -716,7 +756,7 @@ index 130c563b..c046994f 100644
            LTORes.Prevailing = true;
            LTORes.VisibleToRegularObj = true;
            if (MTraceLTO || TraceWrap)
-@@ -3110,6 +3141,19 @@ bool ObjectLinker::finalizeLtoSymbolResolution(
+@@ -3138,6 +3169,19 @@ bool ObjectLinker::finalizeLtoSymbolResolution(
          if (HasSectionsCmd && Sym.isCommon())
            LTORes.VisibleToRegularObj = true;
  
@@ -737,7 +777,7 @@ index 130c563b..c046994f 100644
          if (!Info->isDyn() && !Info->isUndef() &&
              (ThisConfig.codeGenType() == LinkerConfig::Exec ||
 diff --git a/lib/Readers/BitcodeReader.cpp b/lib/Readers/BitcodeReader.cpp
-index c95d5d2a..132ab4ca 100644
+index b34bf0c0..f32d4fd9 100644
 --- a/lib/Readers/BitcodeReader.cpp
 +++ b/lib/Readers/BitcodeReader.cpp
 @@ -149,7 +149,9 @@ bool BitcodeReader::readInput(InputFile &InputFile,
@@ -820,6 +860,144 @@ index 00000000..0a5e6caa
 +  .wrap : {
 +    *(.text.__wrap_foo)
 +  }
++}
+diff --git a/test/Common/LTO/lto-with-linker-scripts/InputSectionOrder.test b/test/Common/LTO/lto-with-linker-scripts/InputSectionOrder.test
+new file mode 100644
+index 00000000..2aa25071
+--- /dev/null
++++ b/test/Common/LTO/lto-with-linker-scripts/InputSectionOrder.test
+@@ -0,0 +1,132 @@
++# Check that the input section order within an output section is correct
++# when LTO is used with linker script.
++# RUN: rm -rf %t && split-file %s %t
++# RUN: %python -c "N=100; print('int bar();'); print('int baz();'); [print(f'int foo_{i}() {{ return {i}; }}') for i in range(N)]; print('int main() { return ' + ' + '.join(f'foo_{i}()' for i in range(N)) + ' + baz() + bar(); }')" > %t/1.c
++# RUN: %clang %clangopts %t/1.c -o %t/1.o -c -ffunction-sections -fdata-sections
++# RUN: %clang %clangopts %t/2.c -o %t/2.o -c -ffunction-sections -fdata-sections -flto -flto-linker-scripts
++# RUN: %clang %clangopts %t/3.c -o %t/3.o -c -ffunction-sections -fdata-sections -flto -flto-linker-scripts
++# RUN: %link -MapStyle txt %linkopts --lto-linker-scripts -o %t/out %t/2.o %t/1.o %t/3.o -T %t/script.t -e main\
++# RUN:   -flto-options=codegen="-function-sections -data-sections" --save-temps -Map %t/map.txt
++# RUN: %filecheck %s < %t/map.txt
++
++CHECK: Output Section and Layout
++CHECK: .text
++CHECK: *(*.text*)
++CHECK: .text.bar
++CHECK: .text.foo_0
++CHECK: .text.foo_1
++CHECK: .text.foo_2
++CHECK: .text.foo_3
++CHECK: .text.foo_4
++CHECK: .text.foo_5
++CHECK: .text.foo_6
++CHECK: .text.foo_7
++CHECK: .text.foo_8
++CHECK: .text.foo_9
++CHECK: .text.foo_10
++CHECK: .text.foo_11
++CHECK: .text.foo_12
++CHECK: .text.foo_13
++CHECK: .text.foo_14
++CHECK: .text.foo_15
++CHECK: .text.foo_16
++CHECK: .text.foo_17
++CHECK: .text.foo_18
++CHECK: .text.foo_19
++CHECK: .text.foo_20
++CHECK: .text.foo_21
++CHECK: .text.foo_22
++CHECK: .text.foo_23
++CHECK: .text.foo_24
++CHECK: .text.foo_25
++CHECK: .text.foo_26
++CHECK: .text.foo_27
++CHECK: .text.foo_28
++CHECK: .text.foo_29
++CHECK: .text.foo_30
++CHECK: .text.foo_31
++CHECK: .text.foo_32
++CHECK: .text.foo_33
++CHECK: .text.foo_34
++CHECK: .text.foo_35
++CHECK: .text.foo_36
++CHECK: .text.foo_37
++CHECK: .text.foo_38
++CHECK: .text.foo_39
++CHECK: .text.foo_40
++CHECK: .text.foo_41
++CHECK: .text.foo_42
++CHECK: .text.foo_43
++CHECK: .text.foo_44
++CHECK: .text.foo_45
++CHECK: .text.foo_46
++CHECK: .text.foo_47
++CHECK: .text.foo_48
++CHECK: .text.foo_49
++CHECK: .text.foo_50
++CHECK: .text.foo_51
++CHECK: .text.foo_52
++CHECK: .text.foo_53
++CHECK: .text.foo_54
++CHECK: .text.foo_55
++CHECK: .text.foo_56
++CHECK: .text.foo_57
++CHECK: .text.foo_58
++CHECK: .text.foo_59
++CHECK: .text.foo_60
++CHECK: .text.foo_61
++CHECK: .text.foo_62
++CHECK: .text.foo_63
++CHECK: .text.foo_64
++CHECK: .text.foo_65
++CHECK: .text.foo_66
++CHECK: .text.foo_67
++CHECK: .text.foo_68
++CHECK: .text.foo_69
++CHECK: .text.foo_70
++CHECK: .text.foo_71
++CHECK: .text.foo_72
++CHECK: .text.foo_73
++CHECK: .text.foo_74
++CHECK: .text.foo_75
++CHECK: .text.foo_76
++CHECK: .text.foo_77
++CHECK: .text.foo_78
++CHECK: .text.foo_79
++CHECK: .text.foo_80
++CHECK: .text.foo_81
++CHECK: .text.foo_82
++CHECK: .text.foo_83
++CHECK: .text.foo_84
++CHECK: .text.foo_85
++CHECK: .text.foo_86
++CHECK: .text.foo_87
++CHECK: .text.foo_88
++CHECK: .text.foo_89
++CHECK: .text.foo_90
++CHECK: .text.foo_91
++CHECK: .text.foo_92
++CHECK: .text.foo_93
++CHECK: .text.foo_94
++CHECK: .text.foo_95
++CHECK: .text.foo_96
++CHECK: .text.foo_97
++CHECK: .text.foo_98
++CHECK: .text.foo_99
++CHECK: .text.main
++CHECK: .text.baz
++
++#--- 2.c
++volatile int gbar = 3;
++int bar() { return gbar; }
++
++#--- 3.c
++volatile int gbaz = 5;
++int baz() { return gbaz; }
++
++#--- script.t
++SECTIONS {
++  .text : { *(*.text*) }
++  .sdata : { *(*.sdata*) }
++  .data : { *(*.data*) }
 +}
 diff --git a/test/Common/LTO/lto-with-linker-scripts/LTOAsmAlias.test b/test/Common/LTO/lto-with-linker-scripts/LTOAsmAlias.test
 new file mode 100644
