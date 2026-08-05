@@ -28,6 +28,17 @@ set(MULTILIB_JSON "" CACHE STRING "JSON file to load library definitions from.")
 set(ENABLE_VARIANTS "all" CACHE STRING "Semicolon separated list of variants to build, or \"all\". Must match entries in the json.")
 set(C_LIBRARY "picolibc" CACHE STRING "Which C library to use.")
 set_property(CACHE C_LIBRARY PROPERTY STRINGS picolibc musl-embedded)
+
+# multilib.json and the per-variant JSON files only know about one
+# "picolibc" entry, shared by every fetched picolibc version (e.g.
+# picolibc-main), not a separate entry per version. So map C_LIBRARY to
+# its base library name before looking anything up there.
+if(C_LIBRARY MATCHES "^picolibc")
+    set(json_library_key picolibc)
+else()
+    set(json_library_key ${C_LIBRARY})
+endif()
+
 set(PROJECT_PREFIX "${CMAKE_BINARY_DIR}/lib-builds" CACHE STRING "Directory to build subprojects in.")
 option(
     NUMERICAL_BUILD_NAMES
@@ -84,13 +95,13 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter) # needed by fetch_repo.cma
 
 include(ExternalProject)
 include(${TOOLCHAIN_SOURCE_DIR}/cmake/fetch_repo.cmake)
-if(C_LIBRARY STREQUAL picolibc)
-    fetch_repo(picolibc)
-    list(APPEND passthrough_dirs "-DFETCHCONTENT_SOURCE_DIR_PICOLIBC=${FETCHCONTENT_SOURCE_DIR_PICOLIBC}")
-elseif(C_LIBRARY STREQUAL musl-embedded)
-    fetch_repo(musl-embedded)
-    list(APPEND passthrough_dirs "-DFETCHCONTENT_SOURCE_DIR_MUSL-EMBEDDED=${FETCHCONTENT_SOURCE_DIR_MUSL-EMBEDDED}")
-endif()
+fetch_repo(${C_LIBRARY})
+string(TOUPPER ${C_LIBRARY} c_library_upper)
+list(
+    APPEND
+    passthrough_dirs
+    "-DFETCHCONTENT_SOURCE_DIR_${c_library_upper}=${FETCHCONTENT_SOURCE_DIR_${c_library_upper}}"
+)
 
 # Target for any dependencies to build the runtimes project.
 add_custom_target(runtimes-depends)
@@ -163,7 +174,7 @@ foreach(lib_idx RANGE ${lib_count_dec})
     if(NOT variant_support STREQUAL "libraries_supported-NOTFOUND")
         # Replace colons with semi-colons so CMake comprehends the list.
         string(REPLACE "," ";" variant_support ${variant_support})
-        if(NOT C_LIBRARY IN_LIST variant_support)
+        if(NOT json_library_key IN_LIST variant_support)
             continue()
         endif()
     endif()
@@ -211,7 +222,7 @@ foreach(lib_idx RANGE ${lib_count_dec})
                     ENABLE_COMPILER_RT_TESTS
                     ENABLE_LIBCXX_TESTS
                 )
-                    string(JSON read_${test_enable_var} ERROR_VARIABLE json_error GET ${variant_json_str} "args" ${C_LIBRARY} ${test_enable_var})
+                    string(JSON read_${test_enable_var} ERROR_VARIABLE json_error GET ${variant_json_str} "args" ${json_library_key} ${test_enable_var})
                     if(read_${test_enable_var} STREQUAL "json-NOTFOUND")
                         string(JSON read_${test_enable_var} ERROR_VARIABLE json_error GET ${variant_json_str} "args" "common" ${test_enable_var})
                         if(read_${test_enable_var} STREQUAL "json-NOTFOUND")
