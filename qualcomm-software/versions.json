@@ -10,6 +10,11 @@
       "tagType": "commithash",
       "tag": "01254932e8e81085817ed61fd858648584ffe37c"
     },
+    "picolibc-v1812": {
+      "url": "https://github.com/picolibc/picolibc.git",
+      "tagType": "tag",
+      "tag": "1.8.12"
+    },
     "musl": {
       "url": "git://git.musl-libc.org/musl",
       "tagType": "tag",
