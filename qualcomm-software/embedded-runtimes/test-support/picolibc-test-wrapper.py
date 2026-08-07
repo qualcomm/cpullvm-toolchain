@@ -15,10 +15,15 @@ import subprocess
 import sys
 
 
-def run(args):
+def run(args, extra_args):
     # Some picolibc tests expect argv[0] to be literally "program-name", not
     # the actual program name.
-    argv = ["program-name"] + args.arguments
+    argv = ["program-name"] + extra_args
+    if args.args:
+        # In picolibc v1.8.11 and later, arguments from the picolibc tests
+        # will come as a string rather than a list, so append to the first
+        # element and let the semihosting library handle the splitting.
+        argv[0] += " " + args.args
     if args.qemu_command:
         return run_qemu(
             args.qemu_command,
@@ -68,18 +73,21 @@ def main():
         help="Print verbose output. This may affect test result, as the output "
         "will be added to the output of the test.",
     )
-    parser.add_argument("image", help="image file to execute")
     parser.add_argument(
-        "arguments",
-        nargs=argparse.REMAINDER,
-        default=[],
-        help="optional arguments for the image",
+        "--args",
+        help="String containing optional arguments for the image",
     )
-    args = parser.parse_args()
+    parser.add_argument("image", help="image file to execute")
+    # FIXME: We need to support picolibc versions both with and without
+    # https://github.com/picolibc/picolibc/commit/295b45098fb189185c973376b53d48b86b65e4ae.
+    # Once all supported picolibc versions have this commit (picolibc v1.8.11
+    # or later), `extra_args` should be removed and this can go back to just
+    # `parse_args()`.
+    args, extra_args = parser.parse_known_args()
     # --qemu-cpu is encoded with colons instead of commas to survive CMake list
     # separator substitution (LIST_SEPARATOR ,).  Decode it back here.
     args.qemu_cpu = args.qemu_cpu.replace(":", ",") if args.qemu_cpu else None
-    ret_code = run(args)
+    ret_code = run(args, extra_args)
     sys.exit(ret_code)
 
 
