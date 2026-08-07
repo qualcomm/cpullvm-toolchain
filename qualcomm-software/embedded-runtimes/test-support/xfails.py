@@ -208,8 +208,18 @@ def main():
                 "armv7m_soft_nofp",
                 "armv7m_soft_nofp_nopic",
             ],
-            description="dynamic_cast14.pass.cpp (cxxabi test) fails due to"
-                "insufficient memory. It requires at-least 10MB RAM."
+            description="The variants armv7m_soft_nofp, armv7m_soft_nofp_nopic "
+                "(both mps2-an385, Cortex-M3), and armv7m_hard_fpv5_d16_nopic "
+                "(mps2-an500, Cortex-M7) run on QEMU MPS2 board models that have "
+                "only 4 MiB of real SRAM at 0x20000000 (mirror-aliased to appear as "
+                "8 MiB, see "
+                "https://github.com/qemu/qemu/blob/3e3ccab106f879b1512f8e0d51a827dd4de30e22/hw/arm/mps2.c#L207). "
+                "This is fixed by the emulated hardware and cannot be increased via "
+                "RAM_SIZE."
+                "The dynamic_cast14.pass.cpp test has a static (.data+.bss) footprint "
+                "of 9.45 MiB, before any heap or stack. That already exceeds the "
+                "boards' 8 MiB of addressable RAM, so the test cannot be built to fit. "
+                "Therefore these variants are xfailed."
         ),
         XFail(
             name="flat-container-oom-armv7m",
