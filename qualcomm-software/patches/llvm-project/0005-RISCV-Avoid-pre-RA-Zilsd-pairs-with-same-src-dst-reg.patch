@@ -1,0 +1,124 @@
+From 0621616acecf42d6e08ed397aff91f651fcf0d28 Mon Sep 17 00:00:00 2001
+From: Sudharsan Veeravalli <svs@qti.qualcomm.com>
+Date: Wed, 12 Aug 2026 16:42:04 +0530
+Subject: [PATCH] [RISCV] Avoid pre-RA Zilsd pairs with same src/dst registers
+
+---
+ llvm/lib/Target/RISCV/RISCVZilsdOptimizer.cpp | 16 +-----
+ .../CodeGen/RISCV/zilsd-ldst-opt-prera.mir    |  3 +-
+ llvm/test/CodeGen/RISCV/zilsd.ll              | 55 +++++++++++++++----
+ 3 files changed, 48 insertions(+), 26 deletions(-)
+
+diff --git a/llvm/lib/Target/RISCV/RISCVZilsdOptimizer.cpp b/llvm/lib/Target/RISCV/RISCVZilsdOptimizer.cpp
+index 54908b31f629..1886ccc0b818 100644
+--- a/llvm/lib/Target/RISCV/RISCVZilsdOptimizer.cpp
++++ b/llvm/lib/Target/RISCV/RISCVZilsdOptimizer.cpp
+@@ -212,22 +212,8 @@ bool RISCVPreAllocZilsdOpt::canFormLdSdPair(MachineInstr *MI0,
+ 
+   // Check that the two destination/source registers are different for
+   // load/store respectively.
+-  // The only case two destinations/sources can be same is (x0, x0). This pass
+-  // is run before register coalescer so it will be the form of:
+-  //   %0 = COPY $x0
+-  //   SW %0, %ptr
+-  // instead of:
+-  //   SW $x0, %ptr
+-  Register FirstReg = MI0->getOperand(0).getReg();
+-  Register SecondReg = MI1->getOperand(0).getReg();
+-  if (FirstReg == SecondReg) {
+-    const MachineInstr *FirstOpDefInst = MRI->getUniqueVRegDef(FirstReg);
+-    if (FirstOpDefInst->isCopy() &&
+-        FirstOpDefInst->getOperand(1).getReg() == RISCV::X0 &&
+-        MRI->getRegClass(FirstReg)->contains(RISCV::X0))
+-      return true;
++  if (MI0->getOperand(0).getReg() == MI1->getOperand(0).getReg())
+     return false;
+-  }
+ 
+   return true;
+ }
+diff --git a/llvm/test/CodeGen/RISCV/zilsd-ldst-opt-prera.mir b/llvm/test/CodeGen/RISCV/zilsd-ldst-opt-prera.mir
+index 490586430e9b..09c0f5d00f78 100644
+--- a/llvm/test/CodeGen/RISCV/zilsd-ldst-opt-prera.mir
++++ b/llvm/test/CodeGen/RISCV/zilsd-ldst-opt-prera.mir
+@@ -363,7 +363,8 @@ body: |
+     ; CHECK-4BYTE-NEXT: {{  $}}
+     ; CHECK-4BYTE-NEXT: [[COPY:%[0-9]+]]:gpr = COPY $x10
+     ; CHECK-4BYTE-NEXT: [[COPY1:%[0-9]+]]:gpr = COPY $x0
+-    ; CHECK-4BYTE-NEXT: PseudoSD_RV32_OPT [[COPY1]], [[COPY1]], [[COPY]], 0 :: (store (s32))
++    ; CHECK-4BYTE-NEXT: SW [[COPY1]], [[COPY]], 0 :: (store (s32))
++    ; CHECK-4BYTE-NEXT: SW [[COPY1]], [[COPY]], 4 :: (store (s32))
+     ; CHECK-4BYTE-NEXT: PseudoRET
+     %0:gpr = COPY $x10
+     %1:gpr = COPY $x0
+diff --git a/llvm/test/CodeGen/RISCV/zilsd.ll b/llvm/test/CodeGen/RISCV/zilsd.ll
+index 40ef659a7ce6..b2b71da3898a 100644
+--- a/llvm/test/CodeGen/RISCV/zilsd.ll
++++ b/llvm/test/CodeGen/RISCV/zilsd.ll
+@@ -276,18 +276,53 @@ entry:
+ }
+ 
+ define void @basic_store_zero_combine(ptr %0, i32 %1, i32 %2) {
+-; SLOW-LABEL: basic_store_zero_combine:
+-; SLOW:       # %bb.0:
+-; SLOW-NEXT:    sw zero, 0(a0)
+-; SLOW-NEXT:    sw zero, 4(a0)
+-; SLOW-NEXT:    ret
+-;
+-; FAST-LABEL: basic_store_zero_combine:
+-; FAST:       # %bb.0:
+-; FAST-NEXT:    sd zero, 0(a0)
+-; FAST-NEXT:    ret
++; CHECK-LABEL: basic_store_zero_combine:
++; CHECK:       # %bb.0:
++; CHECK-NEXT:    sw zero, 0(a0)
++; CHECK-NEXT:    sw zero, 4(a0)
++; CHECK-NEXT:    ret
+   store i32 0, ptr %0, align 4
+   %4 = getelementptr inbounds i32, ptr %0, i32 1
+   store i32 0, ptr %4, align 4
+   ret void
+ }
++
++declare void @llvm.memset.p0.i32(ptr, i8, i32, i1 immarg)
++
++define void @no_coalesce() #0 {
++; CHECK-LABEL: no_coalesce:
++; CHECK:       # %bb.0: # %entry
++; CHECK-NEXT:    li a1, 0
++; CHECK-NEXT:    li a0, 1
++; CHECK-NEXT:    j .LBB12_2
++; CHECK-NEXT:  .LBB12_1: # %crash
++; CHECK-NEXT:    # in Loop: Header=BB12_2 Depth=1
++; CHECK-NEXT:    sd a0, 0(zero)
++; CHECK-NEXT:    sw a1, 8(zero)
++; CHECK-NEXT:    sw a1, 0(zero)
++; CHECK-NEXT:    sw a1, 4(zero)
++; CHECK-NEXT:  .LBB12_2: # %loop
++; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
++; CHECK-NEXT:    bnez a1, .LBB12_1
++; CHECK-NEXT:  # %bb.3: # %loop
++; CHECK-NEXT:    # in Loop: Header=BB12_2 Depth=1
++; CHECK-NEXT:    beqz a1, .LBB12_2
++; CHECK-NEXT:  # %bb.4: # %exit
++; CHECK-NEXT:    ret
++entry:
++  br label %loop
++
++loop:
++  switch i8 0, label %loop [
++    i8 1, label %crash
++    i8 3, label %exit
++  ]
++
++crash:
++  store i64 1, ptr null, align 8
++  call void @llvm.memset.p0.i32(ptr null, i8 0, i32 12, i1 false)
++  br label %loop
++
++exit:
++  ret void
++}
+-- 
+2.34.1
+
