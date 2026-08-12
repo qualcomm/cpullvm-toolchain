@@ -12,7 +12,10 @@ jobs:
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     strategy:
       matrix:
-        branch: [main, release/23.x]
+        include:
+          - branch: main
+          - branch: release/23.x
+            stop_at_tag: llvmorg-23.1.0
     env:
       UPSTREAM_REMOTE: https://github.com/llvm/llvm-project.git
     steps:
@@ -27,13 +30,34 @@ jobs:
         with:
           ref: ${{ matrix.branch }}
           token: ${{ steps.generate-token.outputs.token }}
+          fetch-depth: 0
       - name: Configure Upstream Remote
         run: git remote add upstream ${{ env.UPSTREAM_REMOTE }}
       - name: Fetch Upstream Changes
-        run: git pull --ff-only upstream ${{ matrix.branch }}
+        run: |
+          git pull --ff-only upstream ${{ matrix.branch }}
+          if [ -n "${{ matrix.stop_at_tag }}" ]; then
+            git fetch upstream "refs/tags/${{ matrix.stop_at_tag }}:refs/tags/${{ matrix.stop_at_tag }}" 2>/dev/null || true
+          fi
       - name: Configure Git Identity
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - name: Push Changes
-        run: git push origin ${{ matrix.branch }}
+        run: |
+          STOP_TAG="${{ matrix.stop_at_tag }}"
+          if [ -n "$STOP_TAG" ] && \
+             git rev-parse "$STOP_TAG" > /dev/null 2>&1 && \
+             git merge-base --is-ancestor "$(git rev-parse "${STOP_TAG}^{}")" HEAD; then
+            STOP_COMMIT=$(git rev-parse "${STOP_TAG}^{}")
+
+            if [ "$(git rev-parse HEAD)" = "$STOP_COMMIT" ]; then
+              echo "Already at $STOP_TAG ($STOP_COMMIT), nothing to sync."
+              exit 0
+            fi
+
+            echo "Freezing ${{ matrix.branch }} at $STOP_TAG ($STOP_COMMIT)."
+            git push --force-with-lease origin "${STOP_COMMIT}:refs/heads/${{ matrix.branch }}"
+          else
+            git push origin ${{ matrix.branch }}
+          fi
