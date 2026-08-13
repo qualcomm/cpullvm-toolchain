@@ -60,6 +60,8 @@ jobs:
       - name: Apply llvm-project patches
         run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
 
+      - uses: ./.github/actions/setup-cmake
+
       - name: Build
         run: ./qualcomm-software/scripts/build.sh
 
@@ -137,6 +139,8 @@ jobs:
 
       - name: Apply llvm-project patches
         run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
+
+      - uses: ./.github/actions/setup-cmake
 
       - name: Build
         run: ./qualcomm-software/scripts/${{ matrix.build_script }}
