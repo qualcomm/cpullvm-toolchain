@@ -70,5 +70,7 @@ jobs:
           --branch-repo-token ${{ secrets.RELEASE_WORKFLOW_PUSH_SECRET }} \
           --branch-repo "$GITHUB_REPOSITORY" \
           --issue-number ${{ github.event.issue.number }} \
-          --requested-by ${{ (github.event.action == 'opened' && github.event.issue.user.login) || github.event.comment.user.login }} \
+          --requested-by "$REQUESTED_BY" \
           auto
+        env:
+          REQUESTED_BY: ${{ (github.event.action == 'opened' && github.event.issue.user.login) || github.event.comment.user.login }}

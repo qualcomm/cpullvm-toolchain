@@ -1,12 +1,11 @@
 # This workflow executes the automerge python script to automatically merge
 # changes from the `main` branch of upstream LLVM into the `qualcomm-software`
 # branch of the qualcomm/cpullvm-toolchain repository.
+#
+# Note: This workflow is now primarily for manual triggering. Automatic automerge
+# runs as part of the "Sync from Upstream LLVM" workflow.
 name: Automerge
 on:
-  workflow_run:
-    workflows: [Sync from Upstream LLVM]
-    types:
-      - completed
   workflow_dispatch:
 jobs:
   Run-Automerge:
@@ -28,11 +27,16 @@ jobs:
         with:
           app_id: ${{ secrets.SYNC_APP_ID }}
           private_key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          # Explicitly limit permissions to only what's needed
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           ref: ${{ matrix.branches.to_branch }}
           token: ${{ steps.generate-token.outputs.token }}
+          persist-credentials: false
       - name: Configure Git Identity
         run: |
           git config --local user.name "github-actions[bot]"
