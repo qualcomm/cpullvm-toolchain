@@ -1,11 +1,31 @@
 # Toolchain usage
 
-## MUSL Overlays Installation
-CPULLVM includes overlays for [Qualcomm’s musl-embedded](https://github.com/qualcomm/musl-embedded) Arm/AArch64 variants.
+## Overlay Installation and Usage
+CPULLVM distributes additional overlay packages that allow for alternative sets of libraries (using different C library
+implementations or versions, for example) to be optionally downloaded, installed, and used.
 
-To install it, untar the overlay file at the root of the CPULLVM toolchain installation directory.
+To install the overlay, untar or unzip the overlay file at the root of an existing CPULLVM toolchain installation directory.
 
-To invoke the toolchain using musl-embedded as the C library, use the `--config=musl-embedded.cfg` compiler option.
+To invoke the toolchain using the desired overlay, pass either of the below options to all compile and link
+commands:
+* `--config=<overlay name>.cfg` (ex: `--config=picolibc-v1812.cfg`)
+* `--sysroot=<path to toolchain root>/lib/clang-runtimes/<overlay name>`
+(ex: `--sysroot=<path to>/lib/clang-runtimes/picolibc-v1812`)
+
+> [!WARNING]
+> The toolchain-internal paths to overlays (ex: `lib/clang-runtimes`) may change at any time without warning.
+>
+> Using `--config=<overlay name>.cfg` should be preferred.
+>
+> However, some build systems provide better support for specifying a sysroot directly, so `--sysroot`
+> may still be a useful alternative.
+
+The default set of libraries are still available if the `--config` and `--sysroot` options above are omitted.
+
+The following overlays are supported:
+* `picolibc-v1812`: picolibc v1.8.12 supporting all the same variants as CPULLVM's default picolibc library set.
+* `musl-embedded`: [Qualcomm’s musl-embedded](https://github.com/qualcomm/musl-embedded) supporting select
+Arm/AArch64 variants.
 
 > [!WARNING]
 > musl Linux variants are used for CPULLVM test infrastructure.
