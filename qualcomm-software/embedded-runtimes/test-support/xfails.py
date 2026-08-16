@@ -180,6 +180,8 @@ def main():
             testnames=[
                 "math_errhandling.test",
                 "test-fma.test",
+                # math_errhandling.test was renamed in picolibc v1.8.12
+                "test-math-errhandling.test",
             ],
             result=NewResult.XFAILED,
             project="picolibc",
@@ -199,6 +201,10 @@ def main():
                 "math_errhandling.test",
                 "rounding-mode.test",
                 "test-fma.test",
+                # math_errhandling.test and rounding-mode.test were renamed in
+                # picolibc v1.8.12
+                "test-math-errhandling.test",
+                "test-rounding-mode.test",
             ],
             result=NewResult.XFAILED,
             project="picolibc",
