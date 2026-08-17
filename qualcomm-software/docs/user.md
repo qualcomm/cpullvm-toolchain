@@ -20,7 +20,8 @@ may still be a useful alternative.
 > [!WARNING]
 > The toolchain-internal paths to overlays (ex: `lib/clang-runtimes`) may change between releases without warning.
 
-The default set of libraries are still available and will be  used if the `--config` and `--sysroot` options above are omitted.
+The default set of libraries (currently picolibc v1.8.10) are still available and will be  used if the `--config` and `--sysroot`
+options above are omitted.
 
 The following overlays are supported:
 * `picolibc-v1812`: picolibc [v1.8.12](https://github.com/picolibc/picolibc/releases/tag/1.8.12) supporting the same
