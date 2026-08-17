@@ -39,14 +39,6 @@ jobs:
             target_os: Linux-x86_64
             runner: cpullvm-ubuntu24-x86_64
 
-          # FIXME: this should maybe go into the nightly instead,
-          # but I don't want to keep triggering those until we're
-          # closer to being ready to merge.
-          - build_script: build_picolibc-v1812_overlay.sh
-            test_script: test_picolibc-v1812_overlay.sh
-            target_os: Linux-x86_64
-            runner: cpullvm-ubuntu24-x86_64
-
     steps:
       - name: Checkout source
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
