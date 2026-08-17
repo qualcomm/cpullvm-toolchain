@@ -12,25 +12,19 @@ commands:
 * `--sysroot=<path to toolchain root>/lib/clang-runtimes/<overlay name>`
 (ex: `--sysroot=<path to>/lib/clang-runtimes/picolibc-v1812`)
 
-> [!WARNING]
-> The toolchain-internal paths to overlays (ex: `lib/clang-runtimes`) may change at any time without warning.
->
-> Using `--config=<overlay name>.cfg` should be preferred.
->
-> However, some build systems provide better support for specifying a sysroot directly, so `--sysroot`
-> may still be a useful alternative.
+Using `--config=<overlay name>.cfg` should be preferred.
 
-The default set of libraries are still available if the `--config` and `--sysroot` options above are omitted.
+However, some build systems (e.g. Zephyr) provide better support for specifying a sysroot directly, so `--sysroot`
+may still be a useful alternative.
+
+> [!WARNING]
+> The toolchain-internal paths to overlays (ex: `lib/clang-runtimes`) may change between releases without warning.
+
+The default set of libraries are still available and will be  used if the `--config` and `--sysroot` options above are omitted.
 
 The following overlays are supported:
-* `picolibc-v1812`: picolibc v1.8.12 supporting all the same variants as CPULLVM's default picolibc library set.
-* `musl-embedded`: [Qualcomm’s musl-embedded](https://github.com/qualcomm/musl-embedded) supporting select
-Arm/AArch64 variants.
-
-> [!WARNING]
-> musl Linux variants are used for CPULLVM test infrastructure.
-> 
-> musl-embedded will be deprecated in CPULLVM 23.1.0. Please switch to picolibc.
+* `picolibc-v1812`: picolibc [v1.8.12](https://github.com/picolibc/picolibc/releases/tag/1.8.12) supporting the same
+variants as CPULLVM's default picolibc library set.
 
 ## Using ELD
 CPULLVM supports and recommends the [ELD linker](https://github.com/qualcomm/eld) for building embedded images.
