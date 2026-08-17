@@ -197,55 +197,6 @@ def main():
             description="Disable the tests for now while the issue is being fixed upstream (https://github.com/picolibc/picolibc/pull/1072).",
         ),
         XFail(
-            name="Insufficient RAM",
-            testnames=[
-                "dynamic_cast14.pass.cpp",
-            ],
-            result=NewResult.XFAILED,
-            project="libcxx",
-            variants=[
-                "armv7m_hard_fpv5_d16_nopic",
-                "armv7m_soft_nofp",
-                "armv7m_soft_nofp_nopic",
-            ],
-            description="dynamic_cast14.pass.cpp (cxxabi test) fails due to"
-                "insufficient memory. It requires at-least 10MB RAM."
-        ),
-        XFail(
-            name="flat-container-oom-armv7m",
-            testnames=[
-                "std/containers/container.adaptors/flat.map/flat.map.capacity/size.pass.cpp",
-                "std/containers/container.adaptors/flat.set/flat.set.capacity/size.pass.cpp",
-            ],
-            result=NewResult.XFAILED,
-            project="libcxx",
-            variants=[
-                "armv7m_soft_nofp",
-                "armv7m_soft_nofp_nopic",
-                "armv7m_hard_fpv5_d16_nopic",
-            ],
-            description="flat.map/size and flat.set/size insert 1,000,000 elements at "
-                        "runtime, exceeding the 8MB RAM on armv7m bare-metal QEMU targets. "
-                        "armv7a/armv8 have 16MB RAM and pass. The test aborts with exit 1.",
-        ),
-        XFail(
-            name="sort-heap-complexity-armv7m",
-            testnames=[
-                "std/algorithms/alg.sorting/alg.heap.operations/sort.heap/complexity.pass.cpp",
-                "std/algorithms/alg.sorting/alg.heap.operations/sort.heap/ranges_sort_heap.pass.cpp",
-            ],
-            result=NewResult.XFAILED,
-            project="libcxx",
-            variants=[
-                "armv7m_soft_nofp",
-                "armv7m_soft_nofp_nopic",
-                "armv7m_hard_fpv5_d16_nopic",
-            ],
-            description="sort.heap complexity tests use std::random_device which falls "
-                        "back to a fixed seed on armv7m bare-metal, causing the complexity "
-                        "assertion to fail. armv7a/armv8 pass. Exits with code 1.",
-        ),
-        XFail(
             name="simd-unary-compiler-crash-armv7a",
             testnames=[
                 "std/experimental/simd/simd.class/simd_unary.pass.cpp",
