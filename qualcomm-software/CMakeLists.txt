@@ -162,6 +162,7 @@ set(BUG_REPORT_URL "https://github.com/qualcomm/cpullvm-toolchain/issues" CACHE 
 set(LLVM_DISTRIBUTION_COMPONENTS
     clang
     clang-format
+    clang-headers
     clang-refactor
     clang-resource-headers
     clang-scan-deps
@@ -198,6 +199,7 @@ set(LLVM_DISTRIBUTION_COMPONENTS
     llvm-dwarfutil
     llvm-dwp
     llvm-extract
+    llvm-headers
     llvm-ifs
     llvm-lib
     llvm-ml
