@@ -96,6 +96,20 @@ def main():
         p = subprocess.run(test_args, capture_output=True, check=False)
         return p.returncode != 0
 
+    # FIXME: Eventualy it might make more sense to add a `libc` member into
+    # `XFail` for more direct use depending on how many libc-specific xfails
+    # are needed. But, while supporting multiple picolibc versions is new,
+    # using the existing conditionals seems an unobtrusive and flexible way
+    # forward.
+    # Test whether picolibc is cpullvm's v1.8.12 version.
+    def check_picolibc_is_v1812():
+        return args.libc == 'picolibc-v1812'
+
+    # Test whether picolibc is cpullvm's "primary" version (currently between
+    # v1.8.10 and v1.8.11).
+    def check_picolibc_is_primary():
+        return args.libc == 'picolibc'
+
     xfails = [
         XFail(
             name="signal unwind picolibc",
@@ -166,6 +180,8 @@ def main():
             testnames=[
                 "math_errhandling.test",
                 "test-fma.test",
+                # math_errhandling.test was renamed in picolibc v1.8.12
+                "test-math-errhandling.test",
             ],
             result=NewResult.XFAILED,
             project="picolibc",
@@ -185,6 +201,10 @@ def main():
                 "math_errhandling.test",
                 "rounding-mode.test",
                 "test-fma.test",
+                # math_errhandling.test and rounding-mode.test were renamed in
+                # picolibc v1.8.12
+                "test-math-errhandling.test",
+                "test-rounding-mode.test",
             ],
             result=NewResult.XFAILED,
             project="picolibc",
@@ -195,6 +215,24 @@ def main():
                 "riscv32imaf_zve32f_zvfh_zba_zbb_ilp32f_nothreads"
             ],
             description="Disable the tests for now while the issue is being fixed upstream (https://github.com/picolibc/picolibc/pull/1072).",
+        ),
+        XFail(
+            name="picolibc v1.8.12 hello-raw",
+            testnames=[
+                "test-hello-raw.test",
+                "test-hello-raw-no-flash.test",
+            ],
+            result=NewResult.EXCLUDE,
+            conditional=check_picolibc_is_v1812,
+            project="picolibc",
+            variants=[
+                "aarch64a_tlsie",
+                "aarch64a_soft_nofp_tlsie",
+            ],
+            description="picolibc's `*-raw-*` tests rely on serial port usage "
+                        "to exit correctly which our existing wrappers are not "
+                        "setup to handle. Exclude them for now as we aren't losing "
+                        "any significant test coverage by doing so.",
         ),
         XFail(
             name="simd-unary-compiler-crash-armv7a",
@@ -277,8 +315,10 @@ def main():
                 "std/language.support/support.start.term/quick_exit.pass.cpp",
             ],
             result=NewResult.XFAILED,
+            conditional=check_picolibc_is_primary,
             project="libcxx",
-            description="at_quick_exit symbol is not found in the picolibc semihosting runtime.",
+            description="quick_exit, at_quick_exit, and __cxa_at_quick_exit were first added "
+                        "in picolibc v1.8.12. Older versions fail with undefined symbols.",
         ),
         XFail(
             name="uchar-cuchar-xpass-picolibc",

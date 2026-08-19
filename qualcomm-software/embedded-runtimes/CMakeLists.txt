@@ -25,7 +25,7 @@ set(llvmproject_src_dir ${TOOLCHAIN_SOURCE_DIR}/..)
 # CMake arguments are loaded from the JSON file depending on which C
 # library is used, so this must be set before the JSON is processed.
 set(C_LIBRARY "picolibc" CACHE STRING "Which C library to use.")
-set_property(CACHE C_LIBRARY PROPERTY STRINGS picolibc musl-embedded)
+set_property(CACHE C_LIBRARY PROPERTY STRINGS picolibc picolibc-v1812 musl-embedded)
 
 set(VARIANT_JSON "" CACHE STRING "JSON file to load args from.")
 if(VARIANT_JSON)
