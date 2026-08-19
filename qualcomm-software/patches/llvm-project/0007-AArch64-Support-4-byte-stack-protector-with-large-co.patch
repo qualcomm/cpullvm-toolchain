@@ -1,0 +1,80 @@
+From 7f068c7828bf158c3fd9c2aff1bc012abdcca758 Mon Sep 17 00:00:00 2001
+From: Eli Friedman <efriedma@qti.qualcomm.com>
+Date: Mon, 6 Jul 2026 13:52:50 -0700
+Subject: [PATCH] [AArch64] Support 4-byte stack protector with large code
+ model. (#205956)
+
+This is a simple extension to existing code. We might need this in the
+future.
+---
+ llvm/lib/Target/AArch64/AArch64InstrInfo.cpp  | 21 ++++++++++++-------
+ .../test/CodeGen/AArch64/stack-guard-width.ll |  7 +++++++
+ 2 files changed, 21 insertions(+), 7 deletions(-)
+
+diff --git a/llvm/lib/Target/AArch64/AArch64InstrInfo.cpp b/llvm/lib/Target/AArch64/AArch64InstrInfo.cpp
+index 957438ee63e5..e59cc9be1bfd 100644
+--- a/llvm/lib/Target/AArch64/AArch64InstrInfo.cpp
++++ b/llvm/lib/Target/AArch64/AArch64InstrInfo.cpp
+@@ -2518,9 +2518,6 @@ bool AArch64InstrInfo::expandPostRAPseudo(MachineInstr &MI) const {
+           .addMemOperand(*MI.memoperands_begin());
+     }
+   } else if (TM.getCodeModel() == CodeModel::Large) {
+-    if (GuardWidth == 4)
+-      report_fatal_error("Large code model with 4-byte stack protector not yet "
+-                         "supported");
+     BuildMI(MBB, MI, DL, get(AArch64::MOVZXi), Reg)
+         .addGlobalAddress(GV, 0, AArch64II::MO_G0 | MO_NC)
+         .addImm(0);
+@@ -2536,10 +2533,20 @@ bool AArch64InstrInfo::expandPostRAPseudo(MachineInstr &MI) const {
+         .addReg(Reg, RegState::Kill)
+         .addGlobalAddress(GV, 0, AArch64II::MO_G3)
+         .addImm(48);
+-    BuildMI(MBB, MI, DL, get(AArch64::LDRXui), Reg)
+-        .addReg(Reg, RegState::Kill)
+-        .addImm(0)
+-        .addMemOperand(*MI.memoperands_begin());
++    if (GuardWidth == 4) {
++      unsigned Reg32 = TRI->getSubReg(Reg, AArch64::sub_32);
++      BuildMI(MBB, MI, DL, get(AArch64::LDRWui))
++          .addDef(Reg32, RegState::Dead)
++          .addUse(Reg, RegState::Kill)
++          .addImm(0)
++          .addMemOperand(*MI.memoperands_begin())
++          .addDef(Reg, RegState::Implicit);
++    } else {
++      BuildMI(MBB, MI, DL, get(AArch64::LDRXui), Reg)
++          .addReg(Reg, RegState::Kill)
++          .addImm(0)
++          .addMemOperand(*MI.memoperands_begin());
++    }
+   } else if (TM.getCodeModel() == CodeModel::Tiny) {
+     // FIXME: This is computing the stack protector value as a constant
+     // pc-relative offset, not loading it from memory. Which is maybe
+diff --git a/llvm/test/CodeGen/AArch64/stack-guard-width.ll b/llvm/test/CodeGen/AArch64/stack-guard-width.ll
+index b9d24e5d8856..928f299cb0c7 100644
+--- a/llvm/test/CodeGen/AArch64/stack-guard-width.ll
++++ b/llvm/test/CodeGen/AArch64/stack-guard-width.ll
+@@ -5,6 +5,7 @@
+ ; RUN: cat a.ll nopic.ll > b.ll
+ ; RUN: cat a.ll pic.ll > c.ll
+ ; RUN: llc < b.ll | FileCheck %s
++; RUN: llc -code-model=large < b.ll | FileCheck -check-prefix=LARGE %s
+ ; RUN: llc < c.ll -relocation-model=pic | FileCheck %s -check-prefix=PIC
+ 
+ ;--- a.ll
+@@ -16,6 +17,12 @@ define dso_local void @f(ptr noundef %g) #0 {
+ ; CHECK: adrp x8, __stack_chk_guard
+ ; CHECK: ldr w8, [x8, :lo12:__stack_chk_guard]
+ 
++; LARGE: movz x9, #:abs_g0_nc:__stack_chk_guard
++; LARGE: movk x9, #:abs_g1_nc:__stack_chk_guard
++; LARGE: movk x9, #:abs_g2_nc:__stack_chk_guard
++; LARGE: movk x9, #:abs_g3:__stack_chk_guard
++; LARGE: ldr w9, [x9]
++
+ ; PIC: adrp x9, :got:__stack_chk_guard
+ ; PIC: ldr x9, [x9, :got_lo12:__stack_chk_guard]
+ ; PIC: ldr w9, [x9]
+-- 
+2.34.1
+
