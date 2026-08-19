@@ -126,7 +126,7 @@ set(LLVM_TOOLCHAIN_C_LIBRARY
     "Which C library to use."
 )
 set_property(CACHE LLVM_TOOLCHAIN_C_LIBRARY
-    PROPERTY STRINGS picolibc musl-embedded)
+    PROPERTY STRINGS picolibc picolibc-v1812 musl-embedded)
 
 option(
     SHORT_BUILD_PATHS

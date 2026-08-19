@@ -25,6 +25,9 @@ function(get_libc_license_files clib_name license_file_list_out)
             COPYING.picolibc COPYING.picolibc
             PARENT_SCOPE
         )
+    elseif(${clib_name} STREQUAL picolibc-v1812)
+        # COPYING.NEWLIB has been removed
+        set(${license_file_list_out} COPYING.picolibc COPYING.picolibc PARENT_SCOPE)
     elseif(${clib_name} STREQUAL musl-embedded)
         set(${license_file_list_out} COPYRIGHT musl-embedded-COPYRIGHT.txt PARENT_SCOPE)
     elseif(${clib_name} STREQUAL musl)

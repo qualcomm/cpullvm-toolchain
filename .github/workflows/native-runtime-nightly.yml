@@ -46,6 +46,17 @@ jobs:
             target_os: Linux-AArch64
             runner: ubuntu-24.04-arm
 
+          # FIXME: convert to an ordinary build once we are able to source an
+          # up-to-date QEMU. Similarly, the oridinary test script can't be used
+          # as it references targets that don't exist with QEMU disabled. So
+          # skip testing as well until we can re-enable QEMU. Little coverage
+          # is lost in the meantime.
+          - build_script: build_picolibc-v1812_overlay_no_qemu.sh
+            test_script: ''
+            install_script: install_dependencies.sh
+            target_os: Linux-AArch64
+            runner: ubuntu-24.04-arm
+
           - build_script: build_musl-embedded_overlay.sh
             test_script: ''
             install_script: ''
