@@ -3,7 +3,7 @@
         "common": {
             "TARGET_ARCH": "armv8",
             "VARIANT": "arvm8_soft_neon",
-            "COMPILE_FLAGS": "-mfloat-abi=softfp -march=armv8 -mthumb -mfpu=neon-fp-armv8 -fPIC",
+            "COMPILE_FLAGS": "-mfloat-abi=softfp -march=armv8 -mthumb -mfpu=neon-fp-armv8 -munaligned-access -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",
