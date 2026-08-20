@@ -9,12 +9,7 @@
 
 name: Linux Premerge Checks
 
-on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths-ignore:
-      - '.github/workflows/qcom-preflight-checks.yml'
-      - '**/*.md'
+# DNM, temp change to avoid triggering builds
 
 permissions:
   contents: read
