@@ -13,11 +13,13 @@ including:
 - musl-embedded
 - libc++/libunwind/libc++abi
 
-For Arm and AArch64 embedded environments, picolibc or musl-embedded may be used as the libc.
-For RISC-V, only picolibc may be used.
+For embedded environments, picolibc is used as the libc.
+
+Multiple versions of picolibc are available and may be installed as overlays. Please
+see CPULLVM's [overlay installation and usage documentation](./docs/user.md#overlay-installation-and-usage) for details.
 
 Libraries intended for use in Linux environments may also be built as part of CPULLVM, though these
-are primarily intended for testing and validation. For Arm and AArch64, musl-embedded is used
+are only intended for testing and validation. For Arm and AArch64, musl-embedded is used
 as the libc for Linux. For RISC-V, musl is used.
 
 ## Targets Built
