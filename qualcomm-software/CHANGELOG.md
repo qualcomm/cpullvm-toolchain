@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [22.1.3]
 ### Added
-- Added aligned aarch64a, aarch64a pacret+bkey+bti, aarch64a nofp, and aarch64a nofp+pacret+bti library variants
+- Added aligned AArch64a, AArch64a pacret+bkey+bti, AArch64a nofp, and AArch64a nofp+pacret+bti library variants
 ### Changed
 - Cherry-picked LLVM commit 23a01e9 - [AArch64] Support 4-byte stack protector with large code model
 - Advanced ELD 22.1.0 to commit 92f8615 - [AArch64] Fixes for reloc overflows
