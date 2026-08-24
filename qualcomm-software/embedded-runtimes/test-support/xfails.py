@@ -121,6 +121,7 @@ def main():
             project="libcxx",
             variants=[
                 "aarch64a_tlsie",
+                "aarch64a_aligned_tlsie",
                 "riscv64gc_lp64d_nopic",
                 "riscv64gc_lp64_nopic",
                 "riscv64gc_zba_zbb_lp64d_nopic",
@@ -227,7 +228,9 @@ def main():
             project="picolibc",
             variants=[
                 "aarch64a_tlsie",
+                "aarch64a_aligned_tlsie",
                 "aarch64a_soft_nofp_tlsie",
+                "aarch64a_soft_nofp_aligned_tlsie",
             ],
             description="picolibc's `*-raw-*` tests rely on serial port usage "
                         "to exit correctly which our existing wrappers are not "
@@ -264,6 +267,7 @@ def main():
             project="libcxx",
             variants=[
                 "aarch64a_tlsie",
+                "aarch64a_aligned_tlsie",
                 "riscv32imac_ilp32",
                 "riscv32imac_ilp32_nopic",
                 "riscv32imac_zba_zbb_ilp32",
@@ -446,7 +450,9 @@ def main():
             project="compiler-rt",
             variants=[
                 "aarch64a_tlsie",
+                "aarch64a_aligned_tlsie",
                 "aarch64a_soft_nofp_tlsie",
+                "aarch64a_soft_nofp_aligned_tlsie",
             ],
             description="QEMU does not deliver crash signals. The emupac test uses "
                 "%expect_crash which requires the OS to deliver a signal back to the "
@@ -463,6 +469,7 @@ def main():
             project="compiler-rt",
             variants=[
                 "aarch64a_soft_nofp_tlsie",
+                "aarch64a_soft_nofp_aligned_tlsie",
             ],
             description="The test fails to compile because the 'cassert' header is not "
                 "found. This variant has ENABLE_CXX_LIBS=OFF so libcxx headers are not "
