@@ -1,16 +1,31 @@
 # Toolchain usage
 
-## MUSL Overlays Installation
-CPULLVM includes overlays for [Qualcomm’s musl-embedded](https://github.com/qualcomm/musl-embedded) Arm/AArch64 variants.
+## Overlay Installation and Usage
+CPULLVM distributes additional overlay packages that allow for alternative sets of libraries (using different C library
+implementations or versions, for example) to be optionally downloaded, installed, and used.
 
-To install it, untar the overlay file at the root of the CPULLVM toolchain installation directory.
+To install the overlay, untar or unzip the overlay file at the root of an existing CPULLVM toolchain installation directory.
 
-To invoke the toolchain using musl-embedded as the C library, use the `--config=musl-embedded.cfg` compiler option.
+To invoke the toolchain using the desired overlay, pass either of the below options to all compile and link
+commands:
+* `--config=<overlay name>.cfg` (ex: `--config=picolibc-v1812.cfg`)
+* `--sysroot=<path to toolchain root>/lib/clang-runtimes/<overlay name>`
+(ex: `--sysroot=<path to>/lib/clang-runtimes/picolibc-v1812`)
+
+Using `--config=<overlay name>.cfg` should be preferred.
+
+However, some build systems (e.g. Zephyr) provide better support for specifying a sysroot directly, so `--sysroot`
+may still be a useful alternative.
 
 > [!WARNING]
-> musl Linux variants are used for CPULLVM test infrastructure.
-> 
-> musl-embedded will be deprecated in CPULLVM 23.1.0. Please switch to picolibc.
+> The toolchain-internal paths to overlays (ex: `lib/clang-runtimes`) may change between releases without warning.
+
+The default set of libraries (currently picolibc v1.8.10) are still available and will be  used if the `--config` and `--sysroot`
+options above are omitted.
+
+The following overlays are supported:
+* `picolibc-v1812`: picolibc [v1.8.12](https://github.com/picolibc/picolibc/releases/tag/1.8.12) supporting the same
+variants as CPULLVM's default picolibc library set.
 
 ## Using ELD
 CPULLVM supports and recommends the [ELD linker](https://github.com/qualcomm/eld) for building embedded images.

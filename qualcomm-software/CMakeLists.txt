@@ -120,7 +120,7 @@ set(LLVM_TOOLCHAIN_C_LIBRARY
     "Which C library to use."
 )
 set_property(CACHE LLVM_TOOLCHAIN_C_LIBRARY
-    PROPERTY STRINGS picolibc musl-embedded)
+    PROPERTY STRINGS picolibc picolibc-v1812 musl-embedded)
 
 option(
     SHORT_BUILD_PATHS
@@ -819,8 +819,11 @@ install(
     COMPONENT llvm-toolchain-docs
 )
 
-if(LLVM_TOOLCHAIN_C_LIBRARY MATCHES "^picolibc")
+if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc)
     string(APPEND LIBC_LICENSE_FILES " - Picolibc: third-party-licenses/COPYING.NEWLIB, third-party-licenses/COPYING.picolibc\n")
+endif()
+if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL picolibc-v1812)
+    string(APPEND LIBC_LICENSE_FILES " - Picolibc: third-party-licenses/COPYING.picolibc\n")
 endif()
 if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded OR ENABLE_LINUX_LIBRARIES)
     string(APPEND LIBC_LICENSE_FILES " - musl-embedded: third-party-licenses/musl-embedded-COPYRIGHT.txt\n")
@@ -867,9 +870,14 @@ list(APPEND third_party_license_files
 
 if(LLVM_TOOLCHAIN_C_LIBRARY MATCHES "^picolibc")
     list(APPEND third_party_license_files
-        ${${LLVM_TOOLCHAIN_C_LIBRARY}_SOURCE_DIR}/COPYING.NEWLIB           COPYING.NEWLIB
-        ${${LLVM_TOOLCHAIN_C_LIBRARY}_SOURCE_DIR}/COPYING.picolibc         COPYING.picolibc
+        ${${LLVM_TOOLCHAIN_C_LIBRARY}_SOURCE_DIR}/COPYING.picolibc COPYING.picolibc
     )
+    # COPYING.NEWLIB has been removed in picolibc 1.8.11 and later.
+    if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL "picolibc")
+        list(APPEND third_party_license_files
+            ${${LLVM_TOOLCHAIN_C_LIBRARY}_SOURCE_DIR}/COPYING.NEWLIB COPYING.NEWLIB
+        )
+    endif()
 elseif(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
     list(APPEND third_party_license_files
         ${musl-embedded_SOURCE_DIR}/COPYRIGHT musl-embedded-COPYRIGHT.txt

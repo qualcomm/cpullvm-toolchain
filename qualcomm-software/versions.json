@@ -10,6 +10,11 @@
       "tagType": "commithash",
       "tag": "01254932e8e81085817ed61fd858648584ffe37c"
     },
+    "picolibc-v1812": {
+      "url": "https://github.com/picolibc/picolibc.git",
+      "tagType": "tag",
+      "tag": "1.8.12"
+    },
     "musl": {
       "url": "git://git.musl-libc.org/musl",
       "tagType": "tag",
@@ -24,7 +29,7 @@
     "eld": {
       "url": "https://github.com/qualcomm/eld",
       "tagType": "commithash",
-      "tag": "5295873a6bbf9b818dd6237f91f5661c01be5a30",
+      "tag": "63cdf1bf97bc261bcdc06f2d708506d8d5bbe098",
       "trackingBranch": "main"
     }
   }

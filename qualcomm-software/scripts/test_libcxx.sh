@@ -25,6 +25,7 @@ REPO_ROOT=$( git -C "${SCRIPT_DIR}" rev-parse --show-toplevel )
 
 cd "${REPO_ROOT}"/build
 ninja check-cxx-aarch64a_tlsie
+ninja check-cxx-aarch64a_aligned_tlsie
 ninja check-cxx-armv7a_hard_vfpv3
 ninja check-cxx-armv7a_soft_neon
 ninja check-cxx-armv7a_soft_nofp
@@ -35,6 +36,7 @@ ninja check-cxx-armv8_soft_neon
 ninja check-cxx-riscv32gc_ilp32d
 ninja check-cxx-riscv32imac_ilp32
 ninja check-cxx-riscv32imac_zba_zbb_ilp32_nopic
+ninja check-cxx-riscv32ima_xqci_ilp32_nopic
 ninja check-cxx-riscv32imafc_zcb_zcmp_zba_zbb_ilp32f
 ninja check-cxx-riscv64gc_lp64_nopic
 ninja check-cxx-riscv64gc_zba_zbb_lp64d_nopic

@@ -27,11 +27,11 @@ set(llvmproject_src_dir ${TOOLCHAIN_SOURCE_DIR}/..)
 set(MULTILIB_JSON "" CACHE STRING "JSON file to load library definitions from.")
 set(ENABLE_VARIANTS "all" CACHE STRING "Semicolon separated list of variants to build, or \"all\". Must match entries in the json.")
 set(C_LIBRARY "picolibc" CACHE STRING "Which C library to use.")
-set_property(CACHE C_LIBRARY PROPERTY STRINGS picolibc musl-embedded)
+set_property(CACHE C_LIBRARY PROPERTY STRINGS picolibc picolibc-v1812 musl-embedded)
 
 # multilib.json and the per-variant JSON files only know about one
 # "picolibc" entry, shared by every fetched picolibc version (e.g.
-# picolibc-main), not a separate entry per version. So map C_LIBRARY to
+# picolibc-v1812), not a separate entry per version. So map C_LIBRARY to
 # its base library name before looking anything up there.
 if(C_LIBRARY MATCHES "^picolibc")
     set(json_library_key picolibc)

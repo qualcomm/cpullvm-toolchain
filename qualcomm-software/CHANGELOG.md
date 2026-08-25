@@ -13,6 +13,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 ### Security
 
+## [22.1.3]
+### Added
+- Added aligned AArch64a, AArch64a pacret+bkey+bti, AArch64a nofp, and AArch64a nofp+pacret+bti library variants
+### Changed
+- Cherry-picked LLVM commit 23a01e9 - [AArch64] Support 4-byte stack protector with large code model
+- Advanced ELD 22.1.0 to commit 92f8615 - [AArch64] Fixes for reloc overflows
+- Multilib selection of unaligned Arm/AArch64 library variants now requires unaligned accesses to be enabled as determined by the flags used (or defaults) when building
+
 ## [22.1.2]
 ### Fixed
 - Updated the Armv7-A and Armv8-A multilib variants to not require Thumb for matching

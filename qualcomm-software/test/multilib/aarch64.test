@@ -9,6 +9,11 @@
 # CHECK-AARCH64: aarch64-none-elf/aarch64a_tlsie{{$}}
 # CHECK-AARCH64-EMPTY:
 
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mno-unaligned-access | FileCheck %s --check-prefix=CHECK-AARCH64-ALIGNED
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -mno-unaligned-access | FileCheck %s --check-prefix=CHECK-AARCH64-ALIGNED
+# CHECK-AARCH64-ALIGNED: aarch64-none-elf/aarch64a_aligned_tlsie{{$}}
+# CHECK-AARCH64-ALIGNED-EMPTY:
+
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.3a -mbranch-protection=pac-ret+leaf | FileCheck %s --check-prefix=CHECK-PACRET
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.3a -mbranch-protection=pac-ret+leaf | FileCheck %s --check-prefix=CHECK-PACRET
 # CHECK-PACRET: aarch64-none-elf/aarch64a_pacret{{$}}
@@ -24,11 +29,22 @@
 # CHECK-PACRET-BKEY-BTI: aarch64-none-elf/aarch64a_pacret_bkey_bti_tlsie{{$}}
 # CHECK-PACRET-BKEY-BTI-EMPTY:
 
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -mno-unaligned-access | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI-ALIGNED
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -mno-unaligned-access | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI-ALIGNED
+# CHECK-PACRET-BKEY-BTI-ALIGNED: aarch64-none-elf/aarch64a_pacret_bkey_bti_aligned_tlsie{{$}}
+# CHECK-PACRET-BKEY-BTI-ALIGNED-EMPTY:
+
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8+nofp+nosimd -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53+nofp+nosimd -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP
 # CHECK-NOFP: aarch64-none-elf/aarch64a_soft_nofp_tlsie{{$}}
 # CHECK-NOFP-EMPTY:
+
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8+nofp+nosimd -mabi=aapcs-soft -mno-unaligned-access | FileCheck %s --check-prefix=CHECK-NOFP-ALIGNED
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53+nofp+nosimd -mabi=aapcs-soft -mno-unaligned-access | FileCheck %s --check-prefix=CHECK-NOFP-ALIGNED
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mabi=aapcs-soft -mno-unaligned-access | FileCheck %s --check-prefix=CHECK-NOFP-ALIGNED
+# CHECK-NOFP-ALIGNED: aarch64-none-elf/aarch64a_soft_nofp_aligned_tlsie{{$}}
+# CHECK-NOFP-ALIGNED-EMPTY:
 
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI
@@ -36,11 +52,14 @@
 # CHECK-NOFP-PACRET-BTI: aarch64-none-elf/aarch64a_soft_nofp_pacret_bti{{$}}
 # CHECK-NOFP-PACRET-BTI-EMPTY:
 
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -mno-unaligned-access | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI-ALIGNED
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -mno-unaligned-access | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI-ALIGNED
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -mno-unaligned-access | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI-ALIGNED
+# CHECK-NOFP-PACRET-BTI-ALIGNED: aarch64-none-elf/aarch64a_soft_nofp_pacret_bti_aligned{{$}}
+# CHECK-NOFP-PACRET-BTI-ALIGNED-EMPTY:
+
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BKEY-BTI
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BKEY-BTI
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BKEY-BTI
 # CHECK-NOFP-PACRET-BKEY-BTI: aarch64-none-elf/aarch64a_soft_nofp_pacret_bkey_bti{{$}}
 # CHECK-NOFP-PACRET-BKEY-BTI-EMPTY:
-
-# RUN: %clang_with_libc_cfg -print-multi-directory -print-multi-directory --target=aarch64-none-elf -mno-unaligned-access 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
-# NOT-FOUND: warning: no multilib found matching flags
