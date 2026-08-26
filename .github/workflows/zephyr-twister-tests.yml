@@ -133,3 +133,123 @@ jobs:
         with:
           name: zephyr-merged-twister-test-results
           path: merged_twister.xml
+
+  #Generate comparison report xlxs format.
+  generate-comparison-report:
+    # Run even if tests or merging had failures — we still want a report.
+    if: always() && github.repository == 'qualcomm/cpullvm-toolchain'
+    name: Generate XLSX comparison report
+    needs: merge-twister-results
+    runs-on: ubuntu-24.04
+
+    steps:
+      # Sparse-checkout only the report script
+      # We only need one Python file from cpullvm-toolchain; sparse-checkout
+      # avoids pulling the entire repository history.
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          repository: qualcomm/cpullvm-toolchain
+          sparse-checkout: .github/scripts/generate_twister_report.py
+
+      # Download THIS run's merged XML
+      # Fetches the artifact produced by the merge-twister-results job above
+      # and places it under current/merged_twister.xml.
+      - name: Download current merged XML
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: zephyr-merged-twister-test-results
+          path: current
+
+      # Locate the most recent previously completed run
+      # Uses `gh run list` to find the last completed run of this workflow
+      # that is NOT the current run. The run ID is stored as a step output
+      # so the download and date-label steps can reference it.
+      - name: Find previous completed run ID
+        id: prev-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          PREV_RUN_ID=$(gh run list             
+          --workflow zephyr-twister-tests.yml             
+          --status completed             
+          --limit 10             
+          --json databaseId,conclusion             
+          --jq '[.[] | select(.databaseId != $ENV.RUN_ID)] | first | .databaseId'             
+          --repo ${{ github.repository }})
+          echo "Previous run ID: $PREV_RUN_ID"
+          echo "run_id=$PREV_RUN_ID" >> "$GITHUB_OUTPUT"
+
+      # Download the previous run's merged XML
+      # `|| true` prevents the job from failing if the artifact has expired
+      # (artifacts are retained for 90 days by default). The next step handles
+      # the missing-file case by injecting an empty placeholder XML.
+      - name: Download previous merged XML
+        if: steps.prev-run.outputs.run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download ${{ steps.prev-run.outputs.run_id }}             
+          --name zephyr-merged-twister-test-results             
+          --dir previous             
+          --repo ${{ github.repository }} || true
+
+      # Inject empty placeholder XML when no previous run exists
+      # Handles two edge cases: (a) this is the very first ever run of the
+      # workflow, or (b) the previous artifact has already expired/been deleted.
+      # An empty <testsuites/> is valid JUnit XML that the script treats as zero tests.
+      - name: Create empty previous XML if missing
+        run: |
+          if [ ! -f previous/merged_twister.xml ]; then
+            echo "No previous results found – creating empty placeholder."
+            echo '<testsuites/>' > previous/merged_twister.xml
+          fi
+
+      #Derive human-readable date labels for the report columns
+      # The XLSX report uses "MMM DD" column headers (e.g. "Jul 28" / "Jul 29").
+      # Current date is taken from the runner clock; previous date is fetched
+      # from the GitHub API using the run ID resolved in Step 3.
+      - name: Compute date labels
+        id: dates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CURR_DATE=$(date -u +"%b %d")
+          if [ -n "${{ steps.prev-run.outputs.run_id }}" ]; then
+            PREV_DATE=$(gh run view ${{ steps.prev-run.outputs.run_id }}               
+            --json createdAt --jq '.createdAt'               
+            --repo ${{ github.repository }}               
+            | xargs -I{} date -u -d {} +"%b %d" 2>/dev/null || echo "Prev Run")
+          else
+            PREV_DATE="Prev Run"
+          fi
+          echo "curr_date=$CURR_DATE" >> "$GITHUB_OUTPUT"
+          echo "prev_date=$PREV_DATE" >> "$GITHUB_OUTPUT"
+
+      # Install Python dependencies for the report script
+      # openpyxl writes the .xlsx file; junitparser parses the merged XML files.
+      - name: Install Python dependencies
+        run: pip install junitparser openpyxl
+
+      # Run the comparison report generator
+      # Passes both XMLs, date labels, and the output path to the script.
+      # Script lives at .github/scripts/generate_twister_report.py (checked out above).
+      - name: Generate XLSX report
+        run: |
+          python .github/scripts/generate_twister_report.py \
+            --prev previous/merged_twister.xml \
+            --curr current/merged_twister.xml  \
+            --out  twister_comparison_report.xlsx \
+            --prev-date "${{ steps.dates.outputs.prev_date }}" \
+            --curr-date "${{ steps.dates.outputs.curr_date }}"
+
+      # Upload the finished XLSX as a downloadable artifact
+      # `if: always()` ensures the report is uploaded even if some tests regressed.
+      # Downloadable from the Actions run summary page as 'zephyr-twister-comparison-report'.
+      - name: Upload XLSX report
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: zephyr-twister-comparison-report
+          path: twister_comparison_report.xlsx
