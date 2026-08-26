@@ -1,0 +1,131 @@
+From 68228aa3765675c3f4bcf7a5bf4f9b5405253ac0 Mon Sep 17 00:00:00 2001
+From: Sudharsan Veeravalli <svs@qti.qualcomm.com>
+Date: Mon, 17 Aug 2026 08:39:11 +0530
+Subject: [PATCH] Revert "Be conservative relaxing CALL to JAL"
+
+This reverts commit 699aec4a4bfc6c771038dedd11de27d7f63806fc.
+
+Signed-off-by: Sudharsan Veeravalli <svs@qti.qualcomm.com>
+---
+ lib/Target/RISCV/RISCVLDBackend.cpp           | 33 ++-----------------
+ test/RISCV/standalone/JALOverflow/Inputs/a.s  | 11 -------
+ test/RISCV/standalone/JALOverflow/Inputs/b.s  |  5 ---
+ .../standalone/JALOverflow/Inputs/jal1.t      |  5 ---
+ .../standalone/JALOverflow/JALOverflow.test   |  9 -----
+ 5 files changed, 2 insertions(+), 61 deletions(-)
+ delete mode 100644 test/RISCV/standalone/JALOverflow/Inputs/a.s
+ delete mode 100644 test/RISCV/standalone/JALOverflow/Inputs/b.s
+ delete mode 100644 test/RISCV/standalone/JALOverflow/Inputs/jal1.t
+ delete mode 100644 test/RISCV/standalone/JALOverflow/JALOverflow.test
+
+diff --git a/lib/Target/RISCV/RISCVLDBackend.cpp b/lib/Target/RISCV/RISCVLDBackend.cpp
+index b55d0f27..f9ac1563 100644
+--- a/lib/Target/RISCV/RISCVLDBackend.cpp
++++ b/lib/Target/RISCV/RISCVLDBackend.cpp
+@@ -481,33 +481,6 @@ bool RISCVLDBackend::doRelaxationCall(Relocation *reloc) {
+   Relocator::DWord P = reloc->place(m_Module);
+   Relocator::DWord X = S + A - P;
+ 
+-  // Be conservative when relaxing CALL into JAL/C.J/C.JAL: later relaxations
+-  // (notably R_RISCV_ALIGN) can increase the final PC-relative distance due
+-  // to changes in required alignment padding. Add a max alignment "slack" to
+-  // the offset for the range check so we only relax when the shortened form is
+-  // guaranteed to remain in-range.
+-  int64_t XForRangeCheck = static_cast<int64_t>(X);
+-  if (llvm::isInt<21>(XForRangeCheck)) {
+-    uint64_t MaxAlignment = 0;
+-    ELFSection *CallOutputSection = reloc->targetRef()->getOutputELFSection();
+-    FragmentRef *SymRef = reloc->symInfo()->outSymbol()->fragRef();
+-    ELFSection *SymOutputSection =
+-        SymRef ? SymRef->getOutputELFSection() : nullptr;
+-
+-    if (CallOutputSection && SymOutputSection) {
+-      if (CallOutputSection == SymOutputSection)
+-        MaxAlignment = CallOutputSection->getAddrAlign();
+-      else
+-        MaxAlignment = std::max<uint64_t>(CallOutputSection->getAddrAlign(),
+-                                          SymOutputSection->getAddrAlign());
+-    }
+-
+-    if (MaxAlignment)
+-      XForRangeCheck += (XForRangeCheck < 0)
+-                            ? -static_cast<int64_t>(MaxAlignment)
+-                            : static_cast<int64_t>(MaxAlignment);
+-  }
+-
+   uint64_t offset = reloc->targetRef()->offset();
+ 
+   // extract the next instruction
+@@ -523,13 +496,11 @@ bool RISCVLDBackend::doRelaxationCall(Relocation *reloc) {
+   // For `C.J`/`C.JAL`, we have to have C relaxations enabled,
+   // and be within 12 bits, and have a destination of `x0` or `ra`
+   bool canRelaxCJ = config().options().getRISCVRelax() &&
+-                    config().options().getRISCVRelaxToC() &&
+-                    isInt<12>(XForRangeCheck) &&
++                    config().options().getRISCVRelaxToC() && isInt<12>(X) &&
+                     (rd == 0 || (rd == 1 && config().targets().is32Bits()));
+ 
+   // For `JAL`, the offset needs to be 21 bits.
+-  bool canRelaxJal =
+-      config().options().getRISCVRelax() && llvm::isInt<21>(XForRangeCheck);
++  bool canRelaxJal = config().options().getRISCVRelax() && llvm::isInt<21>(X);
+ 
+   // For `QC.E.J` and `QC.E.JAL`, we have to have xqci relaxations enabled,
+   // and be on 32-bit, and the destination must be either `x0` or `ra`.
+diff --git a/test/RISCV/standalone/JALOverflow/Inputs/a.s b/test/RISCV/standalone/JALOverflow/Inputs/a.s
+deleted file mode 100644
+index a4db1189..00000000
+--- a/test/RISCV/standalone/JALOverflow/Inputs/a.s
++++ /dev/null
+@@ -1,11 +0,0 @@
+-.section .baz,"ax",@progbits
+-.global baz1
+-baz1:
+-call foo
+-.global baz2
+-baz2:
+-.align 16
+-call foo
+-.global baz3
+-baz3:
+-call foo
+diff --git a/test/RISCV/standalone/JALOverflow/Inputs/b.s b/test/RISCV/standalone/JALOverflow/Inputs/b.s
+deleted file mode 100644
+index 9138169c..00000000
+--- a/test/RISCV/standalone/JALOverflow/Inputs/b.s
++++ /dev/null
+@@ -1,5 +0,0 @@
+-.section .foo,"ax",@progbits
+-.global foo
+-.p2align 12
+-foo:
+-nop
+diff --git a/test/RISCV/standalone/JALOverflow/Inputs/jal1.t b/test/RISCV/standalone/JALOverflow/Inputs/jal1.t
+deleted file mode 100644
+index 2d0106fb..00000000
+--- a/test/RISCV/standalone/JALOverflow/Inputs/jal1.t
++++ /dev/null
+@@ -1,5 +0,0 @@
+-SECTIONS {
+-.baz : { *(.baz) }
+-. = 0x100000 - 0x90;
+-.foo : { *(.foo) }
+-}
+diff --git a/test/RISCV/standalone/JALOverflow/JALOverflow.test b/test/RISCV/standalone/JALOverflow/JALOverflow.test
+deleted file mode 100644
+index da072417..00000000
+--- a/test/RISCV/standalone/JALOverflow/JALOverflow.test
++++ /dev/null
+@@ -1,9 +0,0 @@
+-#---JALOverflow.test------------------------- Executable -------------------#
+-#BEGIN_COMMENT
+-# Repro for JAL overflow behavior with a linker script that moves the dot.
+-#END_COMMENT
+-#START_TEST
+-RUN: %clang -target riscv64 -c %p/Inputs/a.s -o %t1.a.o
+-RUN: %clang -target riscv64 -c %p/Inputs/b.s -o %t1.b.o
+-RUN: %link %linkopts -T %p/Inputs/jal1.t %t1.a.o %t1.b.o -Map %t1.map
+-#END_TEST
+-- 
+2.34.1
+
