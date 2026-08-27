@@ -1,0 +1,47 @@
+From 1f5e5c6d5db3ef584714ba18b0c63c7875189742 Mon Sep 17 00:00:00 2001
+From: Sudharsan Veeravalli <svs@qti.qualcomm.com>
+Date: Thu, 27 Aug 2026 22:39:54 +0530
+Subject: [PATCH] [AdvancedLTO] Export only plugin entry points on Windows
+
+Keep the AdvancedLTO implementation class internal and export only the C plugin
+entry points. This matches the external AdvancedLTO plugin pattern and avoids
+MSVC errors from applying dllexport to an anonymous-namespace class, as well as
+implicit copy/assignment checks for unique_ptr-owned state.
+
+Signed-off-by: Sudharsan Veeravalli <svs@qti.qualcomm.com>
+---
+ Plugins/AdvancedLTO/AdvancedLTO.cpp | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/Plugins/AdvancedLTO/AdvancedLTO.cpp b/Plugins/AdvancedLTO/AdvancedLTO.cpp
+index 5b540590..e908346a 100644
+--- a/Plugins/AdvancedLTO/AdvancedLTO.cpp
++++ b/Plugins/AdvancedLTO/AdvancedLTO.cpp
+@@ -22,10 +22,10 @@
+ #include <string>
+ #include <unordered_map>
+ 
+-namespace {
+-
+ using namespace eld::plugin;
+ 
++namespace {
++
+ struct ModuleData {
+   explicit ModuleData(BitcodeFile BCF) : BCFile(BCF) {}
+ 
+@@ -33,10 +33,9 @@ struct ModuleData {
+   std::unordered_map<std::string, Section> SectionsByName;
+ };
+ 
+-class DLL_A_EXPORT AdvancedLTO : public LinkerPlugin {
++class AdvancedLTO : public LinkerPlugin {
+ public:
+   AdvancedLTO() : LinkerPlugin("AdvancedLTO") {}
+-
+   void Init(const std::string &Options) override {
+     (void)Options;
+     EnableLTOLinkerScripts =
+-- 
+2.34.1
+
