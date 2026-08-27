@@ -1,4 +1,24 @@
-.github
+# cpullvm_modified_files
+#
+# This file defines which files to ignore when merging from upstream LLVM
+# into Qualcomm branches.
+#
+# Syntax:
+#   - Lines starting with '#' are comments
+#   - Regular lines are IGNORE patterns (keep destination version)
+#   - Lines starting with '!' are KEEP patterns (accept upstream version)
+#
+# Example:
+#   .github/*                              # Ignore all .github files
+#   !.github/workflows/sync_from_upstream.yml  # But keep this one from upstream
+
+# Ignore everything in .github directory
+.github/*
+
+# EXCEPT: Keep these workflow files from upstream
+!.github/workflows/issue-release-workflow.yml
+
+# Always ignore Qualcomm-specific directories and files
 qualcomm-software
 CONTRIBUTING.md
 README.md
