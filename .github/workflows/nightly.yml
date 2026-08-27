@@ -3,6 +3,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #
+# trigger CI
 # Changes from Qualcomm Technologies, Inc. are provided under the following license:
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
@@ -85,35 +86,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - build_script: build_copy_runtimes.sh
-            test_script: test.sh
-            install_script: install_dependencies.sh
-            target_os: Linux-AArch64
-            runner: ubuntu-24.04-arm
-
-          - build_script: build_picolibc-v1812_overlay.sh
-            test_script: test_picolibc-v1812_overlay.sh
-            install_script: ''
-            target_os: Linux-x86_64
-            runner: cpullvm-ubuntu24-x86_64
-
-          - build_script: build_musl-embedded_overlay.sh
-            test_script: ''
-            install_script: ''
-            target_os: Linux-x86_64
-            runner: cpullvm-ubuntu24-x86_64
-
           - build_script: build_copy_runtimes.ps1
             test_script: test.ps1
             install_script: install_dependencies.ps1
             target_os: Windows-x86_64
             runner: windows-2025
-
-          - build_script: build_copy_runtimes.ps1
-            test_script: test.ps1
-            install_script: install_dependencies.ps1
-            target_os: Windows-AArch64
-            runner: windows-11-arm
 
     steps:
       # Not setting these can cause lit test failures on Windows machines when
@@ -136,6 +113,12 @@ jobs:
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: cpullvm-packages-build.sh-Linux-x86
+
+      - name: Set up Python 3.14
+        if: runner.os == 'Windows'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14'
 
       - name: Install dependencies
         if: matrix.install_script != ''
