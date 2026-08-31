@@ -23,14 +23,12 @@
     "musl-embedded": {
       "url": "https://github.com/qualcomm/musl-embedded",
       "tagType": "commithash",
-      "tag": "9eafd9adeff02200cecb6a8a745898e33301f4f6",
-      "trackingBranch": "main"
+      "tag": "9eafd9adeff02200cecb6a8a745898e33301f4f6"
     },
     "eld": {
       "url": "https://github.com/qualcomm/eld",
       "tagType": "commithash",
-      "tag": "e3b13645642d1db93eff93e1428b5ecc8dc43519",
-      "trackingBranch": "release/23.x_lto_linker_scripts"
+      "tag": "e3b13645642d1db93eff93e1428b5ecc8dc43519"
     }
   }
 }
