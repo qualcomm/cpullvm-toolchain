@@ -487,7 +487,18 @@ endif()
 if (PACKAGE_SYSTEM_NAME)
     set(CPACK_SYSTEM_NAME "${PACKAGE_SYSTEM_NAME}-${processor_name}")
 else()
-    set(CPACK_SYSTEM_NAME "${CMAKE_SYSTEM_NAME}-${processor_name}")
+    # If building on Ubuntu, append Ubuntu version info to the package name
+    execute_process(
+        COMMAND lsb_release -irs
+        RESULT_VARIABLE lsb_return_val
+        OUTPUT_VARIABLE linux_flavor
+    )
+    if(lsb_return_val EQUAL 0 AND linux_flavor MATCHES "Ubuntu")
+        string(REGEX MATCH "^([A-Za-z]+)\n([0-9]+)" _ "${linux_flavor}")
+        set(extra_os_information "${CMAKE_MATCH_1}${CMAKE_MATCH_2}")
+    endif()
+
+    set(CPACK_SYSTEM_NAME "${CMAKE_SYSTEM_NAME}-${processor_name}${extra_os_information}")
 endif()
 
 set(CPACK_PACKAGE_VERSION ${PACKAGE_VERSION})
