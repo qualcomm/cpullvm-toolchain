@@ -1,0 +1,28 @@
+From b0a962817ea32678970d692efc8a4cd4511a1828 Mon Sep 17 00:00:00 2001
+From: Sudharsan Veeravalli <svs@qti.qualcomm.com>
+Date: Tue, 1 Sep 2026 21:40:30 +0530
+Subject: [PATCH] [AssignSectionsToGlobals] Do not assign a section if the
+ global has type metadata
+
+The LowerTypesTest pass expects globals with a type metadata to not have a section assigned to them.
+---
+ llvm/lib/CodeGen/AssignSectionsToGlobals.cpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/llvm/lib/CodeGen/AssignSectionsToGlobals.cpp b/llvm/lib/CodeGen/AssignSectionsToGlobals.cpp
+index 608c2c701e09..32402387aa7e 100644
+--- a/llvm/lib/CodeGen/AssignSectionsToGlobals.cpp
++++ b/llvm/lib/CodeGen/AssignSectionsToGlobals.cpp
+@@ -125,7 +125,8 @@ bool AssignSections::run(Module &Mod, TargetMachine *TMIn) {
+   // Iterate over objects, and assign sections
+   for (GlobalObject &GO : M->global_objects()) {
+     if (GO.isDeclarationForLinker() || GO.hasSection() ||
+-        GO.hasCommonLinkage() || GO.getName().starts_with("llvm."))
++        GO.hasCommonLinkage() || GO.getName().starts_with("llvm.") ||
++        GO.hasMetadata(LLVMContext::MD_type))
+       continue;
+ 
+     GO.setSection(getDefaultSectionNameForGlobal(GO));
+-- 
+2.34.1
+
