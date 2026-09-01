@@ -60,14 +60,25 @@ jobs:
       - name: Apply llvm-project patches
         run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
 
+      - name: Detect OS version
+        id: osinfo
+        run: |
+          source /etc/os-release
+          OS_TAG="Ubuntu${VERSION_ID%%.*}"
+          ARCH=$(uname -m)
+          echo "Build is running on $OS_TAG (${ARCH})"
+          echo "OS_TAG=$OS_TAG" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"
+
       - name: Build
-        run: ./qualcomm-software/scripts/build.sh
+        run: |
+          export EXTRA_CMAKE_ARGS="-DPACKAGE_SYSTEM_NAME=$OS_TAG"
+          ./qualcomm-software/scripts/build.sh
 
       - name: Upload built packages
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: success()
         with:
-          name: cpullvm-packages-build.sh-Linux-x86
+          name: cpullvm-packages-build.sh-Linux-x86-${{ env.OS_TAG }}
           path: build*/cpullvm-*.tar.xz
           if-no-files-found: error
           retention-days: 7
@@ -132,10 +143,20 @@ jobs:
           # old build products if the runner doesn't do it itself.
           clean: true
 
+      - name: Detect OS version
+        if: runner.os == 'Linux'
+        id: osinfo
+        run: |
+          source /etc/os-release
+          OS_TAG="Ubuntu${VERSION_ID%%.*}"
+          ARCH=$(uname -m)
+          echo "Build is running on $OS_TAG (${ARCH})"
+          echo "OS_TAG=$OS_TAG" | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"
+
       - name: Download Linux-x86 package
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          name: cpullvm-packages-build.sh-Linux-x86
+          name: cpullvm-packages-build.sh-Linux-x86-${{ env.OS_TAG }}
 
       - name: Install dependencies
         if: matrix.install_script != ''
@@ -146,14 +167,16 @@ jobs:
 
       - name: Build
         run: ./qualcomm-software/scripts/${{ matrix.build_script }}
+        env:
+          EXTRA_CMAKE_ARGS: ${{ runner.os == 'Linux' && format('-DPACKAGE_SYSTEM_NAME={0}', env.OS_TAG) || '' }}
 
       - name: Upload built packages
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: success()
         with:
-          name: cpullvm-packages-${{ matrix.build_script }}-${{ matrix.target_os }}
+          name: cpullvm-packages-${{ matrix.build_script }}-${{ matrix.target_os }}${{ runner.os == 'Linux' && format('-{0}', env.OS_TAG) || '' }}
           path: |
-            build*/cpullvm-*.tar.xz
+            build*/cpullvm-*AArch64*.tar.xz
             build*/cpullvm-*.zip
             !build/cpullvm-*-Linux-x86_64.tar.xz
           retention-days: 7
