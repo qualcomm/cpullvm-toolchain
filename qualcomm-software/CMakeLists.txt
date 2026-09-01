@@ -495,7 +495,7 @@ else()
     )
     if(lsb_return_val EQUAL 0 AND linux_flavor MATCHES "Ubuntu")
         string(REGEX MATCH "^([A-Za-z]+)\n([0-9]+)" _ "${linux_flavor}")
-        set(extra_os_information "${CMAKE_MATCH_1}${CMAKE_MATCH_2}")
+        set(extra_os_information "-${CMAKE_MATCH_1}${CMAKE_MATCH_2}")
     endif()
 
     set(CPACK_SYSTEM_NAME "${CMAKE_SYSTEM_NAME}-${processor_name}${extra_os_information}")
