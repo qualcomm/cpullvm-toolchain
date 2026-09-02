@@ -1,0 +1,82 @@
+From b1ccac46ac9ab7e759719fb1fd42dda6781cbec3 Mon Sep 17 00:00:00 2001
+From: Sudharsan Veeravalli <svs@qti.qualcomm.com>
+Date: Wed, 2 Sep 2026 14:22:35 +0530
+Subject: [PATCH] Avoid section assignment for globals written by global ctors
+
+---
+ llvm/lib/CodeGen/AssignSectionsToGlobals.cpp | 41 +++++++++++++++++++-
+ 1 file changed, 40 insertions(+), 1 deletion(-)
+
+diff --git a/llvm/lib/CodeGen/AssignSectionsToGlobals.cpp b/llvm/lib/CodeGen/AssignSectionsToGlobals.cpp
+index 32402387aa7e..44e7ab11cb59 100644
+--- a/llvm/lib/CodeGen/AssignSectionsToGlobals.cpp
++++ b/llvm/lib/CodeGen/AssignSectionsToGlobals.cpp
+@@ -15,6 +15,11 @@
+ 
+ #include "llvm/CodeGen/AssignSectionsToGlobals.h"
+ #include "llvm/Bitcode/BitcodeWriterPass.h"
++#include "llvm/ADT/SmallPtrSet.h"
++#include "llvm/Analysis/ValueTracking.h"
++#include "llvm/IR/Constants.h"
++#include "llvm/IR/InstIterator.h"
++#include "llvm/IR/Instructions.h"
+ #include "llvm/CodeGen/AsmPrinter.h"
+ #include "llvm/CodeGen/MachineModuleInfo.h"
+ #include "llvm/CodeGen/Passes.h"
+@@ -89,6 +94,36 @@ AssignSections::getDefaultSectionNameForGlobal(const GlobalObject &GO) {
+     return "";
+ }
+ 
++// GlobalOpt can rewrite ctor-initialized globals after this pass, so avoid
++// assigning a section before we know that the global will stay inert.
++static void collectGlobalsWrittenByGlobalCtors(
++    Module &M, SmallPtrSetImpl<const GlobalObject *> &WrittenGlobals) {
++  GlobalVariable *GlobalCtors = M.getGlobalVariable("llvm.global_ctors");
++  if (!GlobalCtors || !GlobalCtors->hasUniqueInitializer())
++    return;
++
++  auto *CA = dyn_cast<ConstantArray>(GlobalCtors->getInitializer());
++  if (!CA)
++    return;
++
++  for (auto &V : CA->operands()) {
++    auto *CS = dyn_cast<ConstantStruct>(V);
++    if (!CS)
++      continue;
++    auto *F = dyn_cast<Function>(CS->getOperand(1));
++    if (!F || F->isDeclaration())
++      continue;
++    for (Instruction &I : instructions(F)) {
++      auto *SI = dyn_cast<StoreInst>(&I);
++      if (!SI)
++        continue;
++      if (auto *GO = dyn_cast<GlobalObject>(
++              getUnderlyingObject(SI->getPointerOperand())))
++        WrittenGlobals.insert(GO);
++    }
++  }
++}
++
+ bool AssignSections::run(Module &Mod, TargetMachine *TMIn) {
+   M = &Mod;
+   TM = TMIn;
+@@ -122,11 +157,15 @@ bool AssignSections::run(Module &Mod, TargetMachine *TMIn) {
+   MOFI.initMCObjectFileInfo(MCCtx, /*PIC*/ false);
+   TM->getObjFileLowering()->Initialize(MCCtx, *TM);
+ 
++  SmallPtrSet<const GlobalObject *, 16> GlobalsWrittenByGlobalCtors;
++  collectGlobalsWrittenByGlobalCtors(*M, GlobalsWrittenByGlobalCtors);
++
+   // Iterate over objects, and assign sections
+   for (GlobalObject &GO : M->global_objects()) {
+     if (GO.isDeclarationForLinker() || GO.hasSection() ||
+         GO.hasCommonLinkage() || GO.getName().starts_with("llvm.") ||
+-        GO.hasMetadata(LLVMContext::MD_type))
++        GO.hasMetadata(LLVMContext::MD_type) ||
++        GlobalsWrittenByGlobalCtors.contains(&GO))
+       continue;
+ 
+     GO.setSection(getDefaultSectionNameForGlobal(GO));
+-- 
+2.34.1
+
