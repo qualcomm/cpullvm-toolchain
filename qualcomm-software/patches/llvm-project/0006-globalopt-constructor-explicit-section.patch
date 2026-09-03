@@ -1,0 +1,60 @@
+commit e91d6c6fdc6f33e5ce63f2d8dcde99d6b84713b0
+Author: Eli Friedman <efriedma@qti.qualcomm.com>
+Date:   Wed Sep 2 13:43:39 2026 -0700
+
+    [GlobalOpt] Fix constructor folding on global with explicit section.
+    
+    Make sure we don't try to emit a non-zero value into BSS, or anything
+    similar to that.
+
+diff --git a/llvm/lib/Transforms/Utils/Evaluator.cpp b/llvm/lib/Transforms/Utils/Evaluator.cpp
+index 2b3dfdc4f01f..e700a9aa893f 100644
+--- a/llvm/lib/Transforms/Utils/Evaluator.cpp
++++ b/llvm/lib/Transforms/Utils/Evaluator.cpp
+@@ -296,7 +296,13 @@ bool Evaluator::EvaluateBlock(BasicBlock::iterator CurInst, BasicBlock *&NextBB,
+           DL, Offset, /* AllowNonInbounds */ true));
+       Offset = Offset.sextOrTrunc(DL.getIndexTypeSizeInBits(Ptr->getType()));
+       auto *GV = dyn_cast<GlobalVariable>(Ptr);
+-      if (!GV || !GV->hasUniqueInitializer()) {
++      if (!GV || !GV->hasUniqueInitializer() || GV->hasSection()) {
++        // hasUniqueInitializer() ensures that if we modify the initializer,
++        // the modified initializer will be used.
++        //
++        // We can't modify global variables with an explicit section because
++        // it might not be legal to emit the resulting initializer (for
++        // example, emitting a non-zero value into a BSS section).
+         LLVM_DEBUG(dbgs() << "Store is not to global with unique initializer: "
+                           << *Ptr << "\n");
+         return false;
+diff --git a/llvm/test/Transforms/GlobalOpt/constructor-explicit-section.ll b/llvm/test/Transforms/GlobalOpt/constructor-explicit-section.ll
+new file mode 100644
+index 000000000000..8f34540217d6
+--- /dev/null
++++ b/llvm/test/Transforms/GlobalOpt/constructor-explicit-section.ll
+@@ -0,0 +1,26 @@
++; RUN: opt < %s -passes=globalopt -S | FileCheck %s
++
++; Make sure we don't put a non-zero initializer into BSS
++
++; CHECK: @_ZL3obj = internal global %struct.Holder zeroinitializer, section ".bss", align 8
++
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
++target triple = "x86_64-unknown-linux-gnu"
++
++%struct.Holder = type { ptr }
++
++@_ZL3obj = internal global %struct.Holder zeroinitializer, section ".bss", align 8
++@_ZL5table = internal constant [1 x i32] [i32 7], align 4
++@llvm.global_ctors = appending global [1 x { i32, ptr, ptr }] [{ i32, ptr, ptr } { i32 65535, ptr @_ZL4initv, ptr null }]
++@llvm.compiler.used = appending global [1 x ptr] [ptr @_ZL3obj], section "llvm.metadata"
++
++; Function Attrs: mustprogress nounwind uwtable
++define internal void @_ZL4initv() #0 {
++entry:
++  store ptr @_ZL5table, ptr @_ZL3obj, align 8
++  ret void
++}
++
++define dso_local noundef i32 @main() {
++  ret i32 0
++}
