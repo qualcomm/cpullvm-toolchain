@@ -12,9 +12,14 @@ name: Linux Premerge Checks
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    paths-ignore:
-      - '.github/workflows/qcom-preflight-checks.yml'
-      - '**/*.md'
+    # This should run only if any non-*.md, non-.github/ files were modified as
+    # neither of these groups currently impact the build here. It still needs
+    # to run for changes to linux-premerge.yml itself though.
+    paths:
+      - '**'
+      - '!.github/**'
+      - '!**/*.md'
+      - '.github/workflows/linux-premerge.yml'
 
 permissions:
   contents: read
