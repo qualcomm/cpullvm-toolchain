@@ -170,9 +170,9 @@ set(LLVM_DISTRIBUTION_COMPONENTS
     clangd
     ld.eld
     liblldb
-    lldbPluginScriptInterpreterPython
     lld
     lldb
+    lldbPluginScriptInterpreterPython
     lldb-argdumper
     lldb-dap
     lldb-instr
