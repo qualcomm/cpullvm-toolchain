@@ -461,6 +461,16 @@ def main():
                 "installed in the sysroot. ATfE does not encounter this failure because "
                 "their aarch64a_soft_nofp variant has ENABLE_CXX_LIBS=ON.",
         ),
+        XFail(
+            name="libunwind dwarf_expression_stack.pass.cpp",
+            testnames=[
+                "dwarf_expression_stack.pass.cpp",
+            ],
+            result=NewResult.XFAILED,
+            project="libxx",
+            description="The test uses fork() and waitpid() which aren't supported by "
+                        "picolibc for embedded targets.",
+        ),
     ]
 
     tests_to_xfail = []
