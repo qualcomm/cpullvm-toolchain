@@ -467,7 +467,7 @@ def main():
                 "dwarf_expression_stack.pass.cpp",
             ],
             result=NewResult.XFAILED,
-            project="libxx",
+            project="libcxx",
             description="The test uses fork() and waitpid() which aren't supported by "
                         "picolibc for embedded targets.",
         ),
