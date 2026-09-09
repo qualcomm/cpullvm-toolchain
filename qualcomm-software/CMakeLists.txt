@@ -172,7 +172,6 @@ set(LLVM_DISTRIBUTION_COMPONENTS
     liblldb
     lld
     lldb
-    lldbPluginScriptInterpreterPython
     lldb-argdumper
     lldb-dap
     lldb-instr
@@ -260,6 +259,7 @@ set(LLDB_ENABLE_PYTHON ON CACHE BOOL "")
 # Python versions.
 if (NOT CMAKE_HOST_WIN32)
   set(LLDB_ENABLE_DYNAMIC_SCRIPTINTERPRETERS ON CACHE BOOL "")
+  list(APPEND LLVM_DISTRIBUTION_COMPONENTS lldbPluginScriptInterpreterPython)
 endif()
 # LLDB tests don't work on x86 because clang defaults to AArch64 target triple.
 # See https://github.com/llvm/llvm-project/issues/203090 .  Using a clang
