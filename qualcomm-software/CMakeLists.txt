@@ -234,6 +234,9 @@ set(LLVM_DISTRIBUTION_COMPONENTS
     LTO
     CACHE STRING ""
 )
+if(NOT WIN32)
+    list(APPEND LLVM_DISTRIBUTION_COMPONENTS lldbPluginScriptInterpreterPython)
+endif()
 set(LLVM_TOOLCHAIN_DISTRIBUTION_COMPONENTS
     llvm-toolchain-docs
     llvm-toolchain-libs
