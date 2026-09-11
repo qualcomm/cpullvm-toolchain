@@ -261,6 +261,10 @@ if (NOT CMAKE_HOST_WIN32)
   set(LLDB_ENABLE_DYNAMIC_SCRIPTINTERPRETERS ON CACHE BOOL "")
   list(APPEND LLVM_DISTRIBUTION_COMPONENTS lldbPluginScriptInterpreterPython)
 endif()
+# Explicitly enable limited API. This overrides the default on Windows, and
+# it ensures we don't accidentally break anything on Linux.
+set(LLDB_EMBED_PYTHON_HOME OFF CACHE BOOL "")
+set(LLDB_ENABLE_PYTHON_LIMITED_API ON CACHE BOOL "")
 # LLDB tests don't work on x86 because clang defaults to AArch64 target triple.
 # See https://github.com/llvm/llvm-project/issues/203090 .  Using a clang
 # wrapper works around a few of the failures; we don't have any good workaround
