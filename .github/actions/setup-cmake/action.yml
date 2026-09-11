@@ -1,0 +1,24 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Composite action that downloads the cmake version required for cpullvm
+# Linux x86_64 builds. Update the URL and paths here to change the version
+# across all workflows at once.
+# No-op on non-Linux-x86_64 runners (AArch64 GitHub-hosted runners and
+# Windows runners already have a suitable cmake).
+
+name: 'Setup CMake'
+description: 'Downloads cmake required for cpullvm Linux x86_64 builds'
+
+runs:
+  using: composite
+  steps:
+    - name: Download CMake 4.4.2
+      if: runner.os == 'Linux' && runner.arch == 'X64'
+      run: |
+        wget -q \
+          https://github.com/Kitware/CMake/releases/download/v4.4.2/cmake-4.4.2-linux-x86_64.tar.gz \
+          -O "${RUNNER_TEMP}/cmake-4.4.2-linux-x86_64.tar.gz"
+        tar -xzf "${RUNNER_TEMP}/cmake-4.4.2-linux-x86_64.tar.gz" -C "${RUNNER_TEMP}"
+        echo "${RUNNER_TEMP}/cmake-4.4.2-linux-x86_64/bin" >> "${GITHUB_PATH}"
+      shell: bash
