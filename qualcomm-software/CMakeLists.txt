@@ -178,6 +178,9 @@ set(LLVM_DISTRIBUTION_COMPONENTS
     liblldb
     lld
     lldb
+    # FIXME: this can be removed once https://github.com/llvm/llvm-project/issues/222116
+    # is resolved.
+    lldbPluginScriptInterpreterPython
     lldb-argdumper
     lldb-dap
     lldb-instr
