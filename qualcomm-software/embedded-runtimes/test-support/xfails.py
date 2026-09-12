@@ -238,22 +238,6 @@ def main():
                         "any significant test coverage by doing so.",
         ),
         XFail(
-            name="simd-unary-compiler-crash-armv7a",
-            testnames=[
-                "std/experimental/simd/simd.class/simd_unary.pass.cpp",
-            ],
-            result=NewResult.EXCLUDE,
-            project="libcxx",
-            variants=[
-                "armv7a_soft_neon",
-                "armv8_soft_neon",
-            ],
-            description="simd_unary.pass.cpp triggers a clang assertion failure "
-                        "(ScalarizeVecOp_VSETCC: expected v1i1 type) in "
-                        "LegalizeVectorTypes.cpp when compiling std::experimental::simd "
-                         "on ARMv7-A/ARMv8 with NEON. Compiler bug; exclude until fixed.",
-        ),
-        XFail(
             name="long-double-picolibc-aarch64-riscv",
             testnames=[
                 "std/strings/string.conversions/stold.pass.cpp",
