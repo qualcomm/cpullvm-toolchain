@@ -3625,17 +3625,86 @@ RISCVInstrInfo::getSerializableDirectMachineOperandTargetFlags() const {
   };
   return ArrayRef(TargetFlags);
 }
+
+namespace {
+
+struct CandidatePlacement {
+  StringRef InputSection;
+};
+
+static CandidatePlacement getCandidatePlacement(const outliner::Candidate &C) {
+  const Function &F = C.getMF()->getFunction();
+  return {F.hasSection() ? F.getSection() : StringRef()};
+}
+
+static bool hasMatchingPlacement(const CandidatePlacement &LHS,
+                                 const CandidatePlacement &RHS) {
+  return LHS.InputSection == RHS.InputSection;
+}
+
+static bool placementComesBefore(const CandidatePlacement &LHS,
+                                 const CandidatePlacement &RHS) {
+  return LHS.InputSection < RHS.InputSection;
+}
+
+/// Restrict candidates to the largest group that shares one input section. The
+/// outliner runs within one codegen output object, so matching input sections
+/// are placed into the same output section by the linker.
+static bool pruneToOnePlacement(std::vector<outliner::Candidate> &Candidates,
+                                unsigned MinRepeats) {
+  CandidatePlacement FirstPlacement = getCandidatePlacement(Candidates.front());
+  if (llvm::all_of(Candidates, [&](const outliner::Candidate &C) {
+        return hasMatchingPlacement(getCandidatePlacement(C), FirstPlacement);
+      }))
+    return true;
+
+  SmallVector<CandidatePlacement> Placements;
+  SmallVector<unsigned> PlacementCounts;
+  for (const outliner::Candidate &C : Candidates) {
+    CandidatePlacement Placement = getCandidatePlacement(C);
+    auto I = llvm::find_if(Placements, [&](const CandidatePlacement &Existing) {
+      return hasMatchingPlacement(Existing, Placement);
+    });
+    if (I == Placements.end()) {
+      Placements.push_back(Placement);
+      PlacementCounts.push_back(1);
+    } else {
+      ++PlacementCounts[std::distance(Placements.begin(), I)];
+    }
+  }
+
+  // Break ties by lexicographic input section name for deterministic output.
+  // The empty name for an unsectioned function sorts before named sections.
+  // FIXME: Outline one function per placement instead of requiring reruns to
+  // outline all equally profitable placement buckets.
+  CandidatePlacement BestPlacement;
+  unsigned BestCount = 0;
+  for (unsigned I = 0; I != Placements.size(); ++I) {
+    if (PlacementCounts[I] > BestCount ||
+        (PlacementCounts[I] == BestCount &&
+         placementComesBefore(Placements[I], BestPlacement))) {
+      BestCount = PlacementCounts[I];
+      BestPlacement = Placements[I];
+    }
+  }
+
+  if (BestCount < MinRepeats)
+    return false;
+
+  llvm::erase_if(Candidates, [&](const outliner::Candidate &C) {
+    return !hasMatchingPlacement(getCandidatePlacement(C), BestPlacement);
+  });
+  return true;
+}
+
+} // end anonymous namespace
+
 bool RISCVInstrInfo::isFunctionSafeToOutlineFrom(
     MachineFunction &MF, bool OutlineFromLinkOnceODRs) const {
   const Function &F = MF.getFunction();
 
   // Can F be deduplicated by the linker? If it can, don't outline from it.
   if (!OutlineFromLinkOnceODRs && F.hasLinkOnceODRLinkage())
-    return false;
-
-  // Don't outline from functions with section markings; the program could
-  // expect that all the code is in the named section.
-  if (F.hasSection())
     return false;
 
   // It's safe to outline from MF.
@@ -3658,6 +3727,16 @@ enum MachineOutlinerConstructionID {
 bool RISCVInstrInfo::shouldOutlineFromFunctionByDefault(
     MachineFunction &MF) const {
   return MF.getFunction().hasMinSize();
+}
+
+void RISCVInstrInfo::mergeOutliningCandidateAttributes(
+    Function &F, std::vector<outliner::Candidate> &Candidates) const {
+  TargetInstrInfo::mergeOutliningCandidateAttributes(F, Candidates);
+
+  // getOutliningCandidateInfo() has restricted the group to one placement.
+  const Function &ParentFn = Candidates.front().getMF()->getFunction();
+  if (ParentFn.hasSection())
+    F.setSection(ParentFn.getSection());
 }
 
 static bool isCandidatePatchable(const MachineBasicBlock &MBB) {
@@ -3782,6 +3861,9 @@ RISCVInstrInfo::getOutliningCandidateInfo(
 
   // If the sequence doesn't have enough candidates left, then we're done.
   if (RepeatedSequenceLocs.size() < MinRepeats)
+    return std::nullopt;
+
+  if (!pruneToOnePlacement(RepeatedSequenceLocs, MinRepeats))
     return std::nullopt;
 
   // Each RepeatedSequenceLoc is identical.
