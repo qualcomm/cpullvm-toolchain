@@ -233,6 +233,10 @@ public:
 
   bool shouldOutlineFromFunctionByDefault(MachineFunction &MF) const override;
 
+  void mergeOutliningCandidateAttributes(
+      Function &F,
+      std::vector<outliner::Candidate> &Candidates) const override;
+
   // Return true if the candidate should be discarded from outlining.
   bool analyzeCandidate(outliner::Candidate &C) const;
   // Calculate target-specific information for a set of outlining candidates.
