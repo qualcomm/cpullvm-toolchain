@@ -406,7 +406,8 @@ for VARIANT in "${VARIANTS[@]}"; do
   if [[ "${VARIANT_ARCH}" =~ arm ]]; then
     EXTRA_CRT_CONFIGS="-DCOMPILER_RT_BUILD_SANITIZERS=OFF \
                        -DCOMPILER_RT_BUILD_CTX_PROFILE=OFF \
-                       -DCOMPILER_RT_BUILD_MEMPROF=OFF"
+                       -DCOMPILER_RT_BUILD_MEMPROF=OFF \
+                       -DCOMPILER_RT_BUILD_COPYPROF=OFF"
   fi
 
   # For AArch64, make sure asan/hwasan are compatible with VA smaller than
