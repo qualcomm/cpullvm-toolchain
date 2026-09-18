@@ -387,6 +387,7 @@ for VARIANT in "${VARIANTS[@]}"; do
   # this should be sufficient.
   SAN_TO_BUILD="asan;rtsan;dfsan;msan;hwasan;tsan;tysan;safestack;cfi;scudo_standalone;ubsan_minimal;nsan;asan_abi"
 
+  EXTRA_CRT_CONFIGS=""
   # For AArch64, make sure asan/hwasan are compatible with VA smaller than
   # 48 bits.
   if [[ "${VARIANT_ARCH}" =~ aarch64 ]]; then
