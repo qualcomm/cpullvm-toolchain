@@ -160,24 +160,6 @@ ARCH_MUSL_CFLAGS["riscv64"]="-Os"
 ARCH_MUSL_CFLAGS["aarch64"]="-mstrict-align -fPIC -fno-rounding-math -O3"
 ARCH_MUSL_CFLAGS["arm"]="-mno-unaligned-access -fPIC -fno-rounding-math -O3"
 
-# We also have some new variant-specific configuration going on. Map that out
-# as well. Just list all variants--it'll be cleaned up later.
-declare -A VARIANT_MUSL_CONFIGS
-VARIANT_MUSL_CONFIGS["rv32imac_ilp32"]=""
-VARIANT_MUSL_CONFIGS["rv32imafc_ilp32f"]=""
-VARIANT_MUSL_CONFIGS["rv32ima_xqci_ilp32"]=""
-VARIANT_MUSL_CONFIGS["rv32imaf_zve32f_zvfh_zba_zbb_ilp32f"]=""
-VARIANT_MUSL_CONFIGS["rv32ima_zinx_xqci_ilp32"]=""
-VARIANT_MUSL_CONFIGS["rv64imac_lp64"]=""
-VARIANT_MUSL_CONFIGS["rv64gc_lp64d"]=""
-VARIANT_MUSL_CONFIGS["aarch64a"]="--quic-aarch64-optmem"
-VARIANT_MUSL_CONFIGS["aarch64a_pacret"]="--quic-aarch64-optmem"
-VARIANT_MUSL_CONFIGS["aarch64a_pacret_bti"]="--quic-aarch64-optmem \
-                                             --quic-aarch64-mark-bti"
-VARIANT_MUSL_CONFIGS["aarch64a_pacret_bkey_bti"]="--quic-aarch64-optmem \
-                                                  --quic-aarch64-mark-bti"
-VARIANT_MUSL_CONFIGS["armv7_softfp_neon"]=""
-
 for VARIANT in "${VARIANTS[@]}"; do
   echo "Building libraries for ${VARIANT}"
   VARIANT_BASE_BUILD_DIR="${BASE_BUILD_DIR}/${VARIANT}"
@@ -216,11 +198,10 @@ for VARIANT in "${VARIANTS[@]}"; do
   # Historically, our RISC-V and Arm/AArch64 builds use slightly different
   # flags, sources, etc. Sort that all out here so we can treat the two
   # consistently below.
-  EXTRA_MUSL_CONFIGS="${VARIANT_MUSL_CONFIGS[$VARIANT]}"
+  EXTRA_MUSL_CONFIGS=""
   CMAKE_OPT_LEVEL="Release"
   if [[ "${VARIANT_ARCH}" =~ riscv ]]; then
-    EXTRA_MUSL_CONFIGS="${EXTRA_MUSL_CONFIGS} \
-                        --disable-shared"
+    EXTRA_MUSL_CONFIGS="--disable-shared"
     CMAKE_OPT_LEVEL="MinSizeRel"
   fi
 
@@ -252,7 +233,9 @@ for VARIANT in "${VARIANTS[@]}"; do
                             --prefix="${VARIANT_TMP_SYSROOT}" \
                             CROSS_COMPILE="llvm-" \
                             CC="clang --target=${VARIANT_TARGET} -fuse-ld=eld" \
-                            CFLAGS="${LIB_BUILD_FLAGS} ${ARCH_MUSL_CFLAGS[$VARIANT_ARCH]}"
+                            CFLAGS="${LIB_BUILD_FLAGS} \
+                                    ${ARCH_MUSL_CFLAGS[$VARIANT_ARCH]} \
+                                    -D_LARGEFILE64_SOURCE"
   make install-headers
   popd >/dev/null
 
@@ -304,7 +287,7 @@ for VARIANT in "${VARIANTS[@]}"; do
       --prefix="${VARIANT_TMP_SYSROOT}" \
       CROSS_COMPILE="llvm-" \
       CC="clang --target=${VARIANT_TARGET} -fuse-ld=eld" \
-      CFLAGS="${LIB_BUILD_FLAGS} ${ARCH_MUSL_CFLAGS[$VARIANT_ARCH]}" \
+      CFLAGS="${LIB_BUILD_FLAGS} ${ARCH_MUSL_CFLAGS[$VARIANT_ARCH]} -D_LARGEFILE64_SOURCE" \
       LIBCC="${VARIANT_TMP_RESOURCE_DIR}/lib/${VARIANT_TARGET}/libclang_rt.builtins.a"
   make -j"${JOBS}"
   make install
