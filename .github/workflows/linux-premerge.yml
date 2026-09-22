@@ -55,6 +55,9 @@ jobs:
       - name: Apply llvm-project patches
         run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
 
+      - name: Install dependencies
+        run: ./qualcomm-software/scripts/install_dependencies.sh
+
       - name: Build toolchain
         run: ./qualcomm-software/scripts/${{ matrix.build_script }}
 
