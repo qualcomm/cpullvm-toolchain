@@ -155,7 +155,7 @@ jobs:
           path: |
             build*/cpullvm-*.tar.xz
             build*/cpullvm-*.zip
-            !build/cpullvm-*-Linux-x86_64.tar.xz
+            !build/cpullvm-*-Linux-x86_64*.tar.xz
           retention-days: 7
 
       - name: Test
