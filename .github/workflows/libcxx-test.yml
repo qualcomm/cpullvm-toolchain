@@ -35,6 +35,9 @@ jobs:
           # old build products if the runner doesn't do it itself.
           clean: true
 
+      - name: Install dependencies
+        run: ./qualcomm-software/scripts/install_dependencies_x86.sh
+
       - name: Apply llvm-project patches
         run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
 
