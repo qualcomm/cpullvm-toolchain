@@ -18,7 +18,6 @@ Options:
   --base-install-dir <path>   Directory for the install
   --llvm-src-dir <path>       Directory of the LLVM sources
   --musl-src-dir <path>       Directory of the musl source dir
-  --musl-emb-src-dir <path>   Directory of the musl-embedded source dir
   --download-dir <path>       Directory where extra projects are downloaded into
 EOF
 }
@@ -72,7 +71,6 @@ while [[ $# -gt 0 ]]; do
     --base-install-dir) BASE_INSTALL_DIR="$2"; shift 2;;
     --llvm-src-dir) LLVM_BASE_DIR="$2"; shift 2 ;;
     --musl-src-dir) MUSL_SRC_DIR="$2"; shift 2 ;;
-    --musl-emb-src-dir) MUSL_EMB_SRC_DIR="$2"; shift 2 ;;
     --download-dir) DOWNLOAD_DIR="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown arg: $1"; usage; exit 1 ;;
@@ -85,7 +83,6 @@ if [ -z "${TOOLS_PATH}" ] ||
    [ -z "${BASE_INSTALL_DIR}" ] ||
    [ -z "${LLVM_BASE_DIR}" ] ||
    [ -z "${MUSL_SRC_DIR}" ] ||
-   [ -z "${MUSL_EMB_SRC_DIR}" ] ||
    [ -z "${DOWNLOAD_DIR}" ]; then
   echo "All options must be specified"; usage; exit 1
 fi
@@ -219,11 +216,9 @@ for VARIANT in "${VARIANTS[@]}"; do
   # Historically, our RISC-V and Arm/AArch64 builds use slightly different
   # flags, sources, etc. Sort that all out here so we can treat the two
   # consistently below.
-  MUSL_DIR="${MUSL_EMB_SRC_DIR}"
   EXTRA_MUSL_CONFIGS="${VARIANT_MUSL_CONFIGS[$VARIANT]}"
   CMAKE_OPT_LEVEL="Release"
   if [[ "${VARIANT_ARCH}" =~ riscv ]]; then
-    MUSL_DIR="${MUSL_SRC_DIR}"
     EXTRA_MUSL_CONFIGS="${EXTRA_MUSL_CONFIGS} \
                         --disable-shared"
     CMAKE_OPT_LEVEL="MinSizeRel"
@@ -251,7 +246,7 @@ for VARIANT in "${VARIANTS[@]}"; do
   VARIANT_MUSL_BUILD_DIR="${VARIANT_BASE_BUILD_DIR}"/musl
   mkdir -p "${VARIANT_MUSL_BUILD_DIR}"
   pushd "${VARIANT_MUSL_BUILD_DIR}" >/dev/null
-  "${MUSL_DIR}"/configure \
+  "${MUSL_SRC_DIR}"/configure \
                             ${EXTRA_MUSL_CONFIGS} \
                             --disable-wrapper \
                             --prefix="${VARIANT_TMP_SYSROOT}" \
@@ -303,7 +298,7 @@ for VARIANT in "${VARIANTS[@]}"; do
   make distclean
   # TODO: we should probably standardize which linker we're using (lld vs eld)
   # but that can wait--this matches what we've done in the past.
-  "${MUSL_DIR}"/configure \
+  "${MUSL_SRC_DIR}"/configure \
       ${EXTRA_MUSL_CONFIGS} \
       --disable-wrapper \
       --prefix="${VARIANT_TMP_SYSROOT}" \
@@ -384,33 +379,15 @@ for VARIANT in "${VARIANTS[@]}"; do
 
   # Install the rest of compiler-rt now.
 
-  # The goal here is to disable rtsan and gwp_asan:
-  #   * For rtsan, our musl-embedded is too old to support the fopencookie
-  #     extension, which rtsan relies on.
-  #   * For gwp_asan, it requires execinfo.h which is a glibc-specific
-  #     header--no musl version ships this (or an equivalent).
-  # The actual list corresponds to `ALL_SANITIZERS` in LLVM, minus rtsan and
-  # gwp_asan. Just do this for all targets since aarch64 is the only arch that
-  # rtsan supports that we care about and gwp_asan seems to be generally broken
-  # when building against musl. Might be worth trying to pull the list out of
-  # LLVM sources, but for now this should be sufficient.
-  SAN_TO_BUILD="asan;dfsan;msan;hwasan;tsan;tysan;safestack;cfi;scudo_standalone;ubsan_minimal;nsan;asan_abi"
+  # The goal here is to disable gwp_asan: it requires execinfo.h which is a
+  # glibc-specific header--no musl version ships this (or an equivalent).
+  #
+  # The actual list corresponds to `ALL_SANITIZERS` in LLVM, minus gwp_asan.
+  # Might be worth trying to pull the list out of LLVM sources, but for now
+  # this should be sufficient.
+  SAN_TO_BUILD="asan;rtsan;dfsan;msan;hwasan;tsan;tysan;safestack;cfi;scudo_standalone;ubsan_minimal;nsan;asan_abi"
 
-  # For Arm specifically, we need to disable anything that touches sanitizer
-  # common. Our musl-embedded is old enough that time_t is 32bits and the
-  # sanitizer common code thinks we should have a 64bit time_t (see
-  # https://github.com/llvm/llvm-project/blob/c94739a5d523883663d237ad9072275ff6c847b1/compiler-rt/lib/sanitizer_common/sanitizer_platform_limits_posix.h#L393-L398)
-  # and this disagreement causes issues down the line in ex:
-  # https://github.com/llvm/llvm-project/blob/c94739a5d523883663d237ad9072275ff6c847b1/compiler-rt/lib/sanitizer_common/sanitizer_platform_limits_posix.cpp#L1292
-  # and we fail the static asserts.
   EXTRA_CRT_CONFIGS=""
-  if [[ "${VARIANT_ARCH}" =~ arm ]]; then
-    EXTRA_CRT_CONFIGS="-DCOMPILER_RT_BUILD_SANITIZERS=OFF \
-                       -DCOMPILER_RT_BUILD_CTX_PROFILE=OFF \
-                       -DCOMPILER_RT_BUILD_MEMPROF=OFF \
-                       -DCOMPILER_RT_BUILD_COPYPROF=OFF"
-  fi
-
   # For AArch64, make sure asan/hwasan are compatible with VA smaller than
   # 48 bits.
   if [[ "${VARIANT_ARCH}" =~ aarch64 ]]; then
