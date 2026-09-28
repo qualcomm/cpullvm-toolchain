@@ -234,8 +234,7 @@ for VARIANT in "${VARIANTS[@]}"; do
                             CROSS_COMPILE="llvm-" \
                             CC="clang --target=${VARIANT_TARGET} -fuse-ld=eld" \
                             CFLAGS="${LIB_BUILD_FLAGS} \
-                                    ${ARCH_MUSL_CFLAGS[$VARIANT_ARCH]} \
-                                    -D_LARGEFILE64_SOURCE"
+                                    ${ARCH_MUSL_CFLAGS[$VARIANT_ARCH]}"
   make install-headers
   popd >/dev/null
 
@@ -287,7 +286,7 @@ for VARIANT in "${VARIANTS[@]}"; do
       --prefix="${VARIANT_TMP_SYSROOT}" \
       CROSS_COMPILE="llvm-" \
       CC="clang --target=${VARIANT_TARGET} -fuse-ld=eld" \
-      CFLAGS="${LIB_BUILD_FLAGS} ${ARCH_MUSL_CFLAGS[$VARIANT_ARCH]} -D_LARGEFILE64_SOURCE" \
+      CFLAGS="${LIB_BUILD_FLAGS} ${ARCH_MUSL_CFLAGS[$VARIANT_ARCH]}" \
       LIBCC="${VARIANT_TMP_RESOURCE_DIR}/lib/${VARIANT_TARGET}/libclang_rt.builtins.a"
   make -j"${JOBS}"
   make install
@@ -395,6 +394,9 @@ for VARIANT in "${VARIANTS[@]}"; do
   fi
 
   COMPILER_RT_BUILD_DIR="${VARIANT_BASE_BUILD_DIR}/compiler-rt"
+  # _LARGEFILE64_SOURCE is needed to expose stat64. _LARGEFILE64_SOURCE
+  # may be removed in the future.
+  COMPILER_RT_COMPILE_FLAGS="${LIB_BUILD_FLAGS} -D_LARGEFILE64_SOURCE"
   cmake -G Ninja \
       -DCMAKE_INSTALL_PREFIX="${VARIANT_TMP_RESOURCE_DIR}" \
       -DCMAKE_SYSROOT="${VARIANT_TMP_SYSROOT}" \
@@ -406,9 +408,9 @@ for VARIANT in "${VARIANTS[@]}"; do
       -DCMAKE_ASM_COMPILER_TARGET="${VARIANT_TARGET}" \
       -DCMAKE_C_COMPILER_TARGET="${VARIANT_TARGET}" \
       -DCMAKE_CXX_COMPILER_TARGET="${VARIANT_TARGET}" \
-      -DCMAKE_ASM_FLAGS="${LIB_BUILD_FLAGS}" \
-      -DCMAKE_C_FLAGS="${LIB_BUILD_FLAGS}" \
-      -DCMAKE_CXX_FLAGS="${LIB_BUILD_FLAGS}" \
+      -DCMAKE_ASM_FLAGS="${COMPILER_RT_COMPILE_FLAGS}" \
+      -DCMAKE_C_FLAGS="${COMPILER_RT_COMPILE_FLAGS}" \
+      -DCMAKE_CXX_FLAGS="${COMPILER_RT_COMPILE_FLAGS}" \
       -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON \
       -DCOMPILER_RT_CXX_LIBRARY="libcxx" \
       -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON \
