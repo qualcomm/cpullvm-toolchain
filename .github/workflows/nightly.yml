@@ -37,8 +37,14 @@ on:
       - '.github/workflows/nightly.yml'
   schedule:
     - cron: '0 7 * * *' # 12 AM PT
+
 permissions:
   contents: read
+
+# Cancel in-progress runs for `pull_request` events only.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 env:
   EXTRA_CMAKE_ARGS: ${{ format('{0}', inputs.enable_assertions) == 'false' && '-DLLVM_ENABLE_ASSERTIONS=OFF' || '-DLLVM_ENABLE_ASSERTIONS=ON' }}

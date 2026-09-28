@@ -27,6 +27,11 @@ on:
 permissions:
   contents: read
 
+# Cancel in-progress runs for `pull_request` events only.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     # Don't run on forks
