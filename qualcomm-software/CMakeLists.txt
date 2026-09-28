@@ -126,7 +126,8 @@ set(LLVM_TOOLCHAIN_C_LIBRARY
     "Which C library to use."
 )
 set_property(CACHE LLVM_TOOLCHAIN_C_LIBRARY
-    PROPERTY STRINGS picolibc picolibc-v1812 musl-embedded)
+    PROPERTY STRINGS picolibc picolibc-v1812
+)
 
 option(
     SHORT_BUILD_PATHS
@@ -153,7 +154,7 @@ if(ENABLE_WINDOWS_LIBRARIES AND NOT CMAKE_HOST_WIN32)
 endif()
 
 option(LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL
-    "Make cpack build an overlay package that can be unpacked over the main toolchain to install a secondary set of libraries based on musl-embedded."
+    "Make cpack build an overlay package that can be unpacked over the main toolchain to install a secondary set of libraries."
     ${overlay_install_default})
 if(LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL)
   if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL "picolibc")
@@ -319,11 +320,11 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_repo.cmake)
 # Check out and patch eld
 fetch_repo(eld)
 
-# Check out and patch picolibc or musl-embedded if required.
+# Check out and patch picolibc or musl if required.
 #
 # If you'd rather check out and patch manually then run cmake with
 # -DFETCHCONTENT_SOURCE_DIR_PICOLIBC=/path/to/picolibc
-# -DFETCHCONTENT_SOURCE_DIR_MUSL-EMBEDDED=/path/to/musl-embedded
+# -DFETCHCONTENT_SOURCE_DIR_MUSL=/path/to/musl
 #
 # By default check out will be silent but this can be changed by running
 # cmake with -DFETCHCONTENT_QUIET=OFF

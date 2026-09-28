@@ -30,7 +30,7 @@ multilib.json should be used.
 
 **LLVM_TOOLCHAIN_C_LIBRARY**:STRING  
 Which embedded C library to use. Note that not all libraries are supported on all host and target platforms.
-picolibc is the default, musl-embedded may also be used for Arm and AArch4 targets.
+picolibc is the default, with alternative versions available.
 
 ## Customizing
 

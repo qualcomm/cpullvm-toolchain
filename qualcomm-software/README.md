@@ -10,7 +10,6 @@ including:
 - compiler-rt
 - picolibc
 - musl
-- musl-embedded
 - libc++/libunwind/libc++abi
 
 For embedded environments, picolibc is used as the libc.
@@ -37,7 +36,6 @@ CPULLVM relies on the following upstream components:
 - [LLVM](https://github.com/llvm/llvm-project)
 - [picolibc](https://github.com/picolibc/picolibc)
 - [musl](https://musl.libc.org/)
-- [musl-embedded](https://github.com/qualcomm/musl-embedded)
 - [eld](https://github.com/qualcomm/eld)
 
 ## Host Platforms
