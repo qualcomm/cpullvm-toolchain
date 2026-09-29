@@ -751,14 +751,24 @@ static StringRef getCandidateInputSection(const Candidate &C) {
   return F.hasSection() ? F.getSection() : StringRef();
 }
 
+/// Returns the value of the "linker_output_section" attribute if it exists,
+/// otherwise returns the input section of the candidate's parent function.
+static StringRef getCandidatePlacementSection(const Candidate &C) {
+  const Function &F = C.getMF()->getFunction();
+  Attribute OutputSection = F.getFnAttribute("linker_output_section");
+  if (OutputSection.isValid())
+    return OutputSection.getValueAsString();
+  return getCandidateInputSection(C);
+}
+
 static SmallVector<std::vector<Candidate>>
-partitionCandidatesByInputSection(std::vector<Candidate> &Candidates) {
+partitionCandidatesByPlacementSection(std::vector<Candidate> &Candidates) {
   // Each candidate belongs to exactly one MachineFunction, so the partitions
   // are disjoint and can be outlined independently.
   SmallVector<std::vector<Candidate>> Partitions;
   SmallVector<StringRef> Sections;
   for (Candidate &C : Candidates) {
-    StringRef Section = getCandidateInputSection(C);
+    StringRef Section = getCandidatePlacementSection(C);
     auto It = llvm::find(Sections, Section);
     if (It == Sections.end()) {
       Sections.push_back(Section);
@@ -899,7 +909,7 @@ void MachineOutliner::findCandidates(
 #endif
 
     SmallVector<std::vector<Candidate>> Partitions =
-        partitionCandidatesByInputSection(CandidatesForRepeatedSeq);
+        partitionCandidatesByPlacementSection(CandidatesForRepeatedSeq);
 #ifndef NDEBUG
     LLVM_DEBUG(dbgs() << "    Input section partitions: " << Partitions.size()
                       << "\n");
@@ -908,7 +918,7 @@ void MachineOutliner::findCandidates(
     for (std::vector<Candidate> &Partition : Partitions) {
 #ifndef NDEBUG
       LLVM_DEBUG({
-        StringRef Section = getCandidateInputSection(Partition.front());
+        StringRef Section = getCandidatePlacementSection(Partition.front());
         dbgs() << "    .. section '"
                << (Section.empty() ? StringRef("<none>") : Section)
                << "': " << Partition.size() << " candidates\n";
@@ -986,6 +996,10 @@ MachineFunction *MachineOutliner::createOutlinedFunction(
 
   TII.mergeOutliningCandidateAttributes(*F, OF.Candidates);
 
+  // Place the outlined function in the first candidate's section. Candidates
+  // were partitioned so that they all share one placement section, so any of
+  // them is representative; note they may still differ in input section when
+  // several input sections map to one linker script output section.
   if (TII.supportsSectionAwareOutlining()) {
     const Function &ParentFn = FirstCand.getMF()->getFunction();
     if (ParentFn.hasSection()) {
@@ -993,6 +1007,15 @@ MachineFunction *MachineOutliner::createOutlinedFunction(
 #ifndef NDEBUG
       LLVM_DEBUG(dbgs() << "  INHERITED SECTION: " << ParentFn.getSection()
                         << "\n");
+#endif
+    }
+    
+    Attribute OutputSection = ParentFn.getFnAttribute("linker_output_section");
+    if (OutputSection.isValid()) {
+      F->addFnAttr("linker_output_section", OutputSection.getValueAsString());
+#ifndef NDEBUG
+      LLVM_DEBUG(dbgs() << "  INHERITED OUTPUT SECTION: "
+                        << OutputSection.getValueAsString() << "\n");
 #endif
     }
   }
