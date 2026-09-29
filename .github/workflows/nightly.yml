@@ -43,7 +43,7 @@ permissions:
 
 # Cancel in-progress runs for `pull_request` events only.
 concurrency:
-  group: ${{ github.workflow }}-nightly-${{ github.head_ref || github.run_id }}
+  group: ${{ github.workflow }}-nightly-${{ github.head_ref || github.run_id }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
