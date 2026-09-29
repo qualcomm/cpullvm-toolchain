@@ -10,8 +10,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #
 
-# [DNM] Test change to trigger builds
-
 # How to use this file
 #
 # Recent versions of the following tools are pre-requisites:
