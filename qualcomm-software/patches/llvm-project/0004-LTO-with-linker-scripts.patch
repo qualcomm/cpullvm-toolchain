@@ -1,3 +1,17 @@
+From 9b010cc5524e269d024770eac3f95ebb174356d4 Mon Sep 17 00:00:00 2001
+From: Eli Friedman <efriedma@qti.qualcomm.com>
+Date: Tue, 16 Jun 2026 14:43:36 -0700
+Subject: [PATCH] LTO with linker scripts, end-to-end.
+
+"LTO with linker scripts" is a set of features that makes LTO interact
+in a more predictable way with linker scripts: the semantics of linker
+script rules are much closer to non-LTO semantics.
+
+This includes all changes, end-to-end, required to enable LTO with
+linker scripts.  All the changes are guarded under flags: a clang flag
+-flto-linker-scripts, and an lld flag --lto-linker-scripts.
+---
+
 diff --git a/clang/include/clang/Basic/CodeGenOptions.def b/clang/include/clang/Basic/CodeGenOptions.def
 index 7e54e75752f3..0b206fcdb556 100644
 --- a/clang/include/clang/Basic/CodeGenOptions.def

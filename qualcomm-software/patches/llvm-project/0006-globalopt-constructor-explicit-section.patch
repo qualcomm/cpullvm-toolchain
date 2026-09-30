@@ -1,11 +1,12 @@
-commit e91d6c6fdc6f33e5ce63f2d8dcde99d6b84713b0
-Author: Eli Friedman <efriedma@qti.qualcomm.com>
-Date:   Wed Sep 2 13:43:39 2026 -0700
+From e91d6c6fdc6f33e5ce63f2d8dcde99d6b84713b0 Mon Sep 17 00:00:00 2001
+From: Eli Friedman <efriedma@qti.qualcomm.com>
+Date: Wed, 2 Sep 2026 13:43:39 -0700
+Subject: [PATCH] [GlobalOpt] Fix constructor folding on global with explicit
+ section.
 
-    [GlobalOpt] Fix constructor folding on global with explicit section.
-    
-    Make sure we don't try to emit a non-zero value into BSS, or anything
-    similar to that.
+Make sure we don't try to emit a non-zero value into BSS, or anything
+similar to that.
+---
 
 diff --git a/llvm/lib/Transforms/Utils/Evaluator.cpp b/llvm/lib/Transforms/Utils/Evaluator.cpp
 index 2b3dfdc4f01f..e700a9aa893f 100644

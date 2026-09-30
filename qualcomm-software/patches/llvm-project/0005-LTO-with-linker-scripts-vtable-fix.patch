@@ -1,15 +1,15 @@
-commit 44f4616f0d373e237fe8e670e7c3980a7acd2f8b
-Author: Eli Friedman <efriedma@qti.qualcomm.com>
-Date:   Tue Sep 1 14:43:26 2026 -0700
+From 44f4616f0d373e237fe8e670e7c3980a7acd2f8b Mon Sep 17 00:00:00 2001
+From: Eli Friedman <efriedma@qti.qualcomm.com>
+Date: Tue, 1 Sep 2026 14:43:26 -0700
+Subject: [PATCH] Disable section markings for globals with type markings.
 
-    Disable section markings for globals with type markings.
-    
-    LTO by default emits type metadata on all vtables when LTO is enabled.
-    This is true even when none of the options which would actually
-    consume the metadata are enabled.  We can't control the section of such
-    globals: LowerTypeTests rewrites globals.  So don't try.
-    
-    We might want to expose a clang option to control this.
+LTO by default emits type metadata on all vtables when LTO is enabled.
+This is true even when none of the options which would actually
+consume the metadata are enabled.  We can't control the section of such
+globals: LowerTypeTests rewrites globals.  So don't try.
+
+We might want to expose a clang option to control this.
+---
 
 diff --git a/llvm/lib/CodeGen/AssignSectionsToGlobals.cpp b/llvm/lib/CodeGen/AssignSectionsToGlobals.cpp
 index 608c2c701e09..32402387aa7e 100644
