@@ -1,0 +1,683 @@
+From 862c003021908c0b89deeb1a38f67affc4be648d Mon Sep 17 00:00:00 2001
+From: Sam Elliott <aelliott@qti.qualcomm.com>
+Date: Wed, 30 Sep 2026 22:03:09 -0700
+Subject: [PATCH] [RISCV][compiler-rt] Asm funcs should be hidden
+
+The C builtins are built with `-fvisibility=hidden` when that option is
+available, as the builtins are expected to be statically linked and not
+called across shared library boundaries.
+
+Before this change, the assembly-written builtin implementations were
+declared with STV_DEFAULT visibility, meaning they would be visible
+across shared library boundaries. This change moves them to being
+declared as STV_HIDDEN to fix this issue.
+
+In particular, the save/restore routines are not normal functions and
+cannot be called via a PLT, so this fixes a bug there, and also applies
+it to the assembly multiply routine.
+---
+ .../lib/builtins/riscv/.clang-format-ignore   |   1 +
+ .../lib/builtins/riscv/int_mul_impl.inc       |  32 ++-
+ compiler-rt/lib/builtins/riscv/restore.S      | 172 ++++++--------
+ compiler-rt/lib/builtins/riscv/save.S         | 220 ++++++++----------
+ 4 files changed, 185 insertions(+), 240 deletions(-)
+ create mode 100644 compiler-rt/lib/builtins/riscv/.clang-format-ignore
+
+diff --git a/compiler-rt/lib/builtins/riscv/.clang-format-ignore b/compiler-rt/lib/builtins/riscv/.clang-format-ignore
+new file mode 100644
+index 000000000000..afc537eb5dcc
+--- /dev/null
++++ b/compiler-rt/lib/builtins/riscv/.clang-format-ignore
+@@ -0,0 +1 @@
++int_mul_impl.inc
+diff --git a/compiler-rt/lib/builtins/riscv/int_mul_impl.inc b/compiler-rt/lib/builtins/riscv/int_mul_impl.inc
+index 53699b356f6a..4d6ad6ecc2f2 100644
+--- a/compiler-rt/lib/builtins/riscv/int_mul_impl.inc
++++ b/compiler-rt/lib/builtins/riscv/int_mul_impl.inc
+@@ -10,24 +10,22 @@
+ //
+ //===----------------------------------------------------------------------===//
+ 
++#include "../assembly.h"
++
+ #ifndef __mulxi3
+ #error "__mulxi3 must be defined to use this generic implementation"
+ #endif
+ 
+-	.text
+-	.align 2
+-
+-	.globl __mulxi3
+-	.type  __mulxi3, @function
+-__mulxi3:
+-	mv     a2, a0
+-	mv     a0, zero
+-.L1:
+-	andi   a3, a1, 1
+-	beqz   a3, .L2
+-	add    a0, a0, a2
+-.L2:
+-	srli   a1, a1, 1
+-	slli   a2, a2, 1
+-	bnez   a1, .L1
+-	ret
++DEFINE_COMPILERRT_FUNCTION(__mulxi3)
++  mv     a2, a0
++  mv     a0, zero
++LOCAL_LABEL(loop):
++  andi   a3, a1, 1
++  beqz   a3, LOCAL_LABEL(cond_add)
++  add    a0, a0, a2
++LOCAL_LABEL(cond_add):
++  srli   a1, a1, 1
++  slli   a2, a2, 1
++  bnez   a1, LOCAL_LABEL(loop)
++  ret
++END_COMPILERRT_FUNCTION(__mulxi3)
+diff --git a/compiler-rt/lib/builtins/riscv/restore.S b/compiler-rt/lib/builtins/riscv/restore.S
+index 7816f74ed497..ecb37c498768 100644
+--- a/compiler-rt/lib/builtins/riscv/restore.S
++++ b/compiler-rt/lib/builtins/riscv/restore.S
+@@ -21,98 +21,89 @@
+ // For the ilp32e/lp64e abis, entry points are grouped into 1s, since this is
+ // the minimum grouping which will maintain the required 4-byte stack alignment.
+ 
+-  .text
++#include "../assembly.h"
++
++TEXT_SECTION
++
++// Like DEFINE_COMPILERRT_FUNCTION but without:
++// - Section change (TEXT_SECTION)
++// - Subsections via symbols (FILE_LEVEL_DIRECTIVE)
++//
++// This is needed because `__riscv_restore_<N>` could fallthrough to a later
++// `__riscv_restore_<N>` tail.
++#define DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(name) \
++  DEFINE_CODE_STATE \
++  .globl FUNC_SYMBOL(SYMBOL_NAME(name)) SEPARATOR \
++  SYMBOL_IS_FUNC(SYMBOL_NAME(name)) SEPARATOR \
++  HIDDEN(SYMBOL_NAME(name)) SEPARATOR \
++  DECLARE_FUNC_ENCODING \
++  FUNC_SYMBOL(SYMBOL_NAME(name)):
+ 
+ #if __riscv_xlen == 32
+ 
+ #ifndef __riscv_abi_rve
+ 
+-  .globl  __riscv_restore_12
+-  .type   __riscv_restore_12,@function
+-__riscv_restore_12:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_12)
+   lw      s11, 12(sp)
+   addi    sp, sp, 16
+-  // fallthrough into __riscv_restore_11/10/9/8
+-
+-  .globl  __riscv_restore_11
+-  .type   __riscv_restore_11,@function
+-  .globl  __riscv_restore_10
+-  .type   __riscv_restore_10,@function
+-  .globl  __riscv_restore_9
+-  .type   __riscv_restore_9,@function
+-  .globl  __riscv_restore_8
+-  .type   __riscv_restore_8,@function
+-__riscv_restore_11:
+-__riscv_restore_10:
+-__riscv_restore_9:
+-__riscv_restore_8:
++  // fallthrough into __riscv_restore_11
++
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_11)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_10, __riscv_restore_11)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_9,  __riscv_restore_11)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_8,  __riscv_restore_11)
+   lw      s10, 0(sp)
+   lw      s9,  4(sp)
+   lw      s8,  8(sp)
+   lw      s7,  12(sp)
+   addi    sp, sp, 16
+-  // fallthrough into __riscv_restore_7/6/5/4
+-
+-  .globl  __riscv_restore_7
+-  .type   __riscv_restore_7,@function
+-  .globl  __riscv_restore_6
+-  .type   __riscv_restore_6,@function
+-  .globl  __riscv_restore_5
+-  .type   __riscv_restore_5,@function
+-  .globl  __riscv_restore_4
+-  .type   __riscv_restore_4,@function
+-__riscv_restore_7:
+-__riscv_restore_6:
+-__riscv_restore_5:
+-__riscv_restore_4:
++  // fallthrough into __riscv_restore_7
++
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_7)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_6, __riscv_restore_7)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_5, __riscv_restore_7)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_4, __riscv_restore_7)
+   lw      s6,  0(sp)
+   lw      s5,  4(sp)
+   lw      s4,  8(sp)
+   lw      s3,  12(sp)
+   addi    sp, sp, 16
+-  // fallthrough into __riscv_restore_3/2/1/0
+-
+-  .globl  __riscv_restore_3
+-  .type   __riscv_restore_3,@function
+-  .globl  __riscv_restore_2
+-  .type   __riscv_restore_2,@function
+-  .globl  __riscv_restore_1
+-  .type   __riscv_restore_1,@function
+-  .globl  __riscv_restore_0
+-  .type   __riscv_restore_0,@function
+-__riscv_restore_3:
+-__riscv_restore_2:
+-__riscv_restore_1:
+-__riscv_restore_0:
++  // fallthrough into __riscv_restore_3
++
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_3)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_2, __riscv_restore_3)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_1, __riscv_restore_3)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_0, __riscv_restore_3)
+   lw      s2,  0(sp)
+   lw      s1,  4(sp)
+   lw      s0,  8(sp)
+   lw      ra,  12(sp)
+   addi    sp, sp, 16
+   ret
++END_COMPILERRT_FUNCTION(__riscv_restore_12)
++END_COMPILERRT_FUNCTION(__riscv_restore_11)
++END_COMPILERRT_FUNCTION(__riscv_restore_7)
++END_COMPILERRT_FUNCTION(__riscv_restore_3)
+ 
+ #else
+ 
+-  .globl  __riscv_restore_2
+-  .type   __riscv_restore_2,@function
+-__riscv_restore_2:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_2)
+   lw      s1, 0(sp)
+   addi    sp, sp, 4
+   // fallthrough into __riscv_restore_1/0
+ 
+-  .globl  __riscv_restore_1
+-  .type   __riscv_restore_1,@function
+-__riscv_restore_1:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_1)
+   lw      s0, 0(sp)
+   addi    sp, sp, 4
+   // fallthrough into __riscv_restore_0
+ 
+-  .globl  __riscv_restore_0
+-  .type   __riscv_restore_0,@function
+-__riscv_restore_0:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_0)
+   lw      ra, 0(sp)
+   addi    sp, sp, 4
+   ret
++END_COMPILERRT_FUNCTION(__riscv_restore_2)
++END_COMPILERRT_FUNCTION(__riscv_restore_1)
++END_COMPILERRT_FUNCTION(__riscv_restore_0)
+ 
+ #endif
+ 
+@@ -120,98 +111,73 @@ __riscv_restore_0:
+ 
+ #ifndef __riscv_abi_rve
+ 
+-  .globl  __riscv_restore_12
+-  .type   __riscv_restore_12,@function
+-__riscv_restore_12:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_12)
+   ld      s11, 8(sp)
+   addi    sp, sp, 16
+   // fallthrough into __riscv_restore_11/10
+ 
+-  .globl  __riscv_restore_11
+-  .type   __riscv_restore_11,@function
+-  .globl  __riscv_restore_10
+-  .type   __riscv_restore_10,@function
+-__riscv_restore_11:
+-__riscv_restore_10:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_11)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_10, __riscv_restore_11)
+   ld      s10, 0(sp)
+   ld      s9,  8(sp)
+   addi    sp, sp, 16
+   // fallthrough into __riscv_restore_9/8
+ 
+-  .globl  __riscv_restore_9
+-  .type   __riscv_restore_9,@function
+-  .globl  __riscv_restore_8
+-  .type   __riscv_restore_8,@function
+-__riscv_restore_9:
+-__riscv_restore_8:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_9)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_8, __riscv_restore_9)
+   ld      s8,  0(sp)
+   ld      s7,  8(sp)
+   addi    sp, sp, 16
+   // fallthrough into __riscv_restore_7/6
+ 
+-  .globl  __riscv_restore_7
+-  .type   __riscv_restore_7,@function
+-  .globl  __riscv_restore_6
+-  .type   __riscv_restore_6,@function
+-__riscv_restore_7:
+-__riscv_restore_6:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_7)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_6, __riscv_restore_7)
+   ld      s6,  0(sp)
+   ld      s5,  8(sp)
+   addi    sp, sp, 16
+   // fallthrough into __riscv_restore_5/4
+ 
+-  .globl  __riscv_restore_5
+-  .type   __riscv_restore_5,@function
+-  .globl  __riscv_restore_4
+-  .type   __riscv_restore_4,@function
+-__riscv_restore_5:
+-__riscv_restore_4:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_5)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_4, __riscv_restore_5)
+   ld      s4,  0(sp)
+   ld      s3,  8(sp)
+   addi    sp, sp, 16
+   // fallthrough into __riscv_restore_3/2
+ 
+-  .globl  __riscv_restore_3
+-  .type   __riscv_restore_3,@function
+-  .globl  __riscv_restore_2
+-  .type   __riscv_restore_2,@function
+-__riscv_restore_3:
+-__riscv_restore_2:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_3)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_2, __riscv_restore_3)
+   ld      s2,  0(sp)
+   ld      s1,  8(sp)
+   addi    sp, sp, 16
+   // fallthrough into __riscv_restore_1/0
+ 
+-  .globl  __riscv_restore_1
+-  .type   __riscv_restore_1,@function
+-  .globl  __riscv_restore_0
+-  .type   __riscv_restore_0,@function
+-__riscv_restore_1:
+-__riscv_restore_0:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_1)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_restore_0, __riscv_restore_1)
+   ld      s0,  0(sp)
+   ld      ra,  8(sp)
+   addi    sp, sp, 16
+   ret
++END_COMPILERRT_FUNCTION(__riscv_restore_12)
++END_COMPILERRT_FUNCTION(__riscv_restore_11)
++END_COMPILERRT_FUNCTION(__riscv_restore_9)
++END_COMPILERRT_FUNCTION(__riscv_restore_7)
++END_COMPILERRT_FUNCTION(__riscv_restore_5)
++END_COMPILERRT_FUNCTION(__riscv_restore_3)
++END_COMPILERRT_FUNCTION(__riscv_restore_1)
+ 
+ #else
+ 
+-  .globl  __riscv_restore_2
+-  .type   __riscv_restore_2,@function
+-__riscv_restore_2:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_2)
+   ld      s1, 0(sp)
+   addi    sp, sp, 8
+   // fallthrough into __riscv_restore_1/0
+ 
+-  .globl  __riscv_restore_1
+-  .type   __riscv_restore_1,@function
+-__riscv_restore_1:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_1)
+   ld      s0, 0(sp)
+   addi    sp, sp, 8
+   // fallthrough into __riscv_restore_0
+ 
+-  .globl  __riscv_restore_0
+-  .type   __riscv_restore_0,@function
+-__riscv_restore_0:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_restore_0)
+   ld      ra, 0(sp)
+   addi    sp, sp, 8
+   ret
+diff --git a/compiler-rt/lib/builtins/riscv/save.S b/compiler-rt/lib/builtins/riscv/save.S
+index 6b50bce02252..211bd621c34a 100644
+--- a/compiler-rt/lib/builtins/riscv/save.S
++++ b/compiler-rt/lib/builtins/riscv/save.S
+@@ -13,57 +13,60 @@
+ // The entry points are grouped up into 2s for rv64 and 4s for rv32 since this
+ // is the minimum grouping which will maintain the required 16-byte stack
+ // alignment.
++//
++// We use lots of tail-sharing, which ends up looking like the functions
++// overlap in the ELF metadata. This is expected - the alternative would be
++// to separate the prologues into separate section and risk the
++// `j LOCAL_LABEL(...)` targets being out-of-range at link time.
++
++#include "../assembly.h"
+ 
+-  .text
++TEXT_SECTION
++
++// Like DEFINE_COMPILERRT_FUNCTION but without:
++// - Section change (TEXT_SECTION)
++// - Subsections via symbols (FILE_LEVEL_DIRECTIVE)
++//
++// This is needed because `__riscv_save_<N>` could fallthrough to a later
++// `__riscv_save_<N>` tail.
++#define DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(name) \
++  DEFINE_CODE_STATE \
++  .globl FUNC_SYMBOL(SYMBOL_NAME(name)) SEPARATOR \
++  SYMBOL_IS_FUNC(SYMBOL_NAME(name)) SEPARATOR \
++  HIDDEN(SYMBOL_NAME(name)) SEPARATOR \
++  DECLARE_FUNC_ENCODING \
++  FUNC_SYMBOL(SYMBOL_NAME(name)):
+ 
+ #if __riscv_xlen == 32
+ 
+ #ifndef __riscv_abi_rve
+ 
+-  .globl  __riscv_save_12
+-  .type   __riscv_save_12,@function
+-__riscv_save_12:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_save_12)
+   addi   sp, sp, -64
+   mv     t1, zero
+   sw     s11, 12(sp)
+-  j      .Lriscv_save_11_8
+-
+-  .globl  __riscv_save_11
+-  .type   __riscv_save_11,@function
+-  .globl  __riscv_save_10
+-  .type   __riscv_save_10,@function
+-  .globl  __riscv_save_9
+-  .type   __riscv_save_9,@function
+-  .globl  __riscv_save_8
+-  .type   __riscv_save_8,@function
+-__riscv_save_11:
+-__riscv_save_10:
+-__riscv_save_9:
+-__riscv_save_8:
++  j      LOCAL_LABEL(riscv_save_11_8)
++
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_save_11)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_10, __riscv_save_11)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_9,  __riscv_save_11)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_8,  __riscv_save_11)
+   addi   sp, sp, -64
+   li     t1, 16
+-.Lriscv_save_11_8:
++LOCAL_LABEL(riscv_save_11_8):
+   sw     s10, 16(sp)
+   sw     s9,  20(sp)
+   sw     s8,  24(sp)
+   sw     s7,  28(sp)
+-  j      .Lriscv_save_7_4
+-
+-  .globl  __riscv_save_7
+-  .type   __riscv_save_7,@function
+-  .globl  __riscv_save_6
+-  .type   __riscv_save_6,@function
+-  .globl  __riscv_save_5
+-  .type   __riscv_save_5,@function
+-  .globl  __riscv_save_4
+-  .type   __riscv_save_4,@function
+-__riscv_save_7:
+-__riscv_save_6:
+-__riscv_save_5:
+-__riscv_save_4:
++  j      LOCAL_LABEL(riscv_save_7_4)
++
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_save_7)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_6, __riscv_save_7)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_5, __riscv_save_7)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_4, __riscv_save_7)
+   addi   sp, sp, -64
+   li     t1, 32
+-.Lriscv_save_7_4:
++LOCAL_LABEL(riscv_save_7_4):
+   sw     s6, 32(sp)
+   sw     s5, 36(sp)
+   sw     s4, 40(sp)
+@@ -74,51 +77,47 @@ __riscv_save_4:
+   sw     ra, 60(sp)
+   add    sp, sp, t1
+   jr     t0
+-
+-  .globl  __riscv_save_3
+-  .type   __riscv_save_3,@function
+-  .globl  __riscv_save_2
+-  .type   __riscv_save_2,@function
+-  .globl  __riscv_save_1
+-  .type   __riscv_save_1,@function
+-  .globl  __riscv_save_0
+-  .type   __riscv_save_0,@function
+-__riscv_save_3:
+-__riscv_save_2:
+-__riscv_save_1:
+-__riscv_save_0:
++END_COMPILERRT_FUNCTION(__riscv_save_12)
++END_COMPILERRT_FUNCTION(__riscv_save_11)
++END_COMPILERRT_FUNCTION(__riscv_save_7)
++
++// This function isn't overlapping, but we don't want to apply
++// `.subsections_via_symbols` to the whole file because of the prior
++// overlapping function.
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_save_3)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_2, __riscv_save_3)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_1, __riscv_save_3)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_0, __riscv_save_3)
+   addi    sp, sp, -16
+   sw      s2,  0(sp)
+   sw      s1,  4(sp)
+   sw      s0,  8(sp)
+   sw      ra,  12(sp)
+   jr      t0
++END_COMPILERRT_FUNCTION(__riscv_save_3)
+ 
+ #else
+ 
+-  .globl  __riscv_save_2
+-  .type   __riscv_save_2,@function
+-__riscv_save_2:
++DEFINE_COMPILERRT_FUNCTION(__riscv_save_2)
+   addi    sp, sp, -12
+   sw      s1,  0(sp)
+   sw      s0,  4(sp)
+   sw      ra,  8(sp)
+   jr      t0
++END_COMPILERRT_FUNCTION(__riscv_save_2)
+ 
+-  .globl  __riscv_save_1
+-  .type   __riscv_save_1,@function
+-__riscv_save_1:
++DEFINE_COMPILERRT_FUNCTION(__riscv_save_1)
+   addi    sp, sp, -8
+   sw      s0,  0(sp)
+   sw      ra,  4(sp)
+   jr      t0
++END_COMPILERRT_FUNCTION(__riscv_save_1)
+ 
+-  .globl  __riscv_save_0
+-  .type   __riscv_save_0,@function
+-__riscv_save_0:
++DEFINE_COMPILERRT_FUNCTION(__riscv_save_0)
+   addi    sp, sp, -4
+   sw      ra,  0(sp)
+   jr      t0
++END_COMPILERRT_FUNCTION(__riscv_save_0)
+ 
+ #endif
+ 
+@@ -126,118 +125,99 @@ __riscv_save_0:
+ 
+ #ifndef __riscv_abi_rve
+ 
+-  .globl  __riscv_save_12
+-  .type   __riscv_save_12,@function
+-__riscv_save_12:
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_save_12)
+   addi   sp, sp, -112
+   mv     t1, zero
+   sd     s11, 8(sp)
+-  j      .Lriscv_save_11_10
+-
+-  .globl  __riscv_save_11
+-  .type   __riscv_save_11,@function
+-  .globl  __riscv_save_10
+-  .type   __riscv_save_10,@function
+-__riscv_save_11:
+-__riscv_save_10:
++  j      LOCAL_LABEL(riscv_save_11_10)
++
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_save_11)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_10, __riscv_save_11)
+   addi   sp, sp, -112
+   li     t1, 16
+-.Lriscv_save_11_10:
++LOCAL_LABEL(riscv_save_11_10):
+   sd     s10, 16(sp)
+   sd     s9,  24(sp)
+-  j      .Lriscv_save_9_8
+-
+-  .globl  __riscv_save_9
+-  .type   __riscv_save_9,@function
+-  .globl  __riscv_save_8
+-  .type   __riscv_save_8,@function
+-__riscv_save_9:
+-__riscv_save_8:
++  j      LOCAL_LABEL(riscv_save_9_8)
++
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_save_9)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_8, __riscv_save_9)
+   addi   sp, sp, -112
+   li     t1, 32
+-.Lriscv_save_9_8:
++LOCAL_LABEL(riscv_save_9_8):
+   sd     s8,  32(sp)
+   sd     s7,  40(sp)
+-  j      .Lriscv_save_7_6
+-
+-  .globl  __riscv_save_7
+-  .type   __riscv_save_7,@function
+-  .globl  __riscv_save_6
+-  .type   __riscv_save_6,@function
+-__riscv_save_7:
+-__riscv_save_6:
++  j      LOCAL_LABEL(riscv_save_7_6)
++
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_save_7)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_6, __riscv_save_7)
+   addi   sp, sp, -112
+   li     t1, 48
+-.Lriscv_save_7_6:
++LOCAL_LABEL(riscv_save_7_6):
+   sd     s6,  48(sp)
+   sd     s5,  56(sp)
+-  j      .Lriscv_save_5_4
+-
+-  .globl  __riscv_save_5
+-  .type   __riscv_save_5,@function
+-  .globl  __riscv_save_4
+-  .type   __riscv_save_4,@function
+-__riscv_save_5:
+-__riscv_save_4:
++  j      LOCAL_LABEL(riscv_save_5_4)
++
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_save_5)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_4, __riscv_save_5)
+   addi   sp, sp, -112
+   li     t1, 64
+-.Lriscv_save_5_4:
++LOCAL_LABEL(riscv_save_5_4):
+   sd     s4, 64(sp)
+   sd     s3, 72(sp)
+-  j      .Lriscv_save_3_2
+-
+-  .globl  __riscv_save_3
+-  .type   __riscv_save_3,@function
+-  .globl  __riscv_save_2
+-  .type   __riscv_save_2,@function
+-__riscv_save_3:
+-__riscv_save_2:
++  j      LOCAL_LABEL(riscv_save_3_2)
++
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_save_3)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_2, __riscv_save_3)
+   addi   sp, sp, -112
+   li     t1, 80
+-.Lriscv_save_3_2:
++LOCAL_LABEL(riscv_save_3_2):
+   sd     s2, 80(sp)
+   sd     s1, 88(sp)
+   sd     s0, 96(sp)
+   sd     ra, 104(sp)
+   add    sp, sp, t1
+   jr     t0
+-
+-  .globl  __riscv_save_1
+-  .type   __riscv_save_1,@function
+-  .globl  __riscv_save_0
+-  .type   __riscv_save_0,@function
+-__riscv_save_1:
+-__riscv_save_0:
++END_COMPILERRT_FUNCTION(__riscv_save_12)
++END_COMPILERRT_FUNCTION(__riscv_save_11)
++END_COMPILERRT_FUNCTION(__riscv_save_9)
++END_COMPILERRT_FUNCTION(__riscv_save_7)
++END_COMPILERRT_FUNCTION(__riscv_save_5)
++END_COMPILERRT_FUNCTION(__riscv_save_3)
++
++// This function isn't overlapping, but we don't want to apply
++// `.subsections_via_symbols` to the whole file because of the prior
++// overlapping function.
++DEFINE_COMPILERRT_OVERLAPPING_FUNCTION(__riscv_save_1)
++DEFINE_COMPILERRT_FUNCTION_ALIAS(__riscv_save_0, __riscv_save_1)
+   addi   sp, sp, -16
+   sd     s0, 0(sp)
+   sd     ra, 8(sp)
+   jr     t0
++END_COMPILERRT_FUNCTION(__riscv_save_1)
+ 
+ #else
+ 
+-  .globl  __riscv_save_2
+-  .type   __riscv_save_2,@function
+-__riscv_save_2:
++DEFINE_COMPILERRT_FUNCTION(__riscv_save_2)
+   addi    sp, sp, -24
+   sw      s1, 0(sp)
+   sw      s0, 8(sp)
+   sw      ra, 16(sp)
+   jr      t0
++END_COMPILERRT_FUNCTION(__riscv_save_3)
+ 
+-  .globl  __riscv_save_1
+-  .type   __riscv_save_1,@function
+-__riscv_save_1:
++DEFINE_COMPILERRT_FUNCTION(__riscv_save_1)
+   addi    sp, sp, -16
+   sw      s0, 0(sp)
+   sw      ra, 8(sp)
+   jr      t0
++END_COMPILERRT_FUNCTION(__riscv_save_3)
+ 
+-  .globl  __riscv_save_0
+-  .type   __riscv_save_0,@function
+-__riscv_save_0:
++DEFINE_COMPILERRT_FUNCTION(__riscv_save_0)
+   addi    sp, sp, -8
+   sw      ra,  0(sp)
+   jr      t0
++END_COMPILERRT_FUNCTION(__riscv_save_3)
+ 
+ #endif
+ 
+-- 
+2.54.0
+
