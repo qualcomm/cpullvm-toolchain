@@ -10,7 +10,6 @@ including:
 - compiler-rt
 - picolibc
 - musl
-- musl-embedded
 - libc++/libunwind/libc++abi
 
 For embedded environments, picolibc is used as the libc.
@@ -19,8 +18,7 @@ Multiple versions of picolibc are available and may be installed as overlays. Pl
 see CPULLVM's [overlay installation and usage documentation](./docs/user.md#overlay-installation-and-usage) for details.
 
 Libraries intended for use in Linux environments may also be built as part of CPULLVM, though these
-are only intended for testing and validation. For Arm and AArch64, musl-embedded is used
-as the libc for Linux. For RISC-V, musl is used.
+are only intended for testing and validation. musl is used as the libc for Linux for Arm, AArch64, and RISC-V.
 
 ## Targets Built
 CPULLVM supports generating code for Arm, AArch64, RISC-V, and x86 targets only. It does **not** generate code for other targets supported by the upstream LLVM compiler.
@@ -38,7 +36,6 @@ CPULLVM relies on the following upstream components:
 - [LLVM](https://github.com/llvm/llvm-project)
 - [picolibc](https://github.com/picolibc/picolibc)
 - [musl](https://musl.libc.org/)
-- [musl-embedded](https://github.com/qualcomm/musl-embedded)
 - [eld](https://github.com/qualcomm/eld)
 
 ## Host Platforms

@@ -30,7 +30,7 @@ multilib.json should be used.
 
 **LLVM_TOOLCHAIN_C_LIBRARY**:STRING  
 Which embedded C library to use. Note that not all libraries are supported on all host and target platforms.
-picolibc is the default, musl-embedded may also be used for Arm and AArch4 targets.
+picolibc is the default, with alternative versions available.
 
 ## Customizing
 
@@ -66,8 +66,8 @@ what you're enabling.
 
 Currently, Linux variants must be added by directly modifying [build_linux_runtimes.sh](../scripts/build_linux_runtimes.sh).
 
-In most cases, you should only have to modify the `VARIANTS`, `VARIANT_BUILD_FLAGS`,
-and `VARIANT_MUSL_CONFIGS` variables. Doing so will enable the appropriate compiler-rt, musl/musl-embedded,
+In most cases, you should only have to modify the `VARIANTS` and `VARIANT_BUILD_FLAGS`
+variables. Doing so will enable the appropriate compiler-rt, musl,
 and libc++/libc++abi/libunwind libraries for the variant.
 
 ## Building

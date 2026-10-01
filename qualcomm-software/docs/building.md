@@ -62,7 +62,7 @@ The commands below can be used to build a toolchain containing Picolibc librarie
 currently-enabled embedded variants.
 
 > [!NOTE]
-> Not all runtimes may be built on all hosts. CPULLVM's musl and musl-embedded libraries
+> Not all runtimes may be built on all hosts. CPULLVM's musl libraries
 > are only expected to be built on Linux hosts. Windows runtimes (compiler-rt, profile libraries)
 > are expected to be built on Windows hosts. Please refer to our [workflows](/.github/workflows) and
 > [build scripts](/qualcomm-software/scripts) for examples on how our toolchains are built and packaged

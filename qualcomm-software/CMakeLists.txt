@@ -126,7 +126,8 @@ set(LLVM_TOOLCHAIN_C_LIBRARY
     "Which C library to use."
 )
 set_property(CACHE LLVM_TOOLCHAIN_C_LIBRARY
-    PROPERTY STRINGS picolibc picolibc-v1812 musl-embedded)
+    PROPERTY STRINGS picolibc picolibc-v1812
+)
 
 option(
     SHORT_BUILD_PATHS
@@ -153,7 +154,7 @@ if(ENABLE_WINDOWS_LIBRARIES AND NOT CMAKE_HOST_WIN32)
 endif()
 
 option(LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL
-    "Make cpack build an overlay package that can be unpacked over the main toolchain to install a secondary set of libraries based on musl-embedded."
+    "Make cpack build an overlay package that can be unpacked over the main toolchain to install a secondary set of libraries."
     ${overlay_install_default})
 if(LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL)
   if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL "picolibc")
@@ -319,11 +320,11 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fetch_repo.cmake)
 # Check out and patch eld
 fetch_repo(eld)
 
-# Check out and patch picolibc or musl-embedded if required.
+# Check out and patch picolibc or musl if required.
 #
 # If you'd rather check out and patch manually then run cmake with
 # -DFETCHCONTENT_SOURCE_DIR_PICOLIBC=/path/to/picolibc
-# -DFETCHCONTENT_SOURCE_DIR_MUSL-EMBEDDED=/path/to/musl-embedded
+# -DFETCHCONTENT_SOURCE_DIR_MUSL=/path/to/musl
 #
 # By default check out will be silent but this can be changed by running
 # cmake with -DFETCHCONTENT_QUIET=OFF
@@ -333,9 +334,6 @@ fetch_repo(eld)
 if(NOT PREBUILT_TARGET_LIBRARIES)
     fetch_repo(${LLVM_TOOLCHAIN_C_LIBRARY})
     if(ENABLE_LINUX_LIBRARIES)
-        if(NOT LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
-            fetch_repo(musl-embedded)
-        endif()
         fetch_repo(musl)
     endif()
 else()
@@ -351,9 +349,6 @@ else()
         ${LLVM_TOOLCHAIN_C_LIBRARY}_URL
     )
     if(ENABLE_LINUX_LIBRARIES)
-        if(NOT LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
-            get_url_from_version_txt(${version_txt_path} musl-embedded musl-embedded_URL)
-        endif()
         get_url_from_version_txt(${version_txt_path} musl musl_URL)
     endif()
 endif()
@@ -548,10 +543,7 @@ add_custom_target(
     -D${LLVM_TOOLCHAIN_C_LIBRARY}_URL=${${LLVM_TOOLCHAIN_C_LIBRARY}_URL}
     -DLLVM_TOOLCHAIN_C_LIBRARY=${LLVM_TOOLCHAIN_C_LIBRARY}
     # Always pass through the Linux library information--the script will
-    # determine if it is needed. This might be a repeat if musl-embedded
-    # is the selected C library, but repeating it is harmless.
-    -Dmusl-embedded_SOURCE_DIR=${musl-embedded_SOURCE_DIR}
-    -Dmusl-embedded_URL=${musl-embedded_URL}
+    # determine if it is needed.
     -Dmusl_SOURCE_DIR=${musl_SOURCE_DIR}
     -Dmusl_URL=${musl_URL}
     -DENABLE_LINUX_LIBRARIES=${ENABLE_LINUX_LIBRARIES}
@@ -762,7 +754,6 @@ if(NOT PREBUILT_TARGET_LIBRARIES)
                     --base-install-dir <INSTALL_DIR>
                     --llvm-src-dir ${llvmproject_src_dir}
                     --musl-src-dir ${musl_SOURCE_DIR}
-                    --musl-emb-src-dir ${musl-embedded_SOURCE_DIR}
                     --download-dir <DOWNLOAD_DIR>
             INSTALL_COMMAND ""
             USES_TERMINAL_CONFIGURE TRUE
@@ -864,9 +855,6 @@ install(
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_libc_license_info.cmake)
 set(libc_names_to_process ${LLVM_TOOLCHAIN_C_LIBRARY})
 if(ENABLE_LINUX_LIBRARIES)
-    if(NOT ${LLVM_TOOLCHAIN_C_LIBRARY} STREQUAL musl-embedded)
-        list(APPEND libc_names_to_process musl-embedded)
-    endif()
     list(APPEND libc_names_to_process musl)
 endif()
 

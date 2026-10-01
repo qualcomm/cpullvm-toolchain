@@ -25,7 +25,7 @@ set(llvmproject_src_dir ${TOOLCHAIN_SOURCE_DIR}/..)
 # CMake arguments are loaded from the JSON file depending on which C
 # library is used, so this must be set before the JSON is processed.
 set(C_LIBRARY "picolibc" CACHE STRING "Which C library to use.")
-set_property(CACHE C_LIBRARY PROPERTY STRINGS picolibc picolibc-v1812 musl-embedded)
+set_property(CACHE C_LIBRARY PROPERTY STRINGS picolibc picolibc-v1812)
 
 set(VARIANT_JSON "" CACHE STRING "JSON file to load args from.")
 if(VARIANT_JSON)
@@ -94,22 +94,13 @@ set(DISABLE_THREADS ${DISABLE_THREADS_def} CACHE BOOL "Disable threads/atomic/TL
 set(SUPPORTED_TLS_MODELS local-exec initial-exec local-dynamic global-dynamic)
 if(NOT DEFINED TLS_MODEL_def)
     set(TLS_MODEL_def local-exec)
-elseif(C_LIBRARY STREQUAL musl-embedded)
-    message(FATAL_ERROR "TLS_MODEL is currently unsupported when using musl-embedded.")
 elseif(NOT TLS_MODEL_def IN_LIST SUPPORTED_TLS_MODELS)
     string(REPLACE ";" ", " SUPPORTED_TLS_MODELS_STR "${SUPPORTED_TLS_MODELS}")
     message(FATAL_ERROR "Unsupported TLS_MODEL value. Supported values are ${SUPPORTED_TLS_MODELS_STR}")
 endif()
-set(TLS_MODEL ${TLS_MODEL_def} CACHE STRING "TLS model to use when building libraries. Unsupported for variants using musl-embedded.")
+set(TLS_MODEL ${TLS_MODEL_def} CACHE STRING "TLS model to use when building libraries.")
 set_property(CACHE TLS_MODEL PROPERTY STRINGS ${SUPPORTED_TLS_MODELS})
 set(LLVM_BINARY_DIR "" CACHE PATH "Path to LLVM toolchain root to build libraries with")
-
-# Set up a few arbitrary pass-through flags for musl-embedded. This probably
-# isn't the best idea, but historically, our flag usage is such that it is a
-# bit unclear how to do this in a more princicpled way. This should be
-# revisited and probably cleaned up, but for now just mirror what we used to do.
-set(EXTRA_MUSL-EMBEDDED_CONFIG_FLAGS ${EXTRA_MUSL-EMBEDDED_CONFIG_FLAGS_def} CACHE BOOL "Extra configure options for musl-embedded.")
-set(EXTRA_MUSL-EMBEDDED_CFLAGS ${EXTRA_MUSL-EMBEDDED_CFLAGS_def} CACHE BOOL "Extra flags to be used when compiling musl-embedded.")
 
 set(PROJECT_PREFIX "subproj" CACHE STRING "Directory to build subprojects in.")
 set(VARIANT_BUILD_ID "${VARIANT}" CACHE STRING "Name to use to identify build directories." )
@@ -248,7 +239,7 @@ if(ENABLE_LIBC_TESTS OR ENABLE_COMPILER_RT_TESTS OR ENABLE_LIBCXX_TESTS)
 endif()
 
 set(compile_arch_flags "--target=${target_triple} ${COMPILE_FLAGS} --sysroot ${TEMP_LIB_DIR}")
-if(NOT C_LIBRARY STREQUAL musl-embedded)
+if(C_LIBRARY MATCHES "^picolibc")
     # Apply the same TLS model to test compilation as is used for library builds.
     # Without this, -fPIC variants default to general-dynamic TLS which emits
     # __tls_get_addr calls that are not available on bare-metal.
@@ -640,77 +631,6 @@ if(C_LIBRARY MATCHES "^picolibc")
 
 endif()
 
-###############################################################################
-# musl-embedded
-###############################################################################
-if(C_LIBRARY STREQUAL musl-embedded)
-    if(ENABLE_LIBC_TESTS)
-        message(FATAL_ERROR "Tests cannot be enabled using musl-embedded.")
-    endif()
-
-    if(WIN32)
-        message(FATAL_ERROR "Building musl-embedded is not supported on Windows hosts")
-    endif()
-
-    if(TARGET_ARCH MATCHES "^riscv")
-        message(FATAL_ERROR "Only Arm and AArch64 targets are supported for musl-embedded")
-    endif()
-
-    fetch_repo(musl-embedded)
-
-    include(ProcessorCount)
-    set(make_flags)
-    ProcessorCount(nproc)
-    if(NOT nproc EQUAL 0)
-        set(make_flags -j${nproc})
-    endif()
-
-    if(LIBRARY_BUILD_TYPE STREQUAL minsizerelease)
-        set(musl-embedded_opt_flags "-Os")
-    elseif((LIBRARY_BUILD_TYPE STREQUAL release) OR (LIBRARY_BUILD_TYPE STREQUAL releasewithdebuginfo))
-        set(musl-embedded_opt_flags "-O3")
-    endif()
-
-    # FIXME: if we need the extra `uselocks`/`standalone` variants, we
-    # can add a passthrough here and make them separate variants.
-    set(musl_embedded_flags
-        --disable-wrapper
-        --quic-arm-baremetal
-        --disable-visibility
-        ${EXTRA_MUSL-EMBEDDED_CONFIG_FLAGS}
-        "CROSS_COMPILE=${LLVM_BINARY_DIR}/bin/llvm-"
-        "CC=${LLVM_BINARY_DIR}/bin/clang --target=${target_triple} -fuse-ld=eld"
-        "CFLAGS=${lib_compile_flags} ${musl-embedded_opt_flags} -fPIC -fvisibility=hidden -DVISIBILITY_HIDDEN -fno-rounding-math ${EXTRA_MUSL-EMBEDDED_CFLAGS}"
-        "LIBCC=${TEMP_LIB_DIR}/libclang_rt.builtins.a")
-
-    ExternalProject_Add(
-        ${C_LIBRARY}
-        STAMP_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/stamp
-        BINARY_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/build
-        DOWNLOAD_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/dl
-        TMP_DIR ${PROJECT_PREFIX}/${C_LIBRARY}/${VARIANT_BUILD_ID}/tmp
-        SOURCE_DIR ${musl-embedded_SOURCE_DIR}
-        INSTALL_DIR ${TEMP_LIB_DIR}
-        DEPENDS compiler_rt-install
-        CONFIGURE_COMMAND
-            <SOURCE_DIR>/configure
-            --prefix=${TEMP_LIB_DIR}
-            ${musl_embedded_flags}
-        BUILD_COMMAND
-            make ${make_flags}
-        INSTALL_COMMAND
-            make install
-        USES_TERMINAL_CONFIGURE TRUE
-        USES_TERMINAL_BUILD TRUE
-        USES_TERMINAL_INSTALL TRUE
-        # Always run the build command so that incremental builds are correct.
-        CONFIGURE_HANDLED_BY_BUILD TRUE
-        TEST_EXCLUDE_FROM_MAIN TRUE
-        STEP_TARGETS configure build install
-    )
-endif()
-
-
 add_dependencies(clib-configure ${C_LIBRARY}-configure)
 add_dependencies(clib-build ${C_LIBRARY}-build)
 add_dependencies(clib-install ${C_LIBRARY}-install)
@@ -761,21 +681,6 @@ if(ENABLE_CXX_LIBS)
                 -DLLVM_EXTERNAL_LIT=${external_lit_path}
             )
         endif()
-    elseif(C_LIBRARY STREQUAL musl-embedded)
-        set(cxxlibs_extra_cmake_options
-            -DLIBCXX_HAS_MUSL_LIBC=ON
-            -DLIBCXXABI_ENABLE_THREADS=OFF
-            -DLIBCXX_ENABLE_RANDOM_DEVICE=OFF
-            -DLIBCXX_ENABLE_THREADS=OFF
-            -DLIBCXX_ENABLE_FILESYSTEM=OFF
-            -DLIBCXX_ENABLE_LOCALIZATION=OFF
-            -DLIBUNWIND_ENABLE_THREADS=OFF
-            -DLIBCXXABI_ENABLE_EXCEPTIONS=${ENABLE_EXCEPTIONS}
-            -DLIBCXXABI_ENABLE_STATIC_UNWINDER=${ENABLE_EXCEPTIONS}
-            -DLIBCXX_ENABLE_EXCEPTIONS=${ENABLE_EXCEPTIONS}
-            -DLIBCXX_ENABLE_RTTI=${ENABLE_RTTI}
-            )
-        set(lib_compile_flags "${lib_compile_flags} -fno-unroll-loops -fno-optimize-sibling-calls -D_GNU_SOURCE")
     endif()
 
     ExternalProject_Add(

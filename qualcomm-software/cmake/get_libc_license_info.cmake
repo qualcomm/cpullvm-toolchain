@@ -3,8 +3,7 @@
 function(get_libc_license_display_name clib_name display_name_out)
     if(${clib_name} MATCHES "^picolibc")
         set(${display_name_out} "Picolibc" PARENT_SCOPE)
-    elseif(${clib_name} STREQUAL musl-embedded OR
-           ${clib_name} STREQUAL musl)
+    elseif(${clib_name} STREQUAL musl)
         set(${display_name_out} ${clib_name} PARENT_SCOPE)
     else()
         message(FATAL_ERROR "Unknown library name!")
@@ -28,8 +27,6 @@ function(get_libc_license_files clib_name license_file_list_out)
     elseif(${clib_name} STREQUAL picolibc-v1812)
         # COPYING.NEWLIB has been removed
         set(${license_file_list_out} COPYING.picolibc COPYING.picolibc PARENT_SCOPE)
-    elseif(${clib_name} STREQUAL musl-embedded)
-        set(${license_file_list_out} COPYRIGHT musl-embedded-COPYRIGHT.txt PARENT_SCOPE)
     elseif(${clib_name} STREQUAL musl)
         set(${license_file_list_out} COPYRIGHT musl-COPYRIGHT.txt PARENT_SCOPE)
     else()
