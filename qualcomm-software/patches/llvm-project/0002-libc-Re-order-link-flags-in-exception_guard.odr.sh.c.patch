@@ -1,0 +1,26 @@
+From a17d5c83651a0129fd606564e21f55343f7d1a9d Mon Sep 17 00:00:00 2001
+From: Jonathon Penix <jpenix@qti.qualcomm.com>
+Date: Mon, 21 Sep 2026 21:16:03 -0700
+Subject: [PATCH] [libc++] Re-order link flags in exception_guard.odr.sh.cpp
+
+Signed-off-by: Jonathon Penix <jpenix@qti.qualcomm.com>
+---
+ libcxx/test/libcxx/utilities/exception_guard.odr.sh.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/libcxx/test/libcxx/utilities/exception_guard.odr.sh.cpp b/libcxx/test/libcxx/utilities/exception_guard.odr.sh.cpp
+index f6b8a29d3682..fec0ee5ee32b 100644
+--- a/libcxx/test/libcxx/utilities/exception_guard.odr.sh.cpp
++++ b/libcxx/test/libcxx/utilities/exception_guard.odr.sh.cpp
+@@ -14,7 +14,7 @@
+ 
+ // RUN: %{cxx} %s %{flags} %{compile_flags} -c -o %t.except.o   -O1 -fexceptions
+ // RUN: %{cxx} %s %{flags} %{compile_flags} -c -o %t.noexcept.o -O1 -fno-exceptions
+-// RUN: %{cxx} %{flags} %{link_flags} -o %t.exe %t.except.o %t.noexcept.o
++// RUN: %{cxx} -o %t.exe %t.except.o %t.noexcept.o %{flags} %{link_flags}
+ // RUN: %{run}
+ 
+ #include <__utility/exception_guard.h>
+-- 
+2.43.0
+
