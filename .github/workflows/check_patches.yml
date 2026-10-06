@@ -1,0 +1,46 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Verify that patch files under qualcomm-software/patches/ are well-formed
+# git format-patch outputs and have no duplicate numeric ordering prefixes.
+
+name: Check Patch Files
+
+on:
+  pull_request:
+    paths:
+      - 'qualcomm-software/patches/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-patches:
+    # Don't run on forks
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Find affected patch directories
+        id: find-dirs
+        run: |
+          dirs=$(git diff --name-only HEAD~ HEAD \
+            | grep '^qualcomm-software/patches/' \
+            | xargs -r -I{} dirname {} \
+            | sort -u \
+            | tr '\n' ' ' \
+            || true)
+          echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
+
+      - name: Check patches
+        if: steps.find-dirs.outputs.dirs != ''
+        run: python3 qualcomm-software/ci/check_patches.py ${{ steps.find-dirs.outputs.dirs }}
