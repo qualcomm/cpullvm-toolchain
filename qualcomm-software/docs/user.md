@@ -36,10 +36,9 @@ libc++ and libc++abi runtimes libraries are provided for many embedded variants.
 supported include:
 
 * Multithreading
-* Exceptions
-* RTTI
 
-If variants with exceptions and RTTI enabled are required, please file an issue.
+Exception and RTTI support is only provided for a limited number of variants. If additional variants with
+exceptions and RTTI enabled are required, please file an issue.
 
 ## Multilib
 CPULLVM automatically selects a set of headers and runtime libraries to use when compiling and linking based on
@@ -50,6 +49,8 @@ When compiling and linking, you should provide at least the following options on
 * The target triple (ex: `--target=riscv32-unknown-elf`)
 * `-march`, `-mabi`, and `-mfpu`, if using non-default options and applicable to your target
 * Whether to use position independent code
+* Whether exceptions and RTTI should be enabled (`-fexceptions`/`-fno-exceptions`, `-frtti`/`-fno-rtti`). Limited
+variants include exception and RTTI support currently, see [C++ Support](#c-support).
 * Any additional options like sanitizers or `-mbranch-protection`
 
 Additionally, CPULLVM implements custom multilib flags to allow selecting variants that are not otherwise tied
