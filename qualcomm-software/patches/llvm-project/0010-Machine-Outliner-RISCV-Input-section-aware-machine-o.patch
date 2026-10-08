@@ -1,0 +1,965 @@
+From b6320858a82e265a2902d0b3fc1680a1bebc7f40 Mon Sep 17 00:00:00 2001
+From: Garvit Gupta <garvgupt@qti.qualcomm.com>
+Date: Tue, 15 Sep 2026 13:11:20 -0700
+Subject: [PATCH] [Machine Outliner][RISCV] Input section aware machine
+ outlining
+
+Currently machine outliner refuses to outline from functions from named section
+functions because the callers of the outlined function could potentially be in
+multiple different input sections and outlined function can only be in one of
+the input section therefore having cross-section calls that breaks the assumption
+around the code being all in the same section
+
+This PR fixes the issue by partitioning the candidates of a repeated sequence
+by their parent function's input sections and emitting the outlined function
+within the same section. An outlined function inherits its parents' input
+section.
+
+This is opt-in via `TargetInstrInfo::supportsSectionAwareOutlining()`, which
+defaults to false and has been enabled only for RISCV.
+
+Signed-off-by: Garvit Gupta <garvgupt@qti.qualcomm.com>
+---
+ llvm/include/llvm/CodeGen/MachineOutliner.h   |   8 +-
+ llvm/include/llvm/CodeGen/TargetInstrInfo.h   |  10 ++
+ llvm/lib/CodeGen/MachineOutliner.cpp          | 117 ++++++++++--
+ llvm/lib/Target/AArch64/AArch64InstrInfo.cpp  |  14 +-
+ llvm/lib/Target/ARM/ARMBaseInstrInfo.cpp      |  14 +-
+ llvm/lib/Target/RISCV/RISCVInstrInfo.cpp      |   9 +-
+ llvm/lib/Target/RISCV/RISCVInstrInfo.h        |   2 +
+ .../machine-outliner-multiple-sections.ll     | 169 ++++++++++++++++++
+ .../machine-outliner-section-attribute.ll     |  68 +++++++
+ .../RISCV/machine-outliner-section-debug.ll   |  16 ++
+ .../RISCV/machineoutliner-pcrel-lo.mir        |  36 ++--
+ .../RISCV/machine-outliner-section-rv32.ll    | 117 ++++++++++++
+ .../RISCV/machine-outliner-section-rv64.ll    | 117 ++++++++++++
+ 13 files changed, 630 insertions(+), 67 deletions(-)
+ create mode 100644 llvm/test/CodeGen/RISCV/machine-outliner-multiple-sections.ll
+ create mode 100644 llvm/test/CodeGen/RISCV/machine-outliner-section-attribute.ll
+ create mode 100644 llvm/test/CodeGen/RISCV/machine-outliner-section-debug.ll
+ create mode 100644 llvm/test/LTO/RISCV/machine-outliner-section-rv32.ll
+ create mode 100644 llvm/test/LTO/RISCV/machine-outliner-section-rv64.ll
+
+diff --git a/llvm/include/llvm/CodeGen/MachineOutliner.h b/llvm/include/llvm/CodeGen/MachineOutliner.h
+index 2f38017f1027..453a7f625470 100644
+--- a/llvm/include/llvm/CodeGen/MachineOutliner.h
++++ b/llvm/include/llvm/CodeGen/MachineOutliner.h
+@@ -107,10 +107,6 @@ private:
+   }
+ 
+ public:
+-  /// The index of this \p Candidate's \p OutlinedFunction in the list of
+-  /// \p OutlinedFunctions.
+-  unsigned FunctionIdx = 0;
+-
+   /// Identifier denoting the instructions to emit to call an outlined function
+   /// from this point. Defined by the target.
+   unsigned CallConstructionID = 0;
+@@ -201,9 +197,9 @@ public:
+   Candidate(unsigned StartIdx, unsigned Len,
+             MachineBasicBlock::iterator &FirstInst,
+             MachineBasicBlock::iterator &LastInst, MachineBasicBlock *MBB,
+-            unsigned FunctionIdx, unsigned Flags)
++            unsigned Flags)
+       : StartIdx(StartIdx), Len(Len), FirstInst(FirstInst), LastInst(LastInst),
+-        MBB(MBB), FunctionIdx(FunctionIdx), Flags(Flags) {}
++        MBB(MBB), Flags(Flags) {}
+   Candidate() = delete;
+ 
+   /// Used to ensure that \p Candidates are outlined in an order that
+diff --git a/llvm/include/llvm/CodeGen/TargetInstrInfo.h b/llvm/include/llvm/CodeGen/TargetInstrInfo.h
+index 8f381c5efe2e..df0f5cf48155 100644
+--- a/llvm/include/llvm/CodeGen/TargetInstrInfo.h
++++ b/llvm/include/llvm/CodeGen/TargetInstrInfo.h
+@@ -2224,6 +2224,16 @@ public:
+   virtual void mergeOutliningCandidateAttributes(
+       Function &F, std::vector<outliner::Candidate> &Candidates) const;
+ 
++  /// Return true if the target supports outlining candidates from multiple
++  /// input sections in one pass. When enabled, candidates are partitioned by
++  /// input section before target-specific outlining checks are performed, and
++  /// each outlined function is placed in the input section of its parents.
++  ///
++  /// A target that enables this must not independently reject functions with
++  /// a section marking in isFunctionSafeToOutlineFrom(), otherwise such
++  /// functions never reach the outliner and this hook has no effect.
++  virtual bool supportsSectionAwareOutlining() const { return false; }
++
+ protected:
+   /// Target-dependent implementation for getOutliningTypeImpl.
+   virtual outliner::InstrType
+diff --git a/llvm/lib/CodeGen/MachineOutliner.cpp b/llvm/lib/CodeGen/MachineOutliner.cpp
+index 9c92c7bf2369..08e9a7df1cc3 100644
+--- a/llvm/lib/CodeGen/MachineOutliner.cpp
++++ b/llvm/lib/CodeGen/MachineOutliner.cpp
+@@ -479,6 +479,13 @@ struct MachineOutliner : public ModulePass {
+       unsigned StringLen, std::vector<Candidate> &CandidatesForRepeatedSeq,
+       OutlinedFunction &OF);
+ 
++  /// Run the outlining cost model for a group of candidates and append the
++  /// resulting outlined function if it is profitable.
++  void createOutlinedFunctionIfBeneficial(
++      std::vector<Candidate> &Candidates, unsigned StringLen,
++      unsigned MinRepeats, const TargetInstrInfo &TII,
++      std::vector<std::unique_ptr<OutlinedFunction>> &FunctionList);
++
+   /// Remark output explaining that a function was outlined.
+   void emitOutlinedFunctionRemark(OutlinedFunction &OF);
+ 
+@@ -723,8 +730,7 @@ void MachineOutliner::findGlobalCandidates(
+     auto Length = ME.EndIdx - ME.StartIdx + 1;
+     MachineBasicBlock *MBB = StartIt->getParent();
+     CandidatesForRepeatedSeq.emplace_back(ME.StartIdx, Length, StartIt, EndIt,
+-                                          MBB, FunctionList.size(),
+-                                          MBBFlagsMap[MBB]);
++                                          MBB, MBBFlagsMap[MBB]);
+     const TargetInstrInfo *TII =
+         MBB->getParent()->getSubtarget().getInstrInfo();
+     unsigned MinRepeats = 1;
+@@ -740,6 +746,54 @@ void MachineOutliner::findGlobalCandidates(
+   }
+ }
+ 
++static StringRef getCandidateInputSection(const Candidate &C) {
++  const Function &F = C.getMF()->getFunction();
++  return F.hasSection() ? F.getSection() : StringRef();
++}
++
++static SmallVector<std::vector<Candidate>>
++partitionCandidatesByInputSection(std::vector<Candidate> &Candidates) {
++  // Each candidate belongs to exactly one MachineFunction, so the partitions
++  // are disjoint and can be outlined independently.
++  SmallVector<std::vector<Candidate>> Partitions;
++  SmallVector<StringRef> Sections;
++  for (Candidate &C : Candidates) {
++    StringRef Section = getCandidateInputSection(C);
++    auto It = llvm::find(Sections, Section);
++    if (It == Sections.end()) {
++      Sections.push_back(Section);
++      Partitions.emplace_back();
++      It = Sections.end() - 1;
++    }
++    Partitions[std::distance(Sections.begin(), It)].push_back(std::move(C));
++  }
++  return Partitions;
++}
++
++void MachineOutliner::createOutlinedFunctionIfBeneficial(
++    std::vector<Candidate> &Candidates, unsigned StringLen, unsigned MinRepeats,
++    const TargetInstrInfo &TII,
++    std::vector<std::unique_ptr<OutlinedFunction>> &FunctionList) {
++  if (Candidates.size() < MinRepeats)
++    return;
++
++  std::optional<std::unique_ptr<OutlinedFunction>> OF =
++      TII.getOutliningCandidateInfo(*MMI, Candidates, MinRepeats);
++
++  // If we deleted too many candidates, then there's nothing worth outlining.
++  // FIXME: This should take target-specified instruction sizes into account.
++  if (!OF.has_value() || OF.value()->Candidates.size() < MinRepeats)
++    return;
++
++  // Is it better to outline this candidate than not?
++  if (OF.value()->getBenefit() < OutlinerBenefitThreshold) {
++    emitNotOutliningCheaperRemark(StringLen, Candidates, *OF.value());
++    return;
++  }
++
++  FunctionList.emplace_back(std::move(OF.value()));
++}
++
+ void MachineOutliner::findCandidates(
+     InstructionMapper &Mapper,
+     std::vector<std::unique_ptr<OutlinedFunction>> &FunctionList) {
+@@ -809,8 +863,7 @@ void MachineOutliner::findCandidates(
+       MachineBasicBlock::iterator EndIt = Mapper.InstrList[EndIdx];
+       MachineBasicBlock *MBB = StartIt->getParent();
+       CandidatesForRepeatedSeq.emplace_back(StartIdx, StringLen, StartIt, EndIt,
+-                                            MBB, FunctionList.size(),
+-                                            Mapper.MBBFlagsMap[MBB]);
++                                            MBB, Mapper.MBBFlagsMap[MBB]);
+     }
+ #ifndef NDEBUG
+     LLVM_DEBUG(dbgs() << "    Candidates discarded: " << NumDiscarded
+@@ -830,23 +883,40 @@ void MachineOutliner::findCandidates(
+     const TargetInstrInfo *TII =
+         CandidatesForRepeatedSeq[0].getMF()->getSubtarget().getInstrInfo();
+ 
+-    std::optional<std::unique_ptr<OutlinedFunction>> OF =
+-        TII->getOutliningCandidateInfo(*MMI, CandidatesForRepeatedSeq,
+-                                       MinRepeats);
+-
+-    // If we deleted too many candidates, then there's nothing worth outlining.
+-    // FIXME: This should take target-specified instruction sizes into account.
+-    if (!OF.has_value() || OF.value()->Candidates.size() < MinRepeats)
+-      continue;
+-
+-    // Is it better to outline this candidate than not?
+-    if (OF.value()->getBenefit() < OutlinerBenefitThreshold) {
+-      emitNotOutliningCheaperRemark(StringLen, CandidatesForRepeatedSeq,
+-                                    *OF.value());
++    // Targets that do not opt in to section aware outlining never map
++    // functions with a section marking, so every candidate would land in a
++    // single partition. Skip partitioning entirely to avoid the allocation.
++    if (!TII->supportsSectionAwareOutlining()) {
++      createOutlinedFunctionIfBeneficial(CandidatesForRepeatedSeq, StringLen,
++                                         MinRepeats, *TII, FunctionList);
+       continue;
+     }
+ 
+-    FunctionList.emplace_back(std::move(OF.value()));
++#ifndef NDEBUG
++    LLVM_DEBUG(
++        dbgs()
++        << "*** Section Aware Outlining is enabled for the target *** \n");
++#endif
++
++    SmallVector<std::vector<Candidate>> Partitions =
++        partitionCandidatesByInputSection(CandidatesForRepeatedSeq);
++#ifndef NDEBUG
++    LLVM_DEBUG(dbgs() << "    Input section partitions: " << Partitions.size()
++                      << "\n");
++#endif
++
++    for (std::vector<Candidate> &Partition : Partitions) {
++#ifndef NDEBUG
++      LLVM_DEBUG({
++        StringRef Section = getCandidateInputSection(Partition.front());
++        dbgs() << "    .. section '"
++               << (Section.empty() ? StringRef("<none>") : Section)
++               << "': " << Partition.size() << " candidates\n";
++      });
++#endif
++      createOutlinedFunctionIfBeneficial(Partition, StringLen, MinRepeats, *TII,
++                                         FunctionList);
++    }
+   }
+ }
+ 
+@@ -916,6 +986,17 @@ MachineFunction *MachineOutliner::createOutlinedFunction(
+ 
+   TII.mergeOutliningCandidateAttributes(*F, OF.Candidates);
+ 
++  if (TII.supportsSectionAwareOutlining()) {
++    const Function &ParentFn = FirstCand.getMF()->getFunction();
++    if (ParentFn.hasSection()) {
++      F->setSection(ParentFn.getSection());
++#ifndef NDEBUG
++      LLVM_DEBUG(dbgs() << "  INHERITED SECTION: " << ParentFn.getSection()
++                        << "\n");
++#endif
++    }
++  }
++
+   // Set uwtable, so we generate eh_frame.
+   UWTableKind UW = std::accumulate(
+       OF.Candidates.cbegin(), OF.Candidates.cend(), UWTableKind::None,
+diff --git a/llvm/lib/Target/AArch64/AArch64InstrInfo.cpp b/llvm/lib/Target/AArch64/AArch64InstrInfo.cpp
+index 018ac03f6295..4319210fcf5d 100644
+--- a/llvm/lib/Target/AArch64/AArch64InstrInfo.cpp
++++ b/llvm/lib/Target/AArch64/AArch64InstrInfo.cpp
+@@ -10767,13 +10767,6 @@ bool AArch64InstrInfo::isFunctionSafeToOutlineFrom(
+   if (!OutlineFromLinkOnceODRs && F.hasLinkOnceODRLinkage())
+     return false;
+ 
+-  // Don't outline from functions with section markings; the program could
+-  // expect that all the code is in the named section.
+-  // FIXME: Allow outlining from multiple functions with the same section
+-  // marking.
+-  if (F.hasSection())
+-    return false;
+-
+   // Outlining from functions with redzones is unsafe since the outliner may
+   // modify the stack. Check if hasRedZone is true or unknown; if yes, don't
+   // outline from it.
+@@ -10792,6 +10785,13 @@ bool AArch64InstrInfo::isFunctionSafeToOutlineFrom(
+   if (MF.getTarget().getMCAsmInfo().usesWindowsCFI())
+     return false;
+ 
++  // Allow outlining from functions with section markings if the target can
++  // place the outlined function in the same section. Otherwise, the outlined
++  // function may be placed in a different section, which can break assumptions
++  // about the section layout.
++  if (F.hasSection())
++    return supportsSectionAwareOutlining();
++
+   // It's safe to outline from MF.
+   return true;
+ }
+diff --git a/llvm/lib/Target/ARM/ARMBaseInstrInfo.cpp b/llvm/lib/Target/ARM/ARMBaseInstrInfo.cpp
+index a922024b032d..d4d163c4f94d 100644
+--- a/llvm/lib/Target/ARM/ARMBaseInstrInfo.cpp
++++ b/llvm/lib/Target/ARM/ARMBaseInstrInfo.cpp
+@@ -6045,17 +6045,17 @@ bool ARMBaseInstrInfo::isFunctionSafeToOutlineFrom(
+   if (!OutlineFromLinkOnceODRs && F.hasLinkOnceODRLinkage())
+     return false;
+ 
+-  // Don't outline from functions with section markings; the program could
+-  // expect that all the code is in the named section.
+-  // FIXME: Allow outlining from multiple functions with the same section
+-  // marking.
+-  if (F.hasSection())
+-    return false;
+-
+   // FIXME: Thumb1 outlining is not handled
+   if (MF.getInfo<ARMFunctionInfo>()->isThumb1OnlyFunction())
+     return false;
+ 
++  // Allow outlining from functions with section markings if the target can
++  // place the outlined function in the same section. Otherwise, the outlined
++  // function may be placed in a different section, which can break assumptions
++  // about the section layout.
++  if (F.hasSection())
++    return supportsSectionAwareOutlining();
++
+   // It's safe to outline from MF.
+   return true;
+ }
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrInfo.cpp b/llvm/lib/Target/RISCV/RISCVInstrInfo.cpp
+index 49d8fa0fc27f..dca767d38cc4 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrInfo.cpp
++++ b/llvm/lib/Target/RISCV/RISCVInstrInfo.cpp
+@@ -3625,6 +3625,7 @@ RISCVInstrInfo::getSerializableDirectMachineOperandTargetFlags() const {
+   };
+   return ArrayRef(TargetFlags);
+ }
++
+ bool RISCVInstrInfo::isFunctionSafeToOutlineFrom(
+     MachineFunction &MF, bool OutlineFromLinkOnceODRs) const {
+   const Function &F = MF.getFunction();
+@@ -3633,10 +3634,12 @@ bool RISCVInstrInfo::isFunctionSafeToOutlineFrom(
+   if (!OutlineFromLinkOnceODRs && F.hasLinkOnceODRLinkage())
+     return false;
+ 
+-  // Don't outline from functions with section markings; the program could
+-  // expect that all the code is in the named section.
++  // Allow outlining from functions with section markings if the target can
++  // place the outlined function in the same section. Otherwise, the outlined
++  // function may be placed in a different section, which can break assumptions
++  // about the section layout.
+   if (F.hasSection())
+-    return false;
++    return supportsSectionAwareOutlining();
+ 
+   // It's safe to outline from MF.
+   return true;
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrInfo.h b/llvm/lib/Target/RISCV/RISCVInstrInfo.h
+index c75335ba7d14..0f6983c08f0c 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrInfo.h
++++ b/llvm/lib/Target/RISCV/RISCVInstrInfo.h
+@@ -233,6 +233,8 @@ public:
+ 
+   bool shouldOutlineFromFunctionByDefault(MachineFunction &MF) const override;
+ 
++  bool supportsSectionAwareOutlining() const override { return true; }
++
+   // Return true if the candidate should be discarded from outlining.
+   bool analyzeCandidate(outliner::Candidate &C) const;
+   // Calculate target-specific information for a set of outlining candidates.
+diff --git a/llvm/test/CodeGen/RISCV/machine-outliner-multiple-sections.ll b/llvm/test/CodeGen/RISCV/machine-outliner-multiple-sections.ll
+new file mode 100644
+index 000000000000..1652897f03da
+--- /dev/null
++++ b/llvm/test/CodeGen/RISCV/machine-outliner-multiple-sections.ll
+@@ -0,0 +1,169 @@
++; NOTE: This test is derived from the following C source. It exercises one
++; repeated sequence across unsectioned functions and three explicit sections.
++;
++; All four input-section buckets are outlined in one pass.
++;
++; #define BODY(N) do { a ^= b; b += a; a = (a << 3) | (a >> 29); \
++;                       a ^= b; return a + N; } while (0)
++; #define SEC(N, V) __attribute__((noinline, section(".sec_shared"))) \
++;   unsigned N(unsigned a, unsigned b) { BODY(V); }
++; #define SEC2(S, N, V) __attribute__((noinline, section(S))) \
++;   unsigned N(unsigned a, unsigned b) { BODY(V); }
++; #define PLAIN(N, V) __attribute__((noinline)) \
++;   unsigned N(unsigned a, unsigned b) { BODY(V); }
++; SEC(shared_0, 1) SEC(shared_1, 2) SEC(shared_2, 3)
++; PLAIN(plain_0, 4) PLAIN(plain_1, 5) PLAIN(plain_2, 6)
++; SEC2(".sec_a", a_0, 7) SEC2(".sec_a", a_1, 8)
++; SEC2(".sec_b", b_0, 9) SEC2(".sec_b", b_1, 10)
++
++; RUN: llc -mtriple=riscv32 -enable-machine-outliner=always -verify-machineinstrs < %s | FileCheck %s --check-prefixes=CHECK,NOFS
++; RUN: llc -mtriple=riscv32 -enable-machine-outliner=always --function-sections -verify-machineinstrs < %s | FileCheck %s --check-prefixes=CHECK,FS
++; RUN: llc -mtriple=riscv64 -enable-machine-outliner=always -verify-machineinstrs < %s | FileCheck %s --check-prefixes=CHECK,NOFS
++; RUN: llc -mtriple=riscv64 -enable-machine-outliner=always --function-sections -verify-machineinstrs < %s | FileCheck %s --check-prefixes=CHECK,FS
++
++; CHECK: .section .sec_shared,"ax",@progbits
++
++define i32 @shared_0(i32 %a, i32 %b) noinline nounwind section ".sec_shared" {
++; CHECK-LABEL: shared_0:
++; CHECK: call t0, OUTLINED_FUNCTION_[[SHARED:[0-9_]+]]
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 1
++  ret i32 %result
++}
++
++define i32 @shared_1(i32 %a, i32 %b) noinline nounwind section ".sec_shared" {
++; CHECK-LABEL: shared_1:
++; CHECK: call t0, OUTLINED_FUNCTION_[[SHARED]]
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 2
++  ret i32 %result
++}
++
++define i32 @shared_2(i32 %a, i32 %b) noinline nounwind section ".sec_shared" {
++; CHECK-LABEL: shared_2:
++; CHECK: call t0, OUTLINED_FUNCTION_[[SHARED]]
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 3
++  ret i32 %result
++}
++
++define i32 @plain_0(i32 %a, i32 %b) noinline nounwind {
++; NOFS: .text{{$}}
++; FS: .section .text.plain_0,"ax",@progbits
++; CHECK-LABEL: plain_0:
++; CHECK: call t0, OUTLINED_FUNCTION_[[PLAIN:[0-9_]+]]
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 4
++  ret i32 %result
++}
++
++define i32 @plain_1(i32 %a, i32 %b) noinline nounwind {
++; FS: .section .text.plain_1,"ax",@progbits
++; CHECK-LABEL: plain_1:
++; CHECK: call t0, OUTLINED_FUNCTION_[[PLAIN]]
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 5
++  ret i32 %result
++}
++
++define i32 @plain_2(i32 %a, i32 %b) noinline nounwind {
++; FS: .section .text.plain_2,"ax",@progbits
++; CHECK-LABEL: plain_2:
++; CHECK: call t0, OUTLINED_FUNCTION_[[PLAIN]]
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 6
++  ret i32 %result
++}
++
++define i32 @a_0(i32 %a, i32 %b) noinline nounwind section ".sec_a" {
++; CHECK-LABEL: a_0:
++; CHECK: call t0, OUTLINED_FUNCTION_[[A:[0-9_]+]]
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 7
++  ret i32 %result
++}
++
++define i32 @a_1(i32 %a, i32 %b) noinline nounwind section ".sec_a" {
++; CHECK-LABEL: a_1:
++; CHECK: call t0, OUTLINED_FUNCTION_[[A]]
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 8
++  ret i32 %result
++}
++
++define i32 @b_0(i32 %a, i32 %b) noinline nounwind section ".sec_b" {
++; CHECK-LABEL: b_0:
++; CHECK: call t0, OUTLINED_FUNCTION_[[B:[0-9_]+]]
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 9
++  ret i32 %result
++}
++
++define i32 @b_1(i32 %a, i32 %b) noinline nounwind section ".sec_b" {
++; CHECK-LABEL: b_1:
++; CHECK: call t0, OUTLINED_FUNCTION_[[B]]
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 10
++  ret i32 %result
++}
++
++; All four section buckets were outlined in the same pass.
++; CHECK: OUTLINED_FUNCTION_[[SHARED]]:
++; NOFS: .text{{$}}
++; NOFS: OUTLINED_FUNCTION_[[PLAIN]]:
++; FS: .section .text.OUTLINED_FUNCTION_[[PLAIN]],"ax",@progbits
++; FS: OUTLINED_FUNCTION_[[PLAIN]]:
++; CHECK: .section .sec_a,"ax",@progbits
++; CHECK: OUTLINED_FUNCTION_[[A]]:
++; CHECK: .section .sec_b,"ax",@progbits
++; CHECK: OUTLINED_FUNCTION_[[B]]:
+diff --git a/llvm/test/CodeGen/RISCV/machine-outliner-section-attribute.ll b/llvm/test/CodeGen/RISCV/machine-outliner-section-attribute.ll
+new file mode 100644
+index 000000000000..52eb6f79791f
+--- /dev/null
++++ b/llvm/test/CodeGen/RISCV/machine-outliner-section-attribute.ll
+@@ -0,0 +1,68 @@
++; NOTE: This test is derived from the following C source. It uses only
++; parameter arithmetic so the repeated sequence is self-contained.
++;
++; #define BODY(N) do { a ^= b; b += a; a = (a << 3) | (a >> 29); \
++;                       a ^= b; return a + N; } while (0)
++; __attribute__((noinline, section(".sec_shared")))
++; unsigned shared_0(unsigned a, unsigned b) { BODY(1); }
++; __attribute__((noinline, section(".sec_shared")))
++; unsigned shared_1(unsigned a, unsigned b) { BODY(2); }
++; __attribute__((noinline, section(".sec_shared")))
++; unsigned shared_2(unsigned a, unsigned b) { BODY(3); }
++
++; RUN: llc -mtriple=riscv32 -enable-machine-outliner=always -verify-machineinstrs < %s | FileCheck %s --check-prefixes=CHECK,RV32
++; RUN: llc -mtriple=riscv32 -enable-machine-outliner=always --function-sections -verify-machineinstrs < %s | FileCheck %s --check-prefixes=CHECK,RV32
++; RUN: llc -mtriple=riscv64 -enable-machine-outliner=always -verify-machineinstrs < %s | FileCheck %s --check-prefixes=CHECK,RV64
++; RUN: llc -mtriple=riscv64 -enable-machine-outliner=always --function-sections -verify-machineinstrs < %s | FileCheck %s --check-prefixes=CHECK,RV64
++
++; CHECK: .section .sec_shared,"ax",@progbits
++
++define i32 @shared_0(i32 %a, i32 %b) noinline nounwind section ".sec_shared" {
++; CHECK-LABEL: shared_0:
++; CHECK: call t0, OUTLINED_FUNCTION_0
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 1
++  ret i32 %result
++}
++
++define i32 @shared_1(i32 %a, i32 %b) noinline nounwind section ".sec_shared" {
++; CHECK-LABEL: shared_1:
++; CHECK: call t0, OUTLINED_FUNCTION_0
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 2
++  ret i32 %result
++}
++
++define i32 @shared_2(i32 %a, i32 %b) noinline nounwind section ".sec_shared" {
++; CHECK-LABEL: shared_2:
++; CHECK: call t0, OUTLINED_FUNCTION_0
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 3
++  ret i32 %result
++}
++
++; The outlined function inherits the input section of its parents.
++; CHECK: OUTLINED_FUNCTION_0:
++; CHECK: xor a0, a0, a1
++; RV32-NEXT: srli a2, a0, 29
++; RV64-NEXT: srliw a2, a0, 29
++; CHECK-NEXT: slli a3, a0, 3
++; CHECK-NEXT: add a0, a1, a0
++; CHECK-NEXT: or a2, a3, a2
++; CHECK-NEXT: xor a0, a2, a0
++; CHECK-NEXT: jr t0
+diff --git a/llvm/test/CodeGen/RISCV/machine-outliner-section-debug.ll b/llvm/test/CodeGen/RISCV/machine-outliner-section-debug.ll
+new file mode 100644
+index 000000000000..4b5e5ac0453f
+--- /dev/null
++++ b/llvm/test/CodeGen/RISCV/machine-outliner-section-debug.ll
+@@ -0,0 +1,16 @@
++; Check debug output for section-aware machine outlining.
++;
++; REQUIRES: asserts
++; RUN: llc -mtriple=riscv32 -enable-machine-outliner=always \
++; RUN:   -debug-only=machine-outliner \
++; RUN:   %S/machine-outliner-multiple-sections.ll -o /dev/null 2>&1 | FileCheck %s
++
++; CHECK: *** Section Aware Outlining is enabled for the target ***
++; CHECK: Input section partitions: 4
++; CHECK: .. section '.sec_shared': 3 candidates
++; CHECK: .. section '<none>': 3 candidates
++; CHECK: .. section '.sec_a': 2 candidates
++; CHECK: .. section '.sec_b': 2 candidates
++; CHECK: INHERITED SECTION: .sec_shared
++; CHECK: INHERITED SECTION: .sec_a
++; CHECK: INHERITED SECTION: .sec_b
+diff --git a/llvm/test/CodeGen/RISCV/machineoutliner-pcrel-lo.mir b/llvm/test/CodeGen/RISCV/machineoutliner-pcrel-lo.mir
+index fd3630bcfad2..4dfe614b12db 100644
+--- a/llvm/test/CodeGen/RISCV/machineoutliner-pcrel-lo.mir
++++ b/llvm/test/CodeGen/RISCV/machineoutliner-pcrel-lo.mir
+@@ -7,10 +7,12 @@
+ # RUN: | FileCheck -check-prefix=CHECK-FS %s
+ # RUN: llc -mtriple=riscv64 -x mir -run-pass=machine-outliner -simplify-mir --function-sections -verify-machineinstrs -outliner-leaf-descendants=false < %s \
+ # RUN: | FileCheck -check-prefix=CHECK-FS %s
++# CHECK: define internal void @OUTLINED_FUNCTION_2() unnamed_addr {{.*}} section ".abc"
++# CHECK-FS: define internal void @OUTLINED_FUNCTION_1() unnamed_addr {{.*}} section ".abc"
+ 
+ --- |
+-  ; Cannot outline instructions with pcrel-lo operands if function section
+-  ; enabled.
++  ; pcrel-lo operands stay in the source section when outlining could split
++  ; their pcrel-hi/pcrel-lo pair across sections.
+   @bar = dso_local local_unnamed_addr global i32 0, align 4
+   define i32 @foo(i32 %a, i32 %b) { ret i32 0 }
+ 
+@@ -199,30 +201,21 @@ body:             |
+   ; CHECK: bb.0:
+   ; CHECK-NEXT:   liveins: $x10, $x11, $x13
+   ; CHECK-NEXT: {{  $}}
+-  ; CHECK-NEXT:   $x11 = ORI $x11, 1023
+-  ; CHECK-NEXT:   $x12 = ADDI $x10, 17
+-  ; CHECK-NEXT:   $x11 = AND $x12, $x11
+-  ; CHECK-NEXT:   $x10 = SUB $x10, $x11
++  ; CHECK-NEXT:   $x5 = PseudoCALLReg target-flags(riscv-call) @OUTLINED_FUNCTION_2, implicit-def $x5, implicit-def $x10, implicit-def $x11, implicit-def $x12, implicit $x10, implicit $x11
+   ; CHECK-NEXT:   $x11 = LW killed renamable $x13, target-flags(riscv-pcrel-lo) <mcsymbol .Lpcrel_hi1> :: (dereferenceable load (s32) from @bar)
+   ; CHECK-NEXT:   PseudoBR %bb.3
+   ; CHECK-NEXT: {{  $}}
+   ; CHECK-NEXT: bb.1:
+   ; CHECK-NEXT:   liveins: $x10, $x11, $x13
+   ; CHECK-NEXT: {{  $}}
+-  ; CHECK-NEXT:   $x11 = ORI $x11, 1023
+-  ; CHECK-NEXT:   $x12 = ADDI $x10, 17
+-  ; CHECK-NEXT:   $x11 = AND $x12, $x11
+-  ; CHECK-NEXT:   $x10 = SUB $x10, $x11
++  ; CHECK-NEXT:   $x5 = PseudoCALLReg target-flags(riscv-call) @OUTLINED_FUNCTION_2, implicit-def $x5, implicit-def $x10, implicit-def $x11, implicit-def $x12, implicit $x10, implicit $x11
+   ; CHECK-NEXT:   $x11 = LW killed renamable $x13, target-flags(riscv-pcrel-lo) <mcsymbol .Lpcrel_hi1> :: (dereferenceable load (s32) from @bar)
+   ; CHECK-NEXT:   PseudoBR %bb.3
+   ; CHECK-NEXT: {{  $}}
+   ; CHECK-NEXT: bb.2:
+   ; CHECK-NEXT:   liveins: $x10, $x11, $x13
+   ; CHECK-NEXT: {{  $}}
+-  ; CHECK-NEXT:   $x11 = ORI $x11, 1023
+-  ; CHECK-NEXT:   $x12 = ADDI $x10, 17
+-  ; CHECK-NEXT:   $x11 = AND $x12, $x11
+-  ; CHECK-NEXT:   $x10 = SUB $x10, $x11
++  ; CHECK-NEXT:   $x5 = PseudoCALLReg target-flags(riscv-call) @OUTLINED_FUNCTION_2, implicit-def $x5, implicit-def $x10, implicit-def $x11, implicit-def $x12, implicit $x10, implicit $x11
+   ; CHECK-NEXT:   $x11 = LW killed renamable $x13, target-flags(riscv-pcrel-lo) <mcsymbol .Lpcrel_hi1> :: (dereferenceable load (s32) from @bar)
+   ; CHECK-NEXT:   PseudoBR %bb.3
+   ; CHECK-NEXT: {{  $}}
+@@ -233,30 +226,21 @@ body:             |
+   ; CHECK-FS: bb.0:
+   ; CHECK-FS-NEXT:   liveins: $x10, $x11, $x13
+   ; CHECK-FS-NEXT: {{  $}}
+-  ; CHECK-FS-NEXT:   $x11 = ORI $x11, 1023
+-  ; CHECK-FS-NEXT:   $x12 = ADDI $x10, 17
+-  ; CHECK-FS-NEXT:   $x11 = AND $x12, $x11
+-  ; CHECK-FS-NEXT:   $x10 = SUB $x10, $x11
++  ; CHECK-FS-NEXT:   $x5 = PseudoCALLReg target-flags(riscv-call) @OUTLINED_FUNCTION_1, implicit-def $x5, implicit-def $x10, implicit-def $x11, implicit-def $x12, implicit $x10, implicit $x11
+   ; CHECK-FS-NEXT:   $x11 = LW killed renamable $x13, target-flags(riscv-pcrel-lo) <mcsymbol .Lpcrel_hi1> :: (dereferenceable load (s32) from @bar)
+   ; CHECK-FS-NEXT:   PseudoBR %bb.3
+   ; CHECK-FS-NEXT: {{  $}}
+   ; CHECK-FS-NEXT: bb.1:
+   ; CHECK-FS-NEXT:   liveins: $x10, $x11, $x13
+   ; CHECK-FS-NEXT: {{  $}}
+-  ; CHECK-FS-NEXT:   $x11 = ORI $x11, 1023
+-  ; CHECK-FS-NEXT:   $x12 = ADDI $x10, 17
+-  ; CHECK-FS-NEXT:   $x11 = AND $x12, $x11
+-  ; CHECK-FS-NEXT:   $x10 = SUB $x10, $x11
++  ; CHECK-FS-NEXT:   $x5 = PseudoCALLReg target-flags(riscv-call) @OUTLINED_FUNCTION_1, implicit-def $x5, implicit-def $x10, implicit-def $x11, implicit-def $x12, implicit $x10, implicit $x11
+   ; CHECK-FS-NEXT:   $x11 = LW killed renamable $x13, target-flags(riscv-pcrel-lo) <mcsymbol .Lpcrel_hi1> :: (dereferenceable load (s32) from @bar)
+   ; CHECK-FS-NEXT:   PseudoBR %bb.3
+   ; CHECK-FS-NEXT: {{  $}}
+   ; CHECK-FS-NEXT: bb.2:
+   ; CHECK-FS-NEXT:   liveins: $x10, $x11, $x13
+   ; CHECK-FS-NEXT: {{  $}}
+-  ; CHECK-FS-NEXT:   $x11 = ORI $x11, 1023
+-  ; CHECK-FS-NEXT:   $x12 = ADDI $x10, 17
+-  ; CHECK-FS-NEXT:   $x11 = AND $x12, $x11
+-  ; CHECK-FS-NEXT:   $x10 = SUB $x10, $x11
++  ; CHECK-FS-NEXT:   $x5 = PseudoCALLReg target-flags(riscv-call) @OUTLINED_FUNCTION_1, implicit-def $x5, implicit-def $x10, implicit-def $x11, implicit-def $x12, implicit $x10, implicit $x11
+   ; CHECK-FS-NEXT:   $x11 = LW killed renamable $x13, target-flags(riscv-pcrel-lo) <mcsymbol .Lpcrel_hi1> :: (dereferenceable load (s32) from @bar)
+   ; CHECK-FS-NEXT:   PseudoBR %bb.3
+   ; CHECK-FS-NEXT: {{  $}}
+diff --git a/llvm/test/LTO/RISCV/machine-outliner-section-rv32.ll b/llvm/test/LTO/RISCV/machine-outliner-section-rv32.ll
+new file mode 100644
+index 000000000000..96e128fdd55a
+--- /dev/null
++++ b/llvm/test/LTO/RISCV/machine-outliner-section-rv32.ll
+@@ -0,0 +1,117 @@
++; Check that the RISC-V machine outliner preserves an explicit input section
++; when it runs in the full LTO backend.
++;
++; RUN: llvm-as %s -o %t.bc
++; RUN: llvm-lto2 run -enable-machine-outliner=always -filetype=asm -o %t.s %t.bc \
++; RUN:   -r=%t.bc,shared_0,px -r=%t.bc,shared_1,px -r=%t.bc,shared_2,px \
++; RUN:   -r=%t.bc,plain_0,px -r=%t.bc,plain_1,px -r=%t.bc,plain_2,px
++; RUN: FileCheck %s --input-file %t.s.0 --check-prefixes=CHECK,NOFS
++;
++; RUN: llvm-lto2 run -enable-machine-outliner=always --function-sections -filetype=asm -o %t.s %t.bc \
++; RUN:   -r=%t.bc,shared_0,px -r=%t.bc,shared_1,px -r=%t.bc,shared_2,px \
++; RUN:   -r=%t.bc,plain_0,px -r=%t.bc,plain_1,px -r=%t.bc,plain_2,px
++; RUN: FileCheck %s --input-file %t.s.0 --check-prefixes=CHECK,FS
++
++target datalayout = "e-m:e-p:32:32-i64:64-n32-S128"
++target triple = "riscv32-unknown-linux-gnu"
++
++; CHECK: .section .sec_shared,"ax",@progbits
++
++define i32 @shared_0(i32 %a, i32 %b) noinline nounwind section ".sec_shared" {
++; CHECK-LABEL: shared_0:
++; CHECK: call t0, OUTLINED_FUNCTION_0
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 1
++  ret i32 %result
++}
++
++define i32 @shared_1(i32 %a, i32 %b) noinline nounwind section ".sec_shared" {
++; CHECK-LABEL: shared_1:
++; CHECK: call t0, OUTLINED_FUNCTION_0
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 2
++  ret i32 %result
++}
++
++define i32 @shared_2(i32 %a, i32 %b) noinline nounwind section ".sec_shared" {
++; CHECK-LABEL: shared_2:
++; CHECK: call t0, OUTLINED_FUNCTION_0
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 3
++  ret i32 %result
++}
++
++define i32 @plain_0(i32 %a, i32 %b) noinline nounwind {
++; NOFS: .text{{$}}
++; FS: .section .text.plain_0,"ax",@progbits
++; CHECK-LABEL: plain_0:
++; CHECK: call t0, OUTLINED_FUNCTION_1
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 4
++  ret i32 %result
++}
++
++define i32 @plain_1(i32 %a, i32 %b) noinline nounwind {
++; FS: .section .text.plain_1,"ax",@progbits
++; CHECK-LABEL: plain_1:
++; CHECK: call t0, OUTLINED_FUNCTION_1
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 5
++  ret i32 %result
++}
++
++define i32 @plain_2(i32 %a, i32 %b) noinline nounwind {
++; FS: .section .text.plain_2,"ax",@progbits
++; CHECK-LABEL: plain_2:
++; CHECK: call t0, OUTLINED_FUNCTION_1
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 6
++  ret i32 %result
++}
++
++; The outlined function for the explicitly sectioned parents inherits their
++; input section, while the one for the unsectioned parents is placed in .text,
++; or in its own synthesized section when --function-sections is enabled.
++; CHECK: .section .sec_shared,"ax",@progbits
++; CHECK: OUTLINED_FUNCTION_0:
++; CHECK: xor a0, a0, a1
++; CHECK-NEXT: srli a2, a0, 29
++; CHECK-NEXT: slli a3, a0, 3
++; CHECK-NEXT: add a0, a1, a0
++; CHECK-NEXT: or a2, a3, a2
++; CHECK-NEXT: xor a0, a2, a0
++; CHECK-NEXT: jr t0
++; NOFS: .text{{$}}
++; NOFS: OUTLINED_FUNCTION_1:
++; FS: .section .text.OUTLINED_FUNCTION_1,"ax",@progbits
++; FS: OUTLINED_FUNCTION_1:
+diff --git a/llvm/test/LTO/RISCV/machine-outliner-section-rv64.ll b/llvm/test/LTO/RISCV/machine-outliner-section-rv64.ll
+new file mode 100644
+index 000000000000..f850a2b3dcb5
+--- /dev/null
++++ b/llvm/test/LTO/RISCV/machine-outliner-section-rv64.ll
+@@ -0,0 +1,117 @@
++; Check that the RISC-V machine outliner preserves an explicit input section
++; when it runs in the full LTO backend.
++;
++; RUN: llvm-as %s -o %t.bc
++; RUN: llvm-lto2 run -enable-machine-outliner=always -filetype=asm -o %t.s %t.bc \
++; RUN:   -r=%t.bc,shared_0,px -r=%t.bc,shared_1,px -r=%t.bc,shared_2,px \
++; RUN:   -r=%t.bc,plain_0,px -r=%t.bc,plain_1,px -r=%t.bc,plain_2,px
++; RUN: FileCheck %s --input-file %t.s.0 --check-prefixes=CHECK,NOFS
++;
++; RUN: llvm-lto2 run -enable-machine-outliner=always --function-sections -filetype=asm -o %t.s %t.bc \
++; RUN:   -r=%t.bc,shared_0,px -r=%t.bc,shared_1,px -r=%t.bc,shared_2,px \
++; RUN:   -r=%t.bc,plain_0,px -r=%t.bc,plain_1,px -r=%t.bc,plain_2,px
++; RUN: FileCheck %s --input-file %t.s.0 --check-prefixes=CHECK,FS
++
++target datalayout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128"
++target triple = "riscv64-unknown-linux-gnu"
++
++; CHECK: .section .sec_shared,"ax",@progbits
++
++define i32 @shared_0(i32 %a, i32 %b) noinline nounwind section ".sec_shared" {
++; CHECK-LABEL: shared_0:
++; CHECK: call t0, OUTLINED_FUNCTION_0
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 1
++  ret i32 %result
++}
++
++define i32 @shared_1(i32 %a, i32 %b) noinline nounwind section ".sec_shared" {
++; CHECK-LABEL: shared_1:
++; CHECK: call t0, OUTLINED_FUNCTION_0
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 2
++  ret i32 %result
++}
++
++define i32 @shared_2(i32 %a, i32 %b) noinline nounwind section ".sec_shared" {
++; CHECK-LABEL: shared_2:
++; CHECK: call t0, OUTLINED_FUNCTION_0
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 3
++  ret i32 %result
++}
++
++define i32 @plain_0(i32 %a, i32 %b) noinline nounwind {
++; NOFS: .text{{$}}
++; FS: .section .text.plain_0,"ax",@progbits
++; CHECK-LABEL: plain_0:
++; CHECK: call t0, OUTLINED_FUNCTION_1
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 4
++  ret i32 %result
++}
++
++define i32 @plain_1(i32 %a, i32 %b) noinline nounwind {
++; FS: .section .text.plain_1,"ax",@progbits
++; CHECK-LABEL: plain_1:
++; CHECK: call t0, OUTLINED_FUNCTION_1
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 5
++  ret i32 %result
++}
++
++define i32 @plain_2(i32 %a, i32 %b) noinline nounwind {
++; FS: .section .text.plain_2,"ax",@progbits
++; CHECK-LABEL: plain_2:
++; CHECK: call t0, OUTLINED_FUNCTION_1
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 6
++  ret i32 %result
++}
++
++; The outlined function for the explicitly sectioned parents inherits their
++; input section, while the one for the unsectioned parents is placed in .text,
++; or in its own synthesized section when --function-sections is enabled.
++; CHECK: .section .sec_shared,"ax",@progbits
++; CHECK: OUTLINED_FUNCTION_0:
++; CHECK: xor a0, a0, a1
++; CHECK-NEXT: srliw a2, a0, 29
++; CHECK-NEXT: slli a3, a0, 3
++; CHECK-NEXT: add a0, a1, a0
++; CHECK-NEXT: or a2, a3, a2
++; CHECK-NEXT: xor a0, a2, a0
++; CHECK-NEXT: jr t0
++; NOFS: .text{{$}}
++; NOFS: OUTLINED_FUNCTION_1:
++; FS: .section .text.OUTLINED_FUNCTION_1,"ax",@progbits
++; FS: OUTLINED_FUNCTION_1:
+-- 
+2.34.1
+
