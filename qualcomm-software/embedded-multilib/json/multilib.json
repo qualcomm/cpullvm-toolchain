@@ -3,92 +3,92 @@
         {
             "variant": "aarch64a_tlsie",
             "json": "aarch64a_tlsie.json",
-            "flags": "--target=aarch64-unknown-none-elf -munaligned-access"
+            "flags": "--target=aarch64-unknown-none-elf -munaligned-access -fmultilib-flag=threads"
         },
         {
             "variant": "aarch64a_aligned_tlsie",
             "json": "aarch64a_aligned_tlsie.json",
-            "flags": "--target=aarch64-unknown-none-elf -mno-unaligned-access"
+            "flags": "--target=aarch64-unknown-none-elf -mno-unaligned-access -fmultilib-flag=threads"
         },
         {
             "variant": "aarch64a_pacret",
             "json": "aarch64a_pacret.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.3-a -mbranch-protection=pac-ret+leaf -munaligned-access"
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.3-a -mbranch-protection=pac-ret+leaf -munaligned-access -fmultilib-flag=threads"
         },
         {
             "variant": "aarch64a_pacret_bti",
             "json": "aarch64a_pacret_bti.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+bti -munaligned-access"
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+bti -munaligned-access -fmultilib-flag=threads"
         },
         {
             "variant": "aarch64a_pacret_bkey_bti_tlsie",
             "json": "aarch64a_pacret_bkey_bti_tlsie.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti -munaligned-access"
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti -munaligned-access -fmultilib-flag=threads"
         },
         {
             "variant": "aarch64a_pacret_bkey_bti_aligned_tlsie",
             "json": "aarch64a_pacret_bkey_bti_aligned_tlsie.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti -mno-unaligned-access"
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti -mno-unaligned-access -fmultilib-flag=threads"
         },
         {
             "variant": "aarch64a_soft_nofp_tlsie",
             "json": "aarch64a_soft_nofp_tlsie.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft -munaligned-access"
+            "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft -munaligned-access -fmultilib-flag=threads"
         },
         {
             "variant": "aarch64a_soft_nofp_aligned_tlsie",
             "json": "aarch64a_soft_nofp_aligned_tlsie.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft -mno-unaligned-access"
+            "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft -mno-unaligned-access -fmultilib-flag=threads"
         },
         {
             "variant": "aarch64a_soft_nofp_pacret_bti",
             "json": "aarch64a_soft_nofp_pacret_bti.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -munaligned-access"
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -munaligned-access  -fmultilib-flag=threads"
         },
         {
             "variant": "aarch64a_soft_nofp_pacret_bti_aligned",
             "json": "aarch64a_soft_nofp_pacret_bti_aligned.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -mno-unaligned-access"
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -mno-unaligned-access -fmultilib-flag=threads"
         },
         {
             "variant": "aarch64a_soft_nofp_pacret_bkey_bti",
             "json": "aarch64a_soft_nofp_pacret_bkey_bti.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft -munaligned-access"
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft -munaligned-access -fmultilib-flag=threads"
         },
         {
             "variant": "armv7a_soft_neon",
             "json": "armv7a_soft_neon.json",
-            "flags": "--target=armv7-unknown-none-eabi -mfpu=neon -munaligned-access"
+            "flags": "--target=armv7-unknown-none-eabi -mfpu=neon -munaligned-access -fmultilib-flag=threads"
         },
         {
             "variant": "armv7a_soft_nofp",
             "json": "armv7a_soft_nofp.json",
-            "flags": "--target=armv7-unknown-none-eabi -mfpu=none -munaligned-access"
+            "flags": "--target=armv7-unknown-none-eabi -mfpu=none -munaligned-access -fmultilib-flag=threads"
         },
         {
             "variant": "armv7a_hard_vfpv3",
             "json": "armv7a_hard_vfpv3.json",
-            "flags": "--target=armv7-unknown-none-eabihf -mfpu=vfpv3 -munaligned-access"
+            "flags": "--target=armv7-unknown-none-eabihf -mfpu=vfpv3 -munaligned-access -fmultilib-flag=threads"
         },
         {
             "variant": "armv8_soft_neon",
             "json": "armv8_soft_neon.json",
-            "flags": "--target=armv8a-unknown-none-eabi -mfpu=neon-fp-armv8 -munaligned-access"
+            "flags": "--target=armv8a-unknown-none-eabi -mfpu=neon-fp-armv8 -munaligned-access -fmultilib-flag=threads"
         },
         {
             "variant": "armv7m_soft_nofp",
             "json": "armv7m_soft_nofp.json",
-            "flags": "--target=thumbv7m-unknown-none-eabi -mfpu=none"
+            "flags": "--target=thumbv7m-unknown-none-eabi -mfpu=none -fmultilib-flag=threads"
         },
         {
             "variant": "armv7m_soft_nofp_nopic",
             "json": "armv7m_soft_nofp_nopic.json",
-            "flags": "--target=thumbv7m-unknown-none-eabi -mfpu=none -fno-pic"
+            "flags": "--target=thumbv7m-unknown-none-eabi -mfpu=none -fmultilib-flag=threads -fno-pic"
         },
         {
             "variant": "armv7m_hard_fpv5_d16_nopic",
             "json": "armv7m_hard_fpv5_d16_nopic.json",
-            "flags": "--target=thumbv7m-unknown-none-eabihf -mfpu=fpv5-d16 -munaligned-access -fno-pic"
+            "flags": "--target=thumbv7m-unknown-none-eabihf -mfpu=fpv5-d16 -munaligned-access -fmultilib-flag=threads -fno-pic"
         },
         {
             "variant": "riscv32imc_ilp32_nothreads_nopic",
@@ -113,17 +113,17 @@
         {
             "variant": "riscv32imac_ilp32",
             "json": "riscv32imac_ilp32.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32 -fcf-protection=none"
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32 -fmultilib-flag=threads -fcf-protection=none"
         },
         {
             "variant": "riscv32imac_ilp32_nopic",
             "json": "riscv32imac_ilp32_nopic.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32 -fno-pic -fcf-protection=none"
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32 -fmultilib-flag=threads -fno-pic -fcf-protection=none"
         },
         {
             "variant": "riscv32imac_ilp32_scs_nopic",
             "json": "riscv32imac_ilp32_scs_nopic.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32 -fsanitize=shadow-call-stack -fno-pic -fcf-protection=none"
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac -mabi=ilp32 -fsanitize=shadow-call-stack -fmultilib-flag=threads -fno-pic -fcf-protection=none"
         },
         {
             "variant": "riscv32imac_ilp32_scs_nothreads_nopic",
@@ -133,42 +133,42 @@
         {
             "variant": "riscv32imac_zba_zbb_ilp32",
             "json": "riscv32imac_zba_zbb_ilp32.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zba_zbb -mabi=ilp32 -fcf-protection=none"
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zba_zbb -mabi=ilp32 -fmultilib-flag=threads -fcf-protection=none"
         },
         {
             "variant": "riscv32imac_zba_zbb_ilp32_nopic",
             "json": "riscv32imac_zba_zbb_ilp32_nopic.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zba_zbb -mabi=ilp32 -fno-pic -fcf-protection=none"
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zba_zbb -mabi=ilp32 -fmultilib-flag=threads -fno-pic -fcf-protection=none"
         },
         {
             "variant": "riscv32imac_zcb_zcmp_ilp32_nopic",
             "json": "riscv32imac_zcb_zcmp_ilp32_nopic.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zcb_zcmp -mabi=ilp32 -fno-pic -fcf-protection=none"
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zcb_zcmp -mabi=ilp32 -fmultilib-flag=threads -fno-pic -fcf-protection=none"
         },
         {
             "variant": "riscv32imac_zcb_zcmp_zba_zbb_ilp32_nopic",
             "json": "riscv32imac_zcb_zcmp_zba_zbb_ilp32_nopic.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zcb_zcmp_zba_zbb -mabi=ilp32 -fno-pic -fcf-protection=none"
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imac_zcb_zcmp_zba_zbb -mabi=ilp32 -fmultilib-flag=threads -fno-pic -fcf-protection=none"
         },
         {
             "variant": "riscv32imafc_ilp32f",
             "json": "riscv32imafc_ilp32f.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imafc -mabi=ilp32f -fcf-protection=none"
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imafc -mabi=ilp32f -fmultilib-flag=threads -fcf-protection=none"
         },
         {
             "variant": "riscv32imafc_zba_zbb_ilp32f",
             "json": "riscv32imafc_zba_zbb_ilp32f.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imafc_zba_zbb -mabi=ilp32f -fcf-protection=none"
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imafc_zba_zbb -mabi=ilp32f -fmultilib-flag=threads -fcf-protection=none"
         },
         {
             "variant": "riscv32imafc_zcb_zcmp_zba_zbb_ilp32f",
             "json": "riscv32imafc_zcb_zcmp_zba_zbb_ilp32f.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imafc_zcb_zcmp_zba_zbb -mabi=ilp32f -fcf-protection=none"
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32imafc_zcb_zcmp_zba_zbb -mabi=ilp32f -fmultilib-flag=threads -fcf-protection=none"
         },
         {
             "variant": "riscv32gc_ilp32d",
             "json": "riscv32gc_ilp32d.json",
-            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32gc -mabi=ilp32d -fcf-protection=none"
+            "flags": "--target=riscv32-unknown-unknown-elf -march=rv32gc -mabi=ilp32d -fmultilib-flag=threads -fcf-protection=none"
         },
         {
             "variant": "riscv32imaf_zve32f_zvfh_zba_zbb_ilp32f_nothreads",
@@ -183,22 +183,22 @@
         {
           "variant": "riscv32ima_xqci_ilp32_exn_rtti_nopic",
           "json": "riscv32ima_xqci_ilp32_exn_rtti_nopic.json",
-          "flags": "--target=riscv32-unknown-unknown-elf -march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp_xqccmt0p1 -mabi=ilp32 -fno-pic -fcf-protection=none"
+          "flags": "--target=riscv32-unknown-unknown-elf -march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp_xqccmt0p1 -mabi=ilp32 -fmultilib-flag=threads -fno-pic -fcf-protection=none"
         },
         {
           "variant": "riscv32ima_xqci_ilp32_nopic",
           "json": "riscv32ima_xqci_ilp32_nopic.json",
-          "flags": "--target=riscv32-unknown-unknown-elf -march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp_xqccmt0p1 -mabi=ilp32 -fno-exceptions -fno-rtti -fno-pic -fcf-protection=none"
+          "flags": "--target=riscv32-unknown-unknown-elf -march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp_xqccmt0p1 -mabi=ilp32 -fmultilib-flag=threads -fno-exceptions -fno-rtti -fno-pic -fcf-protection=none"
         },
         {
           "variant": "riscv32ima_zinx_xqci_ilp32_exn_rtti_nopic",
           "json": "riscv32ima_zinx_xqci_ilp32_exn_rtti_nopic.json",
-          "flags": "--target=riscv32-unknown-unknown-elf -march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_zdinx_zfinx_zhinx_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp_xqccmt0p1 -mabi=ilp32 -fno-pic -fcf-protection=none"
+          "flags": "--target=riscv32-unknown-unknown-elf -march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_zdinx_zfinx_zhinx_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp_xqccmt0p1 -mabi=ilp32 -fmultilib-flag=threads -fno-pic -fcf-protection=none"
         },
         {
           "variant": "riscv32ima_zinx_xqci_ilp32_nopic",
           "json": "riscv32ima_zinx_xqci_ilp32_nopic.json",
-          "flags": "--target=riscv32-unknown-unknown-elf -march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_zdinx_zfinx_zhinx_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp_xqccmt0p1 -mabi=ilp32 -fno-exceptions -fno-rtti -fno-pic -fcf-protection=none"
+          "flags": "--target=riscv32-unknown-unknown-elf -march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_zdinx_zfinx_zhinx_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp_xqccmt0p1 -mabi=ilp32 -fmultilib-flag=threads -fno-exceptions -fno-rtti -fno-pic -fcf-protection=none"
         },
         {
             "variant": "riscv64imc_lp64_nothreads_nopic",
@@ -213,37 +213,37 @@
         {
             "variant": "riscv64imac_lp64_nopic",
             "json": "riscv64imac_lp64_nopic.json",
-            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64imac -mabi=lp64 -fno-pic -fcf-protection=none"
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64imac -mabi=lp64 -fmultilib-flag=threads -fno-pic -fcf-protection=none"
         },
         {
             "variant": "riscv64imac_lp64_scs_nopic",
             "json": "riscv64imac_lp64_scs_nopic.json",
-            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64imac -mabi=lp64 -fsanitize=shadow-call-stack -fno-pic -fcf-protection=none"
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64imac -mabi=lp64 -fsanitize=shadow-call-stack -fmultilib-flag=threads -fno-pic -fcf-protection=none"
         },
         {
             "variant": "riscv64gc_lp64_nopic",
             "json": "riscv64gc_lp64_nopic.json",
-            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc -mabi=lp64 -fno-pic -fcf-protection=none"
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc -mabi=lp64 -fmultilib-flag=threads -fno-pic -fcf-protection=none"
         },
         {
             "variant": "riscv64gc_zba_zbb_lp64_nopic",
             "json": "riscv64gc_zba_zbb_lp64_nopic.json",
-            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc_zba_zbb -mabi=lp64 -fno-pic -fcf-protection=none"
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc_zba_zbb -mabi=lp64 -fmultilib-flag=threads -fno-pic -fcf-protection=none"
         },
         {
             "variant": "riscv64gc_lp64d_nopic",
             "json": "riscv64gc_lp64d_nopic.json",
-            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc -mabi=lp64d -fno-pic -fcf-protection=none"
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc -mabi=lp64d -fmultilib-flag=threads -fno-pic -fcf-protection=none"
         },
         {
             "variant": "riscv64gc_zba_zbb_lp64d_nopic",
             "json": "riscv64gc_zba_zbb_lp64d_nopic.json",
-            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc_zba_zbb -mabi=lp64d -fno-pic -fcf-protection=none"
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc_zba_zbb -mabi=lp64d -fmultilib-flag=threads -fno-pic -fcf-protection=none"
         },
         {
             "variant": "riscv64gc_lp64_scs_nopic",
             "json": "riscv64gc_lp64_scs_nopic.json",
-            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc -mabi=lp64 -fsanitize=shadow-call-stack -fno-pic -fcf-protection=none"
+            "flags": "--target=riscv64-unknown-unknown-elf -march=rv64gc -mabi=lp64 -fsanitize=shadow-call-stack -fmultilib-flag=threads -fno-pic -fcf-protection=none"
          }
     ]
 }
