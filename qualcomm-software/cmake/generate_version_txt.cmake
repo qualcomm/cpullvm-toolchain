@@ -42,11 +42,6 @@ get_commit_from_dir("${eld_SOURCE_DIR}" eld_COMMIT)
 if(ENABLE_LINUX_LIBRARIES)
     get_commit_for_libc_repo("musl" musl_COMMIT)
     set(musl_version_string "* musl: ${musl_URL} (commit ${musl_COMMIT})\n")
-
-    if(NOT LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded)
-        get_commit_for_libc_repo("musl-embedded" musl-embedded_COMMIT)
-        set(musl-embedded_version_string "* musl-embedded: ${musl-embedded_URL} (commit ${musl-embedded_COMMIT})\n")
-    endif()
 endif()
 
 # Supported libcs are all in a separate repo

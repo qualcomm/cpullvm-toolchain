@@ -27,6 +27,11 @@ on:
 permissions:
   contents: read
 
+# Cancel in-progress runs for `pull_request` events only.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     # Don't run on forks
@@ -54,12 +59,6 @@ jobs:
           - build_script: build_picolibc-v1812_overlay_no_qemu.sh
             test_script: ''
             install_script: install_dependencies.sh
-            target_os: Linux-AArch64
-            runner: ubuntu-24.04-arm
-
-          - build_script: build_musl-embedded_overlay.sh
-            test_script: ''
-            install_script: ''
             target_os: Linux-AArch64
             runner: ubuntu-24.04-arm
 

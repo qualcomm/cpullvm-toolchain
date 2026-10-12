@@ -20,6 +20,11 @@ on:
 permissions:
   contents: read
 
+# Cancel in-progress runs for `pull_request` events only.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     # Don't run on forks
@@ -34,6 +39,9 @@ jobs:
           # We build in the repository and rely on clean to cleanup possible
           # old build products if the runner doesn't do it itself.
           clean: true
+
+      - name: Install dependencies
+        run: ./qualcomm-software/scripts/install_dependencies_x86.sh
 
       - name: Apply llvm-project patches
         run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project

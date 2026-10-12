@@ -20,16 +20,10 @@
       "tagType": "tag",
       "tag": "v1.2.5"
     },
-    "musl-embedded": {
-      "url": "https://github.com/qualcomm/musl-embedded",
-      "tagType": "commithash",
-      "tag": "9eafd9adeff02200cecb6a8a745898e33301f4f6",
-      "trackingBranch": "main"
-    },
     "eld": {
       "url": "https://github.com/qualcomm/eld",
       "tagType": "commithash",
-      "tag": "44fc58cf62069e889a23f2bb50b97a70fa4340d3",
+      "tag": "68a751a7f88adbe3c2aaa299d20e003c6e44db86",
       "trackingBranch": "main"
     }
   }

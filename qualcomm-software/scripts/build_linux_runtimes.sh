@@ -18,7 +18,6 @@ Options:
   --base-install-dir <path>   Directory for the install
   --llvm-src-dir <path>       Directory of the LLVM sources
   --musl-src-dir <path>       Directory of the musl source dir
-  --musl-emb-src-dir <path>   Directory of the musl-embedded source dir
   --download-dir <path>       Directory where extra projects are downloaded into
 EOF
 }
@@ -72,7 +71,6 @@ while [[ $# -gt 0 ]]; do
     --base-install-dir) BASE_INSTALL_DIR="$2"; shift 2;;
     --llvm-src-dir) LLVM_BASE_DIR="$2"; shift 2 ;;
     --musl-src-dir) MUSL_SRC_DIR="$2"; shift 2 ;;
-    --musl-emb-src-dir) MUSL_EMB_SRC_DIR="$2"; shift 2 ;;
     --download-dir) DOWNLOAD_DIR="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown arg: $1"; usage; exit 1 ;;
@@ -85,7 +83,6 @@ if [ -z "${TOOLS_PATH}" ] ||
    [ -z "${BASE_INSTALL_DIR}" ] ||
    [ -z "${LLVM_BASE_DIR}" ] ||
    [ -z "${MUSL_SRC_DIR}" ] ||
-   [ -z "${MUSL_EMB_SRC_DIR}" ] ||
    [ -z "${DOWNLOAD_DIR}" ]; then
   echo "All options must be specified"; usage; exit 1
 fi
@@ -163,24 +160,6 @@ ARCH_MUSL_CFLAGS["riscv64"]="-Os"
 ARCH_MUSL_CFLAGS["aarch64"]="-mstrict-align -fPIC -fno-rounding-math -O3"
 ARCH_MUSL_CFLAGS["arm"]="-mno-unaligned-access -fPIC -fno-rounding-math -O3"
 
-# We also have some new variant-specific configuration going on. Map that out
-# as well. Just list all variants--it'll be cleaned up later.
-declare -A VARIANT_MUSL_CONFIGS
-VARIANT_MUSL_CONFIGS["rv32imac_ilp32"]=""
-VARIANT_MUSL_CONFIGS["rv32imafc_ilp32f"]=""
-VARIANT_MUSL_CONFIGS["rv32ima_xqci_ilp32"]=""
-VARIANT_MUSL_CONFIGS["rv32imaf_zve32f_zvfh_zba_zbb_ilp32f"]=""
-VARIANT_MUSL_CONFIGS["rv32ima_zinx_xqci_ilp32"]=""
-VARIANT_MUSL_CONFIGS["rv64imac_lp64"]=""
-VARIANT_MUSL_CONFIGS["rv64gc_lp64d"]=""
-VARIANT_MUSL_CONFIGS["aarch64a"]="--quic-aarch64-optmem"
-VARIANT_MUSL_CONFIGS["aarch64a_pacret"]="--quic-aarch64-optmem"
-VARIANT_MUSL_CONFIGS["aarch64a_pacret_bti"]="--quic-aarch64-optmem \
-                                             --quic-aarch64-mark-bti"
-VARIANT_MUSL_CONFIGS["aarch64a_pacret_bkey_bti"]="--quic-aarch64-optmem \
-                                                  --quic-aarch64-mark-bti"
-VARIANT_MUSL_CONFIGS["armv7_softfp_neon"]=""
-
 for VARIANT in "${VARIANTS[@]}"; do
   echo "Building libraries for ${VARIANT}"
   VARIANT_BASE_BUILD_DIR="${BASE_BUILD_DIR}/${VARIANT}"
@@ -219,13 +198,10 @@ for VARIANT in "${VARIANTS[@]}"; do
   # Historically, our RISC-V and Arm/AArch64 builds use slightly different
   # flags, sources, etc. Sort that all out here so we can treat the two
   # consistently below.
-  MUSL_DIR="${MUSL_EMB_SRC_DIR}"
-  EXTRA_MUSL_CONFIGS="${VARIANT_MUSL_CONFIGS[$VARIANT]}"
+  EXTRA_MUSL_CONFIGS=""
   CMAKE_OPT_LEVEL="Release"
   if [[ "${VARIANT_ARCH}" =~ riscv ]]; then
-    MUSL_DIR="${MUSL_SRC_DIR}"
-    EXTRA_MUSL_CONFIGS="${EXTRA_MUSL_CONFIGS} \
-                        --disable-shared"
+    EXTRA_MUSL_CONFIGS="--disable-shared"
     CMAKE_OPT_LEVEL="MinSizeRel"
   fi
 
@@ -251,13 +227,14 @@ for VARIANT in "${VARIANTS[@]}"; do
   VARIANT_MUSL_BUILD_DIR="${VARIANT_BASE_BUILD_DIR}"/musl
   mkdir -p "${VARIANT_MUSL_BUILD_DIR}"
   pushd "${VARIANT_MUSL_BUILD_DIR}" >/dev/null
-  "${MUSL_DIR}"/configure \
+  "${MUSL_SRC_DIR}"/configure \
                             ${EXTRA_MUSL_CONFIGS} \
                             --disable-wrapper \
                             --prefix="${VARIANT_TMP_SYSROOT}" \
                             CROSS_COMPILE="llvm-" \
                             CC="clang --target=${VARIANT_TARGET} -fuse-ld=eld" \
-                            CFLAGS="${LIB_BUILD_FLAGS} ${ARCH_MUSL_CFLAGS[$VARIANT_ARCH]}"
+                            CFLAGS="${LIB_BUILD_FLAGS} \
+                                    ${ARCH_MUSL_CFLAGS[$VARIANT_ARCH]}"
   make install-headers
   popd >/dev/null
 
@@ -303,7 +280,7 @@ for VARIANT in "${VARIANTS[@]}"; do
   make distclean
   # TODO: we should probably standardize which linker we're using (lld vs eld)
   # but that can wait--this matches what we've done in the past.
-  "${MUSL_DIR}"/configure \
+  "${MUSL_SRC_DIR}"/configure \
       ${EXTRA_MUSL_CONFIGS} \
       --disable-wrapper \
       --prefix="${VARIANT_TMP_SYSROOT}" \
@@ -384,33 +361,15 @@ for VARIANT in "${VARIANTS[@]}"; do
 
   # Install the rest of compiler-rt now.
 
-  # The goal here is to disable rtsan and gwp_asan:
-  #   * For rtsan, our musl-embedded is too old to support the fopencookie
-  #     extension, which rtsan relies on.
-  #   * For gwp_asan, it requires execinfo.h which is a glibc-specific
-  #     header--no musl version ships this (or an equivalent).
-  # The actual list corresponds to `ALL_SANITIZERS` in LLVM, minus rtsan and
-  # gwp_asan. Just do this for all targets since aarch64 is the only arch that
-  # rtsan supports that we care about and gwp_asan seems to be generally broken
-  # when building against musl. Might be worth trying to pull the list out of
-  # LLVM sources, but for now this should be sufficient.
-  SAN_TO_BUILD="asan;dfsan;msan;hwasan;tsan;tysan;safestack;cfi;scudo_standalone;ubsan_minimal;nsan;asan_abi"
+  # The goal here is to disable gwp_asan: it requires execinfo.h which is a
+  # glibc-specific header--no musl version ships this (or an equivalent).
+  #
+  # The actual list corresponds to `ALL_SANITIZERS` in LLVM, minus gwp_asan.
+  # Might be worth trying to pull the list out of LLVM sources, but for now
+  # this should be sufficient.
+  SAN_TO_BUILD="asan;rtsan;dfsan;msan;hwasan;tsan;tysan;safestack;cfi;scudo_standalone;ubsan_minimal;nsan;asan_abi"
 
-  # For Arm specifically, we need to disable anything that touches sanitizer
-  # common. Our musl-embedded is old enough that time_t is 32bits and the
-  # sanitizer common code thinks we should have a 64bit time_t (see
-  # https://github.com/llvm/llvm-project/blob/c94739a5d523883663d237ad9072275ff6c847b1/compiler-rt/lib/sanitizer_common/sanitizer_platform_limits_posix.h#L393-L398)
-  # and this disagreement causes issues down the line in ex:
-  # https://github.com/llvm/llvm-project/blob/c94739a5d523883663d237ad9072275ff6c847b1/compiler-rt/lib/sanitizer_common/sanitizer_platform_limits_posix.cpp#L1292
-  # and we fail the static asserts.
   EXTRA_CRT_CONFIGS=""
-  if [[ "${VARIANT_ARCH}" =~ arm ]]; then
-    EXTRA_CRT_CONFIGS="-DCOMPILER_RT_BUILD_SANITIZERS=OFF \
-                       -DCOMPILER_RT_BUILD_CTX_PROFILE=OFF \
-                       -DCOMPILER_RT_BUILD_MEMPROF=OFF \
-                       -DCOMPILER_RT_BUILD_COPYPROF=OFF"
-  fi
-
   # For AArch64, make sure asan/hwasan are compatible with VA smaller than
   # 48 bits.
   if [[ "${VARIANT_ARCH}" =~ aarch64 ]]; then
@@ -435,6 +394,9 @@ for VARIANT in "${VARIANTS[@]}"; do
   fi
 
   COMPILER_RT_BUILD_DIR="${VARIANT_BASE_BUILD_DIR}/compiler-rt"
+  # _LARGEFILE64_SOURCE is needed to expose stat64. _LARGEFILE64_SOURCE
+  # may be removed in the future.
+  COMPILER_RT_COMPILE_FLAGS="${LIB_BUILD_FLAGS} -D_LARGEFILE64_SOURCE"
   cmake -G Ninja \
       -DCMAKE_INSTALL_PREFIX="${VARIANT_TMP_RESOURCE_DIR}" \
       -DCMAKE_SYSROOT="${VARIANT_TMP_SYSROOT}" \
@@ -446,9 +408,9 @@ for VARIANT in "${VARIANTS[@]}"; do
       -DCMAKE_ASM_COMPILER_TARGET="${VARIANT_TARGET}" \
       -DCMAKE_C_COMPILER_TARGET="${VARIANT_TARGET}" \
       -DCMAKE_CXX_COMPILER_TARGET="${VARIANT_TARGET}" \
-      -DCMAKE_ASM_FLAGS="${LIB_BUILD_FLAGS}" \
-      -DCMAKE_C_FLAGS="${LIB_BUILD_FLAGS}" \
-      -DCMAKE_CXX_FLAGS="${LIB_BUILD_FLAGS}" \
+      -DCMAKE_ASM_FLAGS="${COMPILER_RT_COMPILE_FLAGS}" \
+      -DCMAKE_C_FLAGS="${COMPILER_RT_COMPILE_FLAGS}" \
+      -DCMAKE_CXX_FLAGS="${COMPILER_RT_COMPILE_FLAGS}" \
       -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON \
       -DCOMPILER_RT_CXX_LIBRARY="libcxx" \
       -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON \
