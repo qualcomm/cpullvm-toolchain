@@ -1,0 +1,42 @@
+From 8c9f682d42573ba2d4e134d5a796c004c9da891e Mon Sep 17 00:00:00 2001
+From: Jonathon Penix <jpenix@qti.qualcomm.com>
+Date: Wed, 14 Oct 2026 11:29:27 -0700
+Subject: [PATCH] Fix LW.dll packaging when LLVM_DISTRIBUTION_COMPONENTS is
+ used on Windows
+
+I messed up when originally adding this--the `COMPONENT ld.eld` part attaches
+specifically to the `ARCHIVE DESTINATION lib` artifact kind rather than both
+`ARCHIVE` and `RUNTIME` lines. So the `RUNTIME` line isn't included when the
+`ld.eld` COMPONENT is included in the final package if
+`LLVM_DISTRIBUTION_COMPONENTS` is used.
+
+To fix this, re-order the lines--when it appears first, it apparently applies
+to all the artifact kinds.
+
+We could also duplicate the `COMPONENT` bit for each artifact kind, but that
+seems a bit verbose.
+
+Signed-off-by: Jonathon Penix <jpenix@qti.qualcomm.com>
+---
+ lib/LinkerWrapper/CMakeLists.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/lib/LinkerWrapper/CMakeLists.txt b/lib/LinkerWrapper/CMakeLists.txt
+index 5e50091b..927e9c34 100644
+--- a/lib/LinkerWrapper/CMakeLists.txt
++++ b/lib/LinkerWrapper/CMakeLists.txt
+@@ -116,9 +116,9 @@ endforeach()
+ # library is one of the dependent libraries of the linker.
+ if(ELD_ON_MSVC)
+   install(TARGETS LW
++    COMPONENT ld.eld
+     RUNTIME DESTINATION "${ELD_TOOLS_INSTALL_DIR}"
+-    ARCHIVE DESTINATION lib
+-    COMPONENT ld.eld)
++    ARCHIVE DESTINATION lib)
+ else()
+   install(TARGETS LW
+     LIBRARY DESTINATION lib
+-- 
+2.43.0
+
