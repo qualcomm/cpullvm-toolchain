@@ -21,4 +21,5 @@
 # CHECK-ARMV7-HARD-VFPV3-EMPTY:
 
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=softfp -mthumb -mfpu=neon -mno-unaligned-access 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=softfp -mthumb -mfpu=neon -fmultilib-flag=no-threads 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # NOT-FOUND: warning: no multilib found matching flags
