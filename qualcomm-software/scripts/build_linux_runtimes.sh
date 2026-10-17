@@ -216,7 +216,7 @@ for VARIANT in "${VARIANTS[@]}"; do
           ARCH="${VARIANT_KERNEL_ARCH}"
 
   # Flags common to all libraries.
-  LIB_BUILD_FLAGS="${BUILD_FLAGS} -isystem${KERNEL_BUILD_BASE}/include -resource-dir ${VARIANT_TMP_RESOURCE_DIR} --sysroot=${VARIANT_TMP_SYSROOT}"
+  LIB_BUILD_FLAGS="${BUILD_FLAGS} -isystem ${KERNEL_BUILD_BASE}/include -resource-dir ${VARIANT_TMP_RESOURCE_DIR} --sysroot=${VARIANT_TMP_SYSROOT}"
   LIB_BUILD_FLAGS="${LIB_BUILD_FLAGS} -ffunction-sections -fdata-sections"
 
   # Install musl headers
@@ -345,7 +345,7 @@ for VARIANT in "${VARIANTS[@]}"; do
         -DCMAKE_CXX_COMPILER_TARGET="${VARIANT_TARGET}" \
         -DCMAKE_ASM_FLAGS="${LIB_BUILD_FLAGS}" \
         -DCMAKE_C_FLAGS="${LIB_BUILD_FLAGS}" \
-        -DCMAKE_CXX_FLAGS="${LIB_BUILD_FLAGS} -stdlib=libc++ -I${VARIANT_TMP_SYSROOT}/include/c++/v1/" \
+        -DCMAKE_CXX_FLAGS="${LIB_BUILD_FLAGS} -stdlib=libc++ -isystem ${VARIANT_TMP_SYSROOT}/include/c++/v1" \
         -DLIBOMP_USE_VERSION_SYMBOLS=OFF \
         -DLIBOMP_ENABLE_SHARED=OFF \
         -DOPENMP_ENABLE_LIBOMPTARGET=OFF \
@@ -410,7 +410,7 @@ for VARIANT in "${VARIANTS[@]}"; do
       -DCMAKE_CXX_COMPILER_TARGET="${VARIANT_TARGET}" \
       -DCMAKE_ASM_FLAGS="${COMPILER_RT_COMPILE_FLAGS}" \
       -DCMAKE_C_FLAGS="${COMPILER_RT_COMPILE_FLAGS}" \
-      -DCMAKE_CXX_FLAGS="${COMPILER_RT_COMPILE_FLAGS}" \
+      -DCMAKE_CXX_FLAGS="${COMPILER_RT_COMPILE_FLAGS} -stdlib=libc++ -isystem ${VARIANT_TMP_SYSROOT}/include/c++/v1" \
       -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON \
       -DCOMPILER_RT_CXX_LIBRARY="default" \
       -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON \
