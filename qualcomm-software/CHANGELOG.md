@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 ### Security
 
+## [22.1.4]
+### Changed
+- Advanced ELD 22.1.0 to commit fccabe0 - 22.x: Fix LW.dll packaging when LLVM_DISTRIBUTION_COMPONENTS is used on Windows
+
 ## [22.1.3]
 ### Added
 - Added aligned AArch64a, AArch64a pacret+bkey+bti, AArch64a nofp, and AArch64a nofp+pacret+bti library variants
