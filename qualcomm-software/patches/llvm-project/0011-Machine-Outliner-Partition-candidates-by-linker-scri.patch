@@ -1,0 +1,316 @@
+From aa99e4a2a302f6001cdbf90a0378794203ca369d Mon Sep 17 00:00:00 2001
+From: Garvit Gupta <garvgupt@qti.qualcomm.com>
+Date: Tue, 29 Sep 2026 13:41:27 -0700
+Subject: [PATCH] [Machine Outliner] Partition candidates by linker script
+ output section attribute
+
+Currently, with LTO + linker script, each function get an input section annotation
+because of which machine outliner would just bail out because the named section
+function will reject outlining.
+
+The previous commit added the base support for the input section aware outlining
+and this commit extends the support by first partitioning the candidates based
+on the `linker_output_section` attribute and then falling back to the input section
+if the attribute is not valid.
+
+This is done because several distinct input sections may map to a
+single output section, so partitioning the candidates of a repeated sequence by
+input section alone misses candidates that are in fact co-located, and no
+outlining happens for them.
+
+Signed-off-by: Garvit Gupta <garvgupt@qti.qualcomm.com>
+---
+ .../machine-outliner-output-section.test      |  95 ++++++++++++++++
+ llvm/lib/CodeGen/MachineOutliner.cpp          |  31 +++++-
+ .../RISCV/machine-outliner-output-section.ll  | 101 ++++++++++++++++++
+ 3 files changed, 223 insertions(+), 4 deletions(-)
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/machine-outliner-output-section.test
+ create mode 100644 llvm/test/CodeGen/RISCV/machine-outliner-output-section.ll
+
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/machine-outliner-output-section.test b/lld/test/ELF/lto/lto-with-linker-scripts/machine-outliner-output-section.test
+new file mode 100644
+index 000000000000..447d8565b1ce
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/machine-outliner-output-section.test
+@@ -0,0 +1,95 @@
++# Check that the machine outliner groups candidates by the linker script output
++# section during LTO. hot_0 and hot_1 are in different input sections but the
++# script maps both to .out_hot, so they are outlined together and the outlined
++# function is placed in that output section. cold_0 is mapped to .out_cold and
++# must not join them.
++
++# REQUIRES: riscv
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/1.ll -o %t/1.o
++# RUN: llvm-mc -filetype=obj -triple=riscv32 %t/2.s -o %t/2.o
++# RUN: ld.lld -m elf32lriscv --lto-linker-scripts -e main \
++# RUN:   -mllvm -enable-machine-outliner=always \
++# RUN:   -T %t/script.t %t/1.o %t/2.o -o %t/out
++# RUN: llvm-readelf -S -s -W %t/out | FileCheck %s
++
++# A single outlined function is created for the two candidates that share the
++# .out_hot output section, and it is placed in that section.
++# CHECK: [ [[HOT:[0-9]+]]] .out_hot PROGBITS
++# CHECK: [ [[COLD:[0-9]+]]] .out_cold PROGBITS
++
++# CHECK-DAG: FUNC LOCAL DEFAULT [[HOT]] OUTLINED_FUNCTION_0
++# CHECK-DAG: FUNC GLOBAL DEFAULT [[HOT]] hot_0
++# CHECK-DAG: FUNC GLOBAL DEFAULT [[HOT]] hot_1
++
++# The candidate mapped to a different output section is not grouped with them,
++# so no second outlined function exists.
++# CHECK-DAG: FUNC GLOBAL DEFAULT [[COLD]] cold_0
++# CHECK-NOT: OUTLINED_FUNCTION_1
++
++#--- 1.ll
++target datalayout = "e-m:e-p:32:32-i64:64-n32-S128"
++target triple = "riscv32-unknown-linux-gnu"
++
++define i32 @hot_0(i32 %a, i32 %b) noinline nounwind section ".text.hot_0" {
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 1
++  ret i32 %result
++}
++
++define i32 @hot_1(i32 %a, i32 %b) noinline nounwind section ".text.hot_1" {
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 2
++  ret i32 %result
++}
++
++define i32 @cold_0(i32 %a, i32 %b) noinline nounwind section ".text.cold_0" {
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 3
++  ret i32 %result
++}
++
++#--- 2.s
++.text
++.globl main
++.type main,@function
++main:
++  addi sp, sp, -16
++  sw ra, 12(sp)
++  li a0, 1
++  li a1, 2
++  call hot_0
++  li a0, 1
++  li a1, 2
++  call hot_1
++  li a0, 1
++  li a1, 2
++  call cold_0
++  li a0, 0
++  lw ra, 12(sp)
++  addi sp, sp, 16
++  ret
++.size main, .-main
++
++#--- script.t
++SECTIONS {
++  . = 0x10000;
++  .out_hot  : { *(.text.hot_*) }
++  .out_cold : { *(.text.cold_*) }
++  .text     : { *(.text*) }
++}
+diff --git a/llvm/lib/CodeGen/MachineOutliner.cpp b/llvm/lib/CodeGen/MachineOutliner.cpp
+index 08e9a7df1cc3..ca5324031fd9 100644
+--- a/llvm/lib/CodeGen/MachineOutliner.cpp
++++ b/llvm/lib/CodeGen/MachineOutliner.cpp
+@@ -751,14 +751,24 @@ static StringRef getCandidateInputSection(const Candidate &C) {
+   return F.hasSection() ? F.getSection() : StringRef();
+ }
+ 
++/// Returns the value of the "linker_output_section" attribute if it exists,
++/// otherwise returns the input section of the candidate's parent function.
++static StringRef getCandidatePlacementSection(const Candidate &C) {
++  const Function &F = C.getMF()->getFunction();
++  Attribute OutputSection = F.getFnAttribute("linker_output_section");
++  if (OutputSection.isValid())
++    return OutputSection.getValueAsString();
++  return getCandidateInputSection(C);
++}
++
+ static SmallVector<std::vector<Candidate>>
+-partitionCandidatesByInputSection(std::vector<Candidate> &Candidates) {
++partitionCandidatesByPlacementSection(std::vector<Candidate> &Candidates) {
+   // Each candidate belongs to exactly one MachineFunction, so the partitions
+   // are disjoint and can be outlined independently.
+   SmallVector<std::vector<Candidate>> Partitions;
+   SmallVector<StringRef> Sections;
+   for (Candidate &C : Candidates) {
+-    StringRef Section = getCandidateInputSection(C);
++    StringRef Section = getCandidatePlacementSection(C);
+     auto It = llvm::find(Sections, Section);
+     if (It == Sections.end()) {
+       Sections.push_back(Section);
+@@ -899,7 +909,7 @@ void MachineOutliner::findCandidates(
+ #endif
+ 
+     SmallVector<std::vector<Candidate>> Partitions =
+-        partitionCandidatesByInputSection(CandidatesForRepeatedSeq);
++        partitionCandidatesByPlacementSection(CandidatesForRepeatedSeq);
+ #ifndef NDEBUG
+     LLVM_DEBUG(dbgs() << "    Input section partitions: " << Partitions.size()
+                       << "\n");
+@@ -908,7 +918,7 @@ void MachineOutliner::findCandidates(
+     for (std::vector<Candidate> &Partition : Partitions) {
+ #ifndef NDEBUG
+       LLVM_DEBUG({
+-        StringRef Section = getCandidateInputSection(Partition.front());
++        StringRef Section = getCandidatePlacementSection(Partition.front());
+         dbgs() << "    .. section '"
+                << (Section.empty() ? StringRef("<none>") : Section)
+                << "': " << Partition.size() << " candidates\n";
+@@ -986,6 +996,10 @@ MachineFunction *MachineOutliner::createOutlinedFunction(
+ 
+   TII.mergeOutliningCandidateAttributes(*F, OF.Candidates);
+ 
++  // Place the outlined function in the first candidate's section. Candidates
++  // were partitioned so that they all share one placement section, so any of
++  // them is representative; note they may still differ in input section when
++  // several input sections map to one linker script output section.
+   if (TII.supportsSectionAwareOutlining()) {
+     const Function &ParentFn = FirstCand.getMF()->getFunction();
+     if (ParentFn.hasSection()) {
+@@ -993,6 +1007,15 @@ MachineFunction *MachineOutliner::createOutlinedFunction(
+ #ifndef NDEBUG
+       LLVM_DEBUG(dbgs() << "  INHERITED SECTION: " << ParentFn.getSection()
+                         << "\n");
++#endif
++    }
++    
++    Attribute OutputSection = ParentFn.getFnAttribute("linker_output_section");
++    if (OutputSection.isValid()) {
++      F->addFnAttr("linker_output_section", OutputSection.getValueAsString());
++#ifndef NDEBUG
++      LLVM_DEBUG(dbgs() << "  INHERITED OUTPUT SECTION: "
++                        << OutputSection.getValueAsString() << "\n");
+ #endif
+     }
+   }
+diff --git a/llvm/test/CodeGen/RISCV/machine-outliner-output-section.ll b/llvm/test/CodeGen/RISCV/machine-outliner-output-section.ll
+new file mode 100644
+index 000000000000..037daabd4880
+--- /dev/null
++++ b/llvm/test/CodeGen/RISCV/machine-outliner-output-section.ll
+@@ -0,0 +1,101 @@
++; NOTE: This test is derived from the following C source. With LTO + a linker
++; script the linker records the output section each function is mapped to as the
++; "linker_output_section" attribute.
++;
++; same_out_0/1 are in different input sections but map to one output section, so
++; they are outlined together. diff_out maps elsewhere and is not grouped with
++; them. no_attr_0/1 carry no attribute and fall back to their shared input
++; section.
++;
++; #define BODY(N) do { a ^= b; b += a; a = (a << 3) | (a >> 29); \
++;                       a ^= b; return a + N; } while (0)
++; #define SEC(S, N, V) __attribute__((noinline, section(S))) \
++;   unsigned N(unsigned a, unsigned b) { BODY(V); }
++; SEC(".text.same_out_0", same_out_0, 1) SEC(".text.same_out_1", same_out_1, 2)
++; SEC(".text.diff_out", diff_out, 3)
++; SEC(".text.shared", no_attr_0, 4) SEC(".text.shared", no_attr_1, 5)
++
++; RUN: llc -mtriple=riscv32 -enable-machine-outliner=always -verify-machineinstrs < %s | FileCheck %s
++; RUN: llc -mtriple=riscv64 -enable-machine-outliner=always -verify-machineinstrs < %s | FileCheck %s
++
++; The two functions sharing an output section are outlined together even though
++; their input sections differ.
++define i32 @same_out_0(i32 %a, i32 %b) noinline nounwind #0 section ".text.same_out_0" {
++; CHECK: .section .text.same_out_0,"ax",@progbits
++; CHECK-LABEL: same_out_0:
++; CHECK: call t0, OUTLINED_FUNCTION_[[HOT:[0-9_]+]]
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 1
++  ret i32 %result
++}
++
++define i32 @same_out_1(i32 %a, i32 %b) noinline nounwind #0 section ".text.same_out_1" {
++; CHECK: .section .text.same_out_1,"ax",@progbits
++; CHECK-LABEL: same_out_1:
++; CHECK: call t0, OUTLINED_FUNCTION_[[HOT]]
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 2
++  ret i32 %result
++}
++
++; A different output section must not be grouped with the pair above.
++define i32 @diff_out(i32 %a, i32 %b) noinline nounwind #1 section ".text.diff_out" {
++; CHECK: .section .text.diff_out,"ax",@progbits
++; CHECK-LABEL: diff_out:
++; CHECK-NOT: call t0, OUTLINED_FUNCTION_
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 3
++  ret i32 %result
++}
++
++; No attribute: the input section is used, and these two share it.
++define i32 @no_attr_0(i32 %a, i32 %b) noinline nounwind section ".text.shared" {
++; CHECK: .section .text.shared,"ax",@progbits
++; CHECK-LABEL: no_attr_0:
++; CHECK: call t0, OUTLINED_FUNCTION_[[SHARED:[0-9_]+]]
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 4
++  ret i32 %result
++}
++
++define i32 @no_attr_1(i32 %a, i32 %b) noinline nounwind section ".text.shared" {
++; CHECK-LABEL: no_attr_1:
++; CHECK: call t0, OUTLINED_FUNCTION_[[SHARED]]
++  %a0 = xor i32 %a, %b
++  %b0 = add i32 %b, %a0
++  %a1 = shl i32 %a0, 3
++  %a2 = lshr i32 %a0, 29
++  %a3 = or i32 %a1, %a2
++  %a4 = xor i32 %a3, %b0
++  %result = add i32 %a4, 5
++  ret i32 %result
++}
++
++attributes #0 = { "linker_output_section"="out_hot" }
++attributes #1 = { "linker_output_section"="out_cold" }
++
++; Each outlined function is emitted into the input section of its candidates.
++; CHECK: .section .text.same_out_0,"ax",@progbits
++; CHECK: OUTLINED_FUNCTION_[[HOT]]:
++; CHECK: .section .text.shared,"ax",@progbits
++; CHECK: OUTLINED_FUNCTION_[[SHARED]]:
+-- 
+2.34.1
+
