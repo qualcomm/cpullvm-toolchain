@@ -39,8 +39,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - build_script: build.sh
-            test_script: test.sh
+          - build_script: build_picolibc-v1812_overlay.sh
+            test_script: test_picolibc-v1812_overlay.sh
+            install_script: install_dependencies_x86.sh
             target_os: Linux-x86_64
             runner: cpullvm-ubuntu24-x86_64
 
