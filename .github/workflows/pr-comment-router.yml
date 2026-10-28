@@ -1,0 +1,203 @@
+name: PR Comment Router
+run-name: "PR comment router #${{ inputs.pr_number || github.event.issue.number }}"
+
+on:
+  issue_comment:
+    types: [created, edited]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number
+        required: true
+        type: number
+      pr_sha:
+        description: Exact pull request head SHA
+        required: true
+        type: string
+      command:
+        description: Workflow to run
+        required: true
+        type: choice
+        options:
+          - check-nightly
+          - check-nightly-release
+          - check-zephyr
+
+concurrency:
+  group: pr-comment-router-${{ inputs.pr_number || github.event.issue.number }}-${{ inputs.command || github.event.comment.body || 'manual' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  actions: read
+  statuses: write
+
+jobs:
+  validate:
+    if: github.repository == 'qualcomm/cpullvm-toolchain' && (github.event_name == 'workflow_dispatch' || github.event.issue.pull_request != null)
+    runs-on: ubuntu-24.04
+    outputs:
+      pr_number: ${{ steps.request.outputs.pr_number }}
+      pr_sha: ${{ steps.request.outputs.pr_sha }}
+      command: ${{ steps.request.outputs.command }}
+    steps:
+      - name: Validate comment request
+        id: request
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body || '' }}
+          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+          INPUT_PR_SHA: ${{ inputs.pr_sha }}
+          INPUT_COMMAND: ${{ inputs.command }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const isWorkflowDispatch = context.eventName === 'workflow_dispatch';
+            const command = isWorkflowDispatch
+              ? process.env.INPUT_COMMAND
+              : process.env.COMMENT_BODY.trim();
+            const supported = new Set([
+              'check-nightly',
+              'check-nightly-release',
+              'check-zephyr',
+            ]);
+            const allowed = new Set(['MEMBER', 'OWNER']);
+
+            if (!supported.has(command) ||
+                (!isWorkflowDispatch && !allowed.has(context.payload.comment.author_association))) {
+              core.info('Ignoring unrelated or unauthorized comment.');
+              return;
+            }
+
+            const prNumber = isWorkflowDispatch
+              ? Number(process.env.INPUT_PR_NUMBER)
+              : context.issue.number;
+            if (!Number.isInteger(prNumber) || prNumber <= 0) {
+              core.setFailed('A valid pull request number is required.');
+              return;
+            }
+
+            const pullRequest = (await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            })).data;
+            if (pullRequest.head.repo.full_name !== context.repo.full_name) {
+              core.setFailed('Pull requests from external repositories are not supported.');
+              return;
+            }
+            if (isWorkflowDispatch && pullRequest.head.sha !== process.env.INPUT_PR_SHA) {
+              core.setFailed(`PR #${prNumber} moved from ${process.env.INPUT_PR_SHA} to ${pullRequest.head.sha}.`);
+              return;
+            }
+
+            core.setOutput('pr_number', String(prNumber));
+            core.setOutput('pr_sha', pullRequest.head.sha);
+            core.setOutput('command', command);
+
+            const contexts = {
+              'check-nightly': 'PR Nightly',
+              'check-nightly-release': 'PR Nightly Release',
+              'check-zephyr': 'PR Zephyr',
+            };
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: pullRequest.head.sha,
+              state: 'pending',
+              context: contexts[command],
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: `${command} is starting.`,
+            });
+
+            if (!isWorkflowDispatch) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `${command} request accepted for \`${pullRequest.head.sha}\`.`,
+              });
+            }
+
+  nightly:
+    needs: validate
+    if: always() && needs.validate.outputs.command == 'check-nightly'
+    uses: ./.github/workflows/nightly.yml
+    with:
+      pr_sha: ${{ needs.validate.outputs.pr_sha }}
+      enable_assertions: true
+    permissions:
+      contents: read
+
+  nightly-release:
+    needs: validate
+    if: always() && needs.validate.outputs.command == 'check-nightly-release'
+    uses: ./.github/workflows/nightly-release.yml
+    with:
+      pr_sha: ${{ needs.validate.outputs.pr_sha }}
+    permissions:
+      contents: read
+
+  zephyr:
+    needs: validate
+    if: always() && needs.validate.outputs.command == 'check-zephyr'
+    uses: ./.github/workflows/zephyr-twister-tests.yml
+    with:
+      run-id: ''
+      package-name: cpullvm-packages-build.sh-Linux-x86
+    permissions:
+      contents: read
+      actions: read
+
+  report-nightly:
+    needs: [validate, nightly]
+    if: always() && needs.validate.outputs.command == 'check-nightly'
+    uses: ./.github/workflows/report-pr-check.yml
+    with:
+      check_name: Nightly
+      status_context: PR Nightly
+      pr_number: ${{ needs.validate.outputs.pr_number }}
+      pr_sha: ${{ needs.validate.outputs.pr_sha }}
+      build_result: ${{ needs.nightly.result }}
+      test_result: ${{ needs.nightly.result }}
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    permissions:
+      issues: write
+      pull-requests: write
+      statuses: write
+
+  report-nightly-release:
+    needs: [validate, nightly-release]
+    if: always() && needs.validate.outputs.command == 'check-nightly-release'
+    uses: ./.github/workflows/report-pr-check.yml
+    with:
+      check_name: Nightly Release
+      status_context: PR Nightly Release
+      pr_number: ${{ needs.validate.outputs.pr_number }}
+      pr_sha: ${{ needs.validate.outputs.pr_sha }}
+      build_result: ${{ needs.nightly-release.result }}
+      test_result: ${{ needs.nightly-release.result }}
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    permissions:
+      issues: write
+      pull-requests: write
+      statuses: write
+
+  report-zephyr:
+    needs: [validate, zephyr]
+    if: always() && needs.validate.outputs.command == 'check-zephyr'
+    uses: ./.github/workflows/report-pr-check.yml
+    with:
+      check_name: Zephyr
+      status_context: PR Zephyr
+      pr_number: ${{ needs.validate.outputs.pr_number }}
+      pr_sha: ${{ needs.validate.outputs.pr_sha }}
+      build_result: ${{ needs.zephyr.result }}
+      test_result: ${{ needs.zephyr.result }}
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    permissions:
+      issues: write
+      pull-requests: write
+      statuses: write
