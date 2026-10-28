@@ -1,0 +1,81 @@
+# Report manually dispatched workflow results on the associated pull request.
+
+name: Report Manual Workflow Status
+
+on:
+  workflow_run:
+    workflows:
+      - Nightly Release Build and Test
+      - Nightly Build and Test
+      - Zephyr Twister Tests
+    types:
+      - completed
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  report-status:
+    if: github.event.workflow_run.event == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Report workflow result
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_NAME: ${{ github.event.workflow_run.name }}
+          RUN_STATUS: ${{ github.event.workflow_run.conclusion }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const run = context.payload.workflow_run;
+            const pullRequests = await github.paginate(
+              github.rest.repos.listPullRequestsAssociatedWithCommit,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: process.env.RUN_SHA,
+                per_page: 100,
+              },
+            );
+
+            for (const pullRequest of pullRequests) {
+              const marker = `<!-- manual-workflow-status:${process.env.RUN_ID} -->`;
+              const body = [
+                marker,
+                `Workflow \`${process.env.RUN_NAME}\` completed with status \`${process.env.RUN_STATUS}\`.`,
+                `Branch: \`${process.env.RUN_BRANCH}\``,
+                `[View workflow run](${process.env.RUN_URL})`,
+              ].join('\n\n');
+              const comments = await github.paginate(
+                github.rest.issues.listComments,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pullRequest.number,
+                  per_page: 100,
+                },
+              );
+              const existing = comments.find(comment => comment.body.includes(marker));
+
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pullRequest.number,
+                  body,
+                });
+              }
+            }

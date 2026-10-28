@@ -11,6 +11,11 @@
 #
 # This comment will create a pull request from <branch> to the latest release
 # branch.
+#
+# /run <workflow-file>
+#
+# This comment will dispatch an allowlisted workflow against the head branch of
+# the pull request. Only workflows intended for PR verification are supported.
 
 name: Issue Release Workflow
 
@@ -30,6 +35,92 @@ env:
   COMMENT_BODY: ${{ github.event.action == 'opened' && github.event.issue.body || github.event.comment.body  }}
 
 jobs:
+  run-workflow:
+    name: Run Requested Workflow
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+      pull-requests: read
+    if: >-
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/run ')
+    env:
+      ALLOWED_WORKFLOWS: >-
+        [
+          "nightly-release.yml",
+          "nightly.yml",
+          "zephyr-twister-tests.yml"
+        ]
+    steps:
+      - name: Dispatch requested workflow
+        id: dispatch
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          ALLOWED_WORKFLOWS: ${{ env.ALLOWED_WORKFLOWS }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const issueNumber = context.issue.number;
+            const comment = async (body) => github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body,
+            });
+            let workflow = 'requested workflow';
+
+            try {
+              const command = process.env.COMMENT_BODY.match(/^\/run\s+(\S+)\s*$/);
+              if (!command) {
+                throw new Error('Usage: /run <workflow-file>');
+              }
+
+              workflow = command[1];
+              const allowedWorkflows = JSON.parse(process.env.ALLOWED_WORKFLOWS);
+              if (!allowedWorkflows.includes(workflow)) {
+                throw new Error(`Workflow '${workflow}' is not allowlisted`);
+              }
+
+              const commenter = context.payload.comment.user.login;
+              const membership = await github.rest.teams.getMembershipForUserInOrg({
+                org: 'qualcomm',
+                team_slug: 'cpullvm-toolchain-write',
+                username: commenter,
+              });
+              if (membership.data.state !== 'active') {
+                throw new Error(`User '${commenter}' is not authorized to run workflows`);
+              }
+
+              const pullRequest = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: issueNumber,
+              });
+
+              if (pullRequest.data.head.repo.full_name !== context.payload.repository.full_name) {
+                throw new Error('Workflow dispatch is only supported for pull requests from this repository');
+              }
+
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: workflow,
+                ref: pullRequest.data.head.ref,
+              });
+
+              const workflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/${workflow}`;
+              await comment([
+                `Dispatched \`${workflow}\` for branch \`${pullRequest.data.head.ref}\`.`,
+                `[View workflow runs](${workflowUrl})`,
+              ].join('\n\n'));
+            } catch (error) {
+              await comment(`Unable to dispatch \`${workflow}\`: ${error.message}`);
+              core.setFailed(error.message);
+            }
+
   backport-commits:
     name: Backport Commits
     runs-on: ubuntu-24.04
