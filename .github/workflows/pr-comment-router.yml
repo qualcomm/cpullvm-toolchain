@@ -84,7 +84,8 @@ jobs:
               repo: context.repo.repo,
               pull_number: prNumber,
             })).data;
-            if (pullRequest.head.repo.full_name !== context.repo.full_name) {
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            if (pullRequest.head.repo.full_name !== repository) {
               core.setFailed('Pull requests from external repositories are not supported.');
               return;
             }
