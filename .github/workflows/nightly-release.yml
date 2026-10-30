@@ -8,6 +8,19 @@ name: Nightly Release Build and Test
 
 on:
   workflow_dispatch:
+    inputs:
+      pr_sha:
+        description: 'Exact pull request head SHA'
+        required: false
+        type: string
+        default: ''
+  workflow_call:
+    inputs:
+      pr_sha:
+        description: 'Exact pull request head SHA'
+        required: false
+        type: string
+        default: ''
   pull_request:
     paths:
       - '.github/workflows/nightly-release.yml'
@@ -23,5 +36,8 @@ concurrency:
 jobs:
   nightly-release:
     uses: ./.github/workflows/nightly.yml
+    permissions:
+      contents: read
     with:
       enable_assertions: false
+      pr_sha: ${{ inputs.pr_sha }}

@@ -22,12 +22,20 @@ name: Nightly Build and Test
 on:
   workflow_dispatch:
     inputs:
+      pr_sha:
+        description: 'Exact pull request head SHA'
+        type: string
+        default: ''
       enable_assertions:
         description: 'Enable LLVM assertions'
         type: boolean
         default: true
   workflow_call:
     inputs:
+      pr_sha:
+        description: 'Exact pull request head SHA'
+        type: string
+        default: ''
       enable_assertions:
         description: 'Enable LLVM assertions'
         type: boolean
@@ -62,6 +70,7 @@ jobs:
           # We build in the repository and rely on clean to cleanup possible
           # old build products if the runner doesn't do it itself.
           clean: true
+          ref: ${{ inputs.pr_sha || github.ref }}
 
       - name: Apply llvm-project patches
         run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
@@ -134,6 +143,7 @@ jobs:
           # We build in the repository and rely on clean to cleanup possible
           # old build products if the runner doesn't do it itself.
           clean: true
+          ref: ${{ inputs.pr_sha || github.ref }}
 
       - name: Download Linux-x86 package
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
