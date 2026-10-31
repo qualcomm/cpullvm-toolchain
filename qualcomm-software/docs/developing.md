@@ -41,6 +41,15 @@ To build additional embedded library variants, add the variant-specific JSON fil
 
 Corresponding multilib tests should be added in [test/multilib](../test/multilib/) as well.
 
+#### Naming
+Our embedded variants follow a naming convention roughly along the lines of
+`<arch>_<notable arch features or extensions>_<abi info>_<extra modifiers>`.
+
+`<extra modifiers>` should be limited to notable, atypical aspects of the configuration. For example,
+whether the variant is built with strict alignment enabled (`*_aligned_*` variants), whether thread
+support is disabled (`*_nothreads_*` variants), or whether exception/RTTI information is supported
+(`*_exn_rtti_*` variants).
+
 #### Specifying multilib and compile flags for variants
 Note that the flags listed the multilib.json entry are used differently than those in the variant-specific JSON
 file. Those in the multilib.json entry are used for multilib selection *only*--the flags listed in the
@@ -69,6 +78,12 @@ Currently, Linux variants must be added by directly modifying [build_linux_runti
 In most cases, you should only have to modify the `VARIANTS` and `VARIANT_BUILD_FLAGS`
 variables. Doing so will enable the appropriate compiler-rt, musl,
 and libc++/libc++abi/libunwind libraries for the variant.
+
+#### Naming
+Linux variants should be named similarly to their embedded counterparts. Some differences are expected though:
+* Parts of the embedded name irrelevant to the Linux version may be dropped (ex: `nothreads` is not applicable
+  to Linux variants)
+* `rv` is used as the prefix for RISC-V variants rather than `riscv`
 
 ## Building
 
