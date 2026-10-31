@@ -23,6 +23,7 @@
 # CHECK-IM-ZBA-ZBB-ZBC-ZBS-ZCA-ZCB-ZCMP-NO-THREADS-FNO-PIC-EMPTY:
 
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac -mabi=ilp32 -fpic 2>&1 | FileCheck %s --check-prefix=CHECK-IMAC-PIC
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac -mabi=ilp32 -fmultilib-flag=threads -fpic 2>&1 | FileCheck %s --check-prefix=CHECK-IMAC-PIC
 # CHECK-IMAC-PIC: riscv32-unknown-elf/riscv32imac_ilp32{{$}}
 # CHECK-IMAC-PIC-EMPTY:
 
@@ -105,6 +106,7 @@
 # CHECK-IMA-ZINX-XQCI-ILP32-EXN-RTTI-NO-PIC-EMPTY:
 
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=riscv32-unknown-elf -march=rv32ima -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=riscv32-unknown-elf -march=rv32imac -mabi=ilp32 -fmultilib-flag=no-threads -fpic 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=riscv32-unknown-elf -march=rv32imafdzca_zcf -mabi=ilp32 -fno-pic 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
 # NOT-FOUND: warning: no multilib found matching flags
 

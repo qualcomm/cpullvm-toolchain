@@ -63,3 +63,6 @@
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mbranch-protection=pac-ret+leaf+b-key+bti -mabi=aapcs-soft | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BKEY-BTI
 # CHECK-NOFP-PACRET-BKEY-BTI: aarch64-none-elf/aarch64a_soft_nofp_pacret_bkey_bti{{$}}
 # CHECK-NOFP-PACRET-BKEY-BTI-EMPTY:
+
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -fmultilib-flag=no-threads 2>&1 | FileCheck %s --check-prefix=NOT-FOUND
+# NOT-FOUND: warning: no multilib found matching flags
