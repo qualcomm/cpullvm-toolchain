@@ -201,8 +201,8 @@
           "flags": "--target=riscv32-unknown-unknown-elf -march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_zdinx_zfinx_zhinx_xqcia_xqciac_xqcibi_xqcibm_xqcicli_xqcicm_xqcics_xqcicsr_xqciint_xqciio_xqcilb_xqcili_xqcilia_xqcilo_xqcilsm_xqcisim_xqcisls_xqcisync_xqccmp_xqccmt0p1 -mabi=ilp32 -fno-exceptions -fno-rtti -fno-pic -fcf-protection=none"
         },
         {
-            "variant": "riscv32ima_zinx_zve64x_zvl128b_nopic_xqci_ilp32",
-            "json": "riscv32ima_zinx_zve64x_zvl128b_nopic_xqci_ilp32.json",
+            "variant": "riscv32ima_zinx_zve64x_zvl128b_xqci_ilp32_nopic",
+            "json": "riscv32ima_zinx_zve64x_zvl128b_xqci_ilp32_nopic.json",
             "flags": "--target=riscv32-unknown-unknown-elf -march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_zdinx_zhinx_zfinx_xqci_xqccmp_xqccmt0p1_zve64x_zvl128b -mabi=ilp32 -fno-pic -fcf-protection=none"
         },
         {

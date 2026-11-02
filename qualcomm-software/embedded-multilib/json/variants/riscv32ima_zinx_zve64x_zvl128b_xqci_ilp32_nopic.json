@@ -2,7 +2,7 @@
     "args": {
         "common": {
             "TARGET_ARCH": "riscv32",
-            "VARIANT": "riscv32ima_zinx_zve64x_zvl128b_nopic_xqci_ilp32",
+            "VARIANT": "riscv32ima_zinx_zve64x_zvl128b_xqci_ilp32_nopic",
             "COMPILE_FLAGS": "-march=rv32ima_zawrs_zacas_zabha_zba_zbb_zbs_zca_zcb_zilsd_zclsd_zdinx_zhinx_zfinx_xqci_xqccmp_xqccmt0p1_zve64x_zvl128b -menable-experimental-extensions -mabi=ilp32 -fno-pic -fcf-protection=none",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "OFF",
