@@ -457,8 +457,15 @@ def main():
             variants=[
                 "aarch64a_tlsie",
                 "aarch64a_aligned_tlsie",
+                "aarch64a_pacret",
+                "aarch64a_pacret_bti",
+                "aarch64a_pacret_bkey_bti_tlsie",
+                "aarch64a_pacret_bkey_bti_aligned_tlsie",
                 "aarch64a_soft_nofp_tlsie",
                 "aarch64a_soft_nofp_aligned_tlsie",
+                "aarch64a_soft_nofp_pacret_bti",
+                "aarch64a_soft_nofp_pacret_bti_aligned",
+                "aarch64a_soft_nofp_pacret_bkey_bti",
             ],
             description="QEMU does not deliver crash signals. The emupac test uses "
                 "%expect_crash which requires the OS to deliver a signal back to the "
