@@ -261,6 +261,7 @@ set(LIBCLANG_BUILD_STATIC ON CACHE BOOL "")
 set(LLVM_POLLY_LINK_INTO_TOOLS ON CACHE BOOL "")
 set(CLANG_DEFAULT_LINKER lld CACHE STRING "")
 set(LLDB_ENABLE_PYTHON ON CACHE BOOL "")
+set(CLANG_ENABLE_CIR OFF CACHE BOOL "")
 # Allow using any version of Python at runtime.  We don't need to set this
 # on Windows because it uses a different mechanism to allow different
 # Python versions.
