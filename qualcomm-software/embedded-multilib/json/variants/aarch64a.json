@@ -2,13 +2,13 @@
     "args": {
         "common": {
             "TARGET_ARCH": "aarch64a",
-            "VARIANT": "aarch64a_pacret_bkey_bti_tlsie",
-            "COMPILE_FLAGS": "-march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -munaligned-access -fPIC",
+            "VARIANT": "aarch64a",
+            "COMPILE_FLAGS": "-march=armv8-a -munaligned-access -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",
             "QEMU_MACHINE": "virt",
-            "QEMU_CPU": "max",
+            "QEMU_CPU": "cortex-a57",
             "FLASH_ADDRESS": "0x40000000",
             "FLASH_SIZE": "0x01000000",
             "RAM_ADDRESS": "0x41000000",
@@ -18,9 +18,8 @@
         "picolibc": {
             "ENABLE_CXX_LIBS": "ON",
             "ENABLE_LIBC_TESTS": "ON",
-            "ENABLE_COMPILER_RT_TESTS": "OFF",
-            "ENABLE_LIBCXX_TESTS": "ON",
-            "TLS_MODEL": "initial-exec"
+            "ENABLE_COMPILER_RT_TESTS": "ON",
+            "ENABLE_LIBCXX_TESTS": "ON"
         }
     }
 }
