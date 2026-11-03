@@ -262,14 +262,19 @@ set(LLVM_POLLY_LINK_INTO_TOOLS ON CACHE BOOL "")
 set(CLANG_DEFAULT_LINKER lld CACHE STRING "")
 set(LLDB_ENABLE_PYTHON ON CACHE BOOL "")
 set(CLANG_ENABLE_CIR OFF CACHE BOOL "")
-# Allow using any version of Python at runtime.  We don't need to set this
-# on Windows because it uses a different mechanism to allow different
-# Python versions.
 if (NOT CMAKE_HOST_WIN32)
+  # Allow using any version of Python at runtime.  We don't need to set this
+  # on Windows because it uses a different mechanism to allow different
+  # Python versions.
   set(LLDB_ENABLE_DYNAMIC_SCRIPTINTERPRETERS ON CACHE BOOL "")
   # FIXME: this can be removed once https://github.com/llvm/llvm-project/issues/222116
   # is resolved.
   list(APPEND LLVM_DISTRIBUTION_COMPONENTS lldbPluginScriptInterpreterPython)
+
+  # Force-enable LIBEDIT for both lldb and clang utilities. (Note "force-on"
+  # is spelled differently for LLVM vs. LLDB.)
+  set(LLVM_ENABLE_LIBEDIT FORCE_ON CACHE STRING "")
+  set(LLDB_ENABLE_LIBEDIT ON CACHE STRING "")
 endif()
 # Explicitly enable limited API. This overrides the default on Windows, and
 # it ensures we don't accidentally break anything on Linux.
