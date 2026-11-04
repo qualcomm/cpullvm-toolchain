@@ -18,6 +18,7 @@
 # x86_64 platforms are built and tested separately.
 
 name: Nightly Build and Test
+# DNM: Trigger the Windows nightly matrix while validating PR #750.
 
 on:
   workflow_dispatch:
