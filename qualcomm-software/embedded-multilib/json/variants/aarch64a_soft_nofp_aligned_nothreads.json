@@ -2,8 +2,8 @@
     "args": {
         "common": {
             "TARGET_ARCH": "aarch64a",
-            "VARIANT": "aarch64a_aligned_tlsie",
-            "COMPILE_FLAGS": "-march=armv8-a -mno-unaligned-access -fPIC",
+            "VARIANT": "aarch64a_soft_nofp_aligned_nothreads",
+            "COMPILE_FLAGS": "-march=armv8-a+nofp+nosimd -mabi=aapcs-soft -mno-unaligned-access -fPIC",
             "ENABLE_EXCEPTIONS": "OFF",
             "ENABLE_RTTI": "OFF",
             "TEST_EXECUTOR": "qemu",
@@ -12,7 +12,7 @@
             "FLASH_ADDRESS": "0x40000000",
             "FLASH_SIZE": "0x01000000",
             "RAM_ADDRESS": "0x41000000",
-            "RAM_SIZE": "0x01000000",
+            "RAM_SIZE": "0x1000000",
             "LIBRARY_BUILD_TYPE": "minsizerelease"
         },
         "picolibc": {
@@ -20,7 +20,7 @@
             "ENABLE_LIBC_TESTS": "ON",
             "ENABLE_COMPILER_RT_TESTS": "ON",
             "ENABLE_LIBCXX_TESTS": "ON",
-            "TLS_MODEL": "initial-exec"
+            "DISABLE_THREADS": "ON"
         }
     }
 }

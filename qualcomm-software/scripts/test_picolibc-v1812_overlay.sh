@@ -23,7 +23,7 @@ cd "${REPO_ROOT}"/build_picolibc-v1812_overlay
 ninja check-llvm-toolchain
 ninja check-cxxabi
 ninja check-unwind
-ninja check-cxx-aarch64a_tlsie
+ninja check-cxx-aarch64a
 ninja check-cxx-armv7a_soft_nofp
 ninja check-cxx-riscv32imac_ilp32
 ninja check-cxx-riscv64gc_lp64_nopic
