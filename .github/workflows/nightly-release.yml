@@ -4,6 +4,8 @@
 # Nightly Release build — calls nightly.yml with assertions disabled
 # (Release mode) by passing enable_assertions: false.
 
+# DNM: trigger build
+
 name: Nightly Release Build and Test
 
 on:
