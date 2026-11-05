@@ -277,6 +277,8 @@ def main():
                 "aarch64a_soft_nofp_pacret_bkey_bti",
                 "aarch64a_soft_nofp_pacret_bti",
                 "aarch64a_soft_nofp_pacret_bti_aligned",
+                "aarch64a_soft_nofp_aligned_tlsie",
+                "aarch64a_soft_nofp_tlsie",
                 "riscv32imac_ilp32",
                 "riscv32imac_ilp32_nopic",
                 "riscv32imac_zba_zbb_ilp32",
@@ -429,6 +431,8 @@ def main():
                 "aarch64a_soft_nofp_pacret_bkey_bti",
                 "aarch64a_soft_nofp_pacret_bti",
                 "aarch64a_soft_nofp_pacret_bti_aligned",
+                "aarch64a_soft_nofp_aligned_tlsie",
+                "aarch64a_soft_nofp_tlsie",
             ],
             description="cmath.pass.cpp fails on soft-float builds where std::sqrt(long double) "
                         "gives incorrect results. The 3-argument std::hypot precision assertion "
