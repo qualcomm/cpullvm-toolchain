@@ -739,7 +739,7 @@ index 000000000..56d82fe85
 +strcpy:
 +    mv      a7, a0
 +    or      a2, a0, a1
-+    and     a2, a1, 3
++    and     a2, a2, 3
 +    bnez    a2, 4f
 +1:
 +    qc.lwmi t3, 4, 0(a1)
