@@ -129,6 +129,8 @@ def main():
                 "aarch64a_soft_nofp_pacret_bkey_bti",
                 "aarch64a_soft_nofp_pacret_bti",
                 "aarch64a_soft_nofp_pacret_bti_aligned",
+                "aarch64a_soft_nofp_tlsie",
+                "aarch64a_soft_nofp_aligned_tlsie",
                 "riscv64gc_lp64d_nopic",
                 "riscv64gc_lp64_nopic",
                 "riscv64gc_zba_zbb_lp64d_nopic",
