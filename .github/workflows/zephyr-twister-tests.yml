@@ -18,6 +18,18 @@ on:
           Only Linux packages should be used.
         required: false
         default: cpullvm-packages-build.sh-Linux-x86
+  workflow_call:
+    inputs:
+      run-id:
+        description: 'Run ID of a CPULLVM workflow that built the Linux x86_64 toolchain'
+        required: false
+        type: string
+        default: ''
+      package-name:
+        description: 'Toolchain package artifact name'
+        required: false
+        type: string
+        default: cpullvm-packages-build.sh-Linux-x86
   schedule:
     - cron: '0 5 * * 1' # Sunday 21:00 PST (Monday 05:00 UTC)
   pull_request:
