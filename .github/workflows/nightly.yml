@@ -18,6 +18,7 @@
 # x86_64 platforms are built and tested separately.
 
 name: Nightly Build and Test
+# DNM: Temporary change to trigger the Windows nightly matrix for build validation.
 
 on:
   workflow_dispatch:
