@@ -278,9 +278,9 @@ if (CMAKE_HOST_WIN32)
   # FIXME: Figure out how to build/install zlib for compressed debug info
   set(LLVM_ENABLE_ZLIB OFF CACHE STRING "")
 
-  # FIXME: Figure out how to build libxml2 for XML parsing (lldb and llvm-mt)
-  set(LLVM_ENABLE_LIBXML2 OFF CACHE STRING "")
-  set(LLDB_ENABLE_LIBXML2 OFF CACHE STRING "")
+  # libxml2 is installed by install_dependencies.ps1 for XML parsing.
+  set(LLVM_ENABLE_LIBXML2 FORCE_ON CACHE STRING "")
+  set(LLDB_ENABLE_LIBXML2 ON CACHE STRING "")
 else ()
   # Allow using any version of Python at runtime.  We don't need to set this
   # on Windows because it uses a different mechanism to allow different
