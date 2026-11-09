@@ -3,6 +3,7 @@
 /repos*/
 /build*/
 /install*/
+/vcpkg_installed/
 /venv/
 __pycache__
 *.egg-info
