@@ -32,7 +32,7 @@ on:
         description: 'Enable LLVM assertions'
         type: boolean
         default: true
-  # Exercise nightly builds when this workflow changes in a pull request.
+  # Temporary test-only change to verify the Windows nightly workflow on pull requests.
   pull_request:
     paths:
       - '.github/workflows/nightly.yml'
