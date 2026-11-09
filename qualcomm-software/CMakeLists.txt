@@ -266,6 +266,10 @@ set(CLANG_ENABLE_CIR OFF CACHE BOOL "")
 set(LLDB_ENABLE_PYTHON ON CACHE BOOL "")
 set(LLDB_ENABLE_SWIG ON CACHE BOOL "")
 
+# Force-enable libxml2 for XML parsing on all hosts.
+set(LLVM_ENABLE_LIBXML2 FORCE_ON CACHE STRING "")
+set(LLDB_ENABLE_LIBXML2 ON CACHE STRING "")
+
 if (CMAKE_HOST_WIN32)
   # libedit doesn't exist on Windows. See
   # https://discourse.llvm.org/t/rfc-switching-from-libedit-to-replxx-in-lldb/90720
@@ -277,10 +281,6 @@ if (CMAKE_HOST_WIN32)
 
   # FIXME: Figure out how to build/install zlib for compressed debug info
   set(LLVM_ENABLE_ZLIB OFF CACHE STRING "")
-
-  # libxml2 is installed by install_dependencies.ps1 for XML parsing.
-  set(LLVM_ENABLE_LIBXML2 FORCE_ON CACHE STRING "")
-  set(LLDB_ENABLE_LIBXML2 ON CACHE STRING "")
 else ()
   # Allow using any version of Python at runtime.  We don't need to set this
   # on Windows because it uses a different mechanism to allow different
@@ -301,10 +301,6 @@ else ()
 
   # Force-enable zlib for compressed debug info
   set(LLVM_ENABLE_ZLIB FORCE_ON CACHE STRING "")
-
-  # Force-enable libxml2 for XML parsing
-  set(LLVM_ENABLE_LIBXML2 FORCE_ON CACHE STRING "")
-  set(LLDB_ENABLE_LIBXML2 ON CACHE STRING "")
 endif()
 
 # FIXME: Figure out how to build/install zstd/lzma for compressed debug info
