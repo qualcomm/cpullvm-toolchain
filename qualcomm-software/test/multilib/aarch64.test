@@ -15,6 +15,7 @@
 # CHECK-AARCH64-ALIGNED: aarch64-none-elf/aarch64a_aligned_tlsie{{$}}
 # CHECK-AARCH64-ALIGNED-EMPTY:
 
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -munaligned-access -fmultilib-flag=no-threads | FileCheck %s --check-prefix=CHECK-AARCH64-ALIGNED-NOTHREADS
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mno-unaligned-access -fmultilib-flag=no-threads | FileCheck %s --check-prefix=CHECK-AARCH64-ALIGNED-NOTHREADS
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -mno-unaligned-access -fmultilib-flag=no-threads | FileCheck %s --check-prefix=CHECK-AARCH64-ALIGNED-NOTHREADS
 # CHECK-AARCH64-ALIGNED-NOTHREADS: aarch64-none-elf/aarch64a_aligned_nothreads{{$}}
@@ -41,6 +42,7 @@
 # CHECK-PACRET-BKEY-BTI-ALIGNED: aarch64-none-elf/aarch64a_pacret_bkey_bti_aligned_tlsie{{$}}
 # CHECK-PACRET-BKEY-BTI-ALIGNED-EMPTY:
 
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -munaligned-access -fmultilib-flag=no-threads | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI-ALIGNED-NOTHREADS
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -mno-unaligned-access -fmultilib-flag=no-threads | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI-ALIGNED-NOTHREADS
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a -mbranch-protection=pac-ret+leaf+b-key+bti -mno-unaligned-access -fmultilib-flag=no-threads | FileCheck %s --check-prefix=CHECK-PACRET-BKEY-BTI-ALIGNED-NOTHREADS
 # CHECK-PACRET-BKEY-BTI-ALIGNED-NOTHREADS: aarch64-none-elf/aarch64a_pacret_bkey_bti_aligned_nothreads{{$}}
@@ -59,6 +61,7 @@
 # CHECK-NOFP-ALIGNED: aarch64-none-elf/aarch64a_soft_nofp_aligned_tlsie{{$}}
 # CHECK-NOFP-ALIGNED-EMPTY:
 
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8+nofp+nosimd -mabi=aapcs-soft -munaligned-access -fmultilib-flag=no-threads | FileCheck %s --check-prefix=CHECK-NOFP-ALIGNED-NOTHREADS
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8+nofp+nosimd -mabi=aapcs-soft -mno-unaligned-access -fmultilib-flag=no-threads | FileCheck %s --check-prefix=CHECK-NOFP-ALIGNED-NOTHREADS
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53+nofp+nosimd -mabi=aapcs-soft -mno-unaligned-access -fmultilib-flag=no-threads | FileCheck %s --check-prefix=CHECK-NOFP-ALIGNED-NOTHREADS
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mabi=aapcs-soft -mno-unaligned-access -fmultilib-flag=no-threads | FileCheck %s --check-prefix=CHECK-NOFP-ALIGNED-NOTHREADS
@@ -78,6 +81,7 @@
 # CHECK-NOFP-PACRET-BTI-ALIGNED: aarch64-none-elf/aarch64a_soft_nofp_pacret_bti_aligned{{$}}
 # CHECK-NOFP-PACRET-BTI-ALIGNED-EMPTY:
 
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -munaligned-access -fmultilib-flag=no-threads | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI-ALIGNED-NOTHREADS
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -mno-unaligned-access -fmultilib-flag=no-threads | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI-ALIGNED-NOTHREADS
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -mcpu=cortex-a53 -march=armv8.5a+nofp+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -mno-unaligned-access -fmultilib-flag=no-threads | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI-ALIGNED-NOTHREADS
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=aarch64-none-elf -march=armv8.5a -mgeneral-regs-only -mllvm -aarch64-enable-simd-scalar=false -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -mno-unaligned-access -fmultilib-flag=no-threads | FileCheck %s --check-prefix=CHECK-NOFP-PACRET-BTI-ALIGNED-NOTHREADS

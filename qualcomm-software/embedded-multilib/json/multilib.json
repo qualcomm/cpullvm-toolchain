@@ -21,7 +21,7 @@
         {
             "variant": "aarch64a_aligned_nothreads",
             "json": "aarch64a_aligned_nothreads.json",
-            "flags": "--target=aarch64-unknown-none-elf -mno-unaligned-access -fmultilib-flag=no-threads",
+            "flags": "--target=aarch64-unknown-none-elf -fmultilib-flag=no-threads",
             "libraries_supported": "picolibc"
         },
         {
@@ -61,7 +61,7 @@
         {
             "variant": "aarch64a_pacret_bkey_bti_aligned_nothreads",
             "json": "aarch64a_pacret_bkey_bti_aligned_nothreads.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti -mno-unaligned-access -fmultilib-flag=no-threads",
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -mbranch-protection=pac-ret+leaf+b-key+bti -fmultilib-flag=no-threads",
             "libraries_supported": "picolibc"
         },
         {
@@ -79,7 +79,7 @@
         {
             "variant": "aarch64a_soft_nofp_aligned_nothreads",
             "json": "aarch64a_soft_nofp_aligned_nothreads.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft -mno-unaligned-access -fmultilib-flag=no-threads",
+            "flags": "--target=aarch64-unknown-none-elf -march=armvX+nofp -march=armvX+nosimd -mabi=aapcs-soft -fmultilib-flag=no-threads",
             "libraries_supported": "picolibc"
         },
         {
@@ -95,7 +95,7 @@
         {
             "variant": "aarch64a_soft_nofp_pacret_bti_aligned_nothreads",
             "json": "aarch64a_soft_nofp_pacret_bti_aligned_nothreads.json",
-            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -mno-unaligned-access -fmultilib-flag=no-threads",
+            "flags": "--target=aarch64-unknown-none-elf -march=armv8.5-a -march=armvX+nofp -march=armvX+nosimd -mbranch-protection=pac-ret+leaf+bti -mabi=aapcs-soft -fmultilib-flag=no-threads",
             "libraries_supported": "picolibc"
         },
         {
