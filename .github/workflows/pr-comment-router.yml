@@ -1,204 +1,162 @@
 name: PR Comment Router
-run-name: "PR comment router #${{ inputs.pr_number || github.event.issue.number }}"
+run-name: "PR workflow request #${{ github.event.issue.number }}"
 
 on:
   issue_comment:
-    types: [created, edited]
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: Pull request number
-        required: true
-        type: number
-      pr_sha:
-        description: Exact pull request head SHA
-        required: true
-        type: string
-      command:
-        description: Workflow to run
-        required: true
-        type: choice
-        options:
-          - check-nightly
-          - check-nightly-release
-          - check-zephyr
-
-concurrency:
-  group: pr-comment-router-${{ inputs.pr_number || github.event.issue.number }}-${{ inputs.command || github.event.comment.body || 'manual' }}
-  cancel-in-progress: false
+    types: [created]
 
 permissions:
   contents: read
-  pull-requests: write
-  issues: write
-  actions: read
-  statuses: write
 
 jobs:
   validate:
-    if: github.repository == 'qualcomm/cpullvm-toolchain' && (github.event_name == 'workflow_dispatch' || github.event.issue.pull_request != null)
+    if: github.repository == 'qualcomm/cpullvm-toolchain' && github.event.issue.pull_request != null
     runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+      pull-requests: read
     outputs:
-      pr_number: ${{ steps.request.outputs.pr_number }}
-      pr_sha: ${{ steps.request.outputs.pr_sha }}
       command: ${{ steps.request.outputs.command }}
+      ref: ${{ steps.request.outputs.ref }}
+      comment_id: ${{ steps.request.outputs.comment_id }}
     steps:
-      - name: Validate comment request
+      - name: Validate workflow request
         id: request
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         env:
-          COMMENT_BODY: ${{ github.event.comment.body || '' }}
-          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
-          INPUT_PR_SHA: ${{ inputs.pr_sha }}
-          INPUT_COMMAND: ${{ inputs.command }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
         with:
           github-token: ${{ github.token }}
           script: |
-            const isWorkflowDispatch = context.eventName === 'workflow_dispatch';
-            const command = isWorkflowDispatch
-              ? process.env.INPUT_COMMAND
-              : process.env.COMMENT_BODY.trim();
-            const supported = new Set([
-              'check-nightly',
-              'check-nightly-release',
-              'check-zephyr',
-            ]);
-            const allowed = new Set(['MEMBER', 'OWNER']);
-
-            if (!supported.has(command) ||
-                (!isWorkflowDispatch && !allowed.has(context.payload.comment.author_association))) {
-              core.info('Ignoring unrelated or unauthorized comment.');
+            const comment = process.env.COMMENT_BODY.trim();
+            if (!comment.startsWith('/run')) {
+              core.info('Ignoring unrelated comment.');
               return;
             }
 
-            const prNumber = isWorkflowDispatch
-              ? Number(process.env.INPUT_PR_NUMBER)
-              : context.issue.number;
-            if (!Number.isInteger(prNumber) || prNumber <= 0) {
-              core.setFailed('A valid pull request number is required.');
+            const commands = new Map([
+              ['/run nightly', 'nightly'],
+              ['/run nightly-release', 'nightly-release'],
+            ]);
+            const command = commands.get(comment);
+            const reply = async (body) => github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+            if (!command) {
+              await reply('Unsupported workflow request. Use `/run nightly` or `/run nightly-release`.');
+              return;
+            }
+
+            let authorized = false;
+            try {
+              const membership = await github.rest.teams.getMembershipForUserInOrg({
+                org: 'qualcomm',
+                team_slug: 'cpullvm-toolchain-write',
+                username: context.payload.comment.user.login,
+              });
+              authorized = membership.data.state === 'active';
+            } catch (error) {
+              core.info(`Unable to verify team membership: ${error.message}`);
+            }
+            if (!authorized) {
+              await reply(`@${context.payload.comment.user.login} is not authorized to run pull request workflows.`);
               return;
             }
 
             const pullRequest = (await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: prNumber,
+              pull_number: context.issue.number,
             })).data;
-            const repository = `${context.repo.owner}/${context.repo.repo}`;
-            if (pullRequest.head.repo.full_name !== repository) {
-              core.setFailed('Pull requests from external repositories are not supported.');
+            if (pullRequest.head.repo.full_name !== context.payload.repository.full_name) {
+              await reply('Workflow requests are only supported for pull requests from this repository.');
               return;
             }
-            if (isWorkflowDispatch && pullRequest.head.sha !== process.env.INPUT_PR_SHA) {
-              core.setFailed(`PR #${prNumber} moved from ${process.env.INPUT_PR_SHA} to ${pullRequest.head.sha}.`);
+            if (!pullRequest.merge_commit_sha) {
+              await reply('GitHub has not created a merge commit for this pull request. Resolve merge conflicts and try again.');
               return;
             }
 
-            core.setOutput('pr_number', String(prNumber));
-            core.setOutput('pr_sha', pullRequest.head.sha);
+            const ref = pullRequest.merge_commit_sha;
+            const marker = `<!-- pr-workflow:${command}:${ref} -->`;
+            const requestComment = await reply([
+              marker,
+              `Running \`${comment}\` for merge commit \`${ref}\`.`,
+              `[View workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+            ].join('\n\n'));
+
             core.setOutput('command', command);
-
-            const contexts = {
-              'check-nightly': 'PR Nightly',
-              'check-nightly-release': 'PR Nightly Release',
-              'check-zephyr': 'PR Zephyr',
-            };
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: pullRequest.head.sha,
-              state: 'pending',
-              context: contexts[command],
-              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              description: `${command} is starting.`,
-            });
-
-            if (!isWorkflowDispatch) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: `${command} request accepted for \`${pullRequest.head.sha}\`.`,
-              });
-            }
+            core.setOutput('ref', ref);
+            core.setOutput('comment_id', String(requestComment.data.id));
 
   nightly:
     needs: validate
-    if: always() && needs.validate.outputs.command == 'check-nightly'
+    if: needs.validate.outputs.command == 'nightly'
     uses: ./.github/workflows/nightly.yml
     with:
-      pr_sha: ${{ needs.validate.outputs.pr_sha }}
+      ref: ${{ needs.validate.outputs.ref }}
       enable_assertions: true
     permissions:
       contents: read
+    concurrency:
+      group: pr-workflow-${{ github.event.issue.number }}
+      cancel-in-progress: true
 
   nightly-release:
     needs: validate
-    if: always() && needs.validate.outputs.command == 'check-nightly-release'
+    if: needs.validate.outputs.command == 'nightly-release'
     uses: ./.github/workflows/nightly-release.yml
     with:
-      pr_sha: ${{ needs.validate.outputs.pr_sha }}
+      ref: ${{ needs.validate.outputs.ref }}
     permissions:
       contents: read
+    concurrency:
+      group: pr-workflow-${{ github.event.issue.number }}
+      cancel-in-progress: true
 
-  zephyr:
-    needs: validate
-    if: always() && needs.validate.outputs.command == 'check-zephyr'
-    uses: ./.github/workflows/zephyr-twister-tests.yml
-    with:
-      run-id: ''
-      package-name: cpullvm-packages-build.sh-Linux-x86
-    permissions:
-      contents: read
-      actions: read
-
-  report-nightly:
-    needs: [validate, nightly]
-    if: always() && needs.validate.outputs.command == 'check-nightly'
-    uses: ./.github/workflows/report-pr-check.yml
-    with:
-      check_name: Nightly
-      status_context: PR Nightly
-      pr_number: ${{ needs.validate.outputs.pr_number }}
-      pr_sha: ${{ needs.validate.outputs.pr_sha }}
-      build_result: ${{ needs.nightly.result }}
-      test_result: ${{ needs.nightly.result }}
-      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  report:
+    needs: [validate, nightly, nightly-release]
+    if: >-
+      always() && needs.validate.result == 'success' &&
+      (needs.validate.outputs.command == 'nightly' || needs.validate.outputs.command == 'nightly-release')
+    runs-on: ubuntu-24.04
     permissions:
       issues: write
-      pull-requests: write
-      statuses: write
+    steps:
+      - name: Update workflow request
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          COMMAND: ${{ needs.validate.outputs.command }}
+          COMMENT_ID: ${{ needs.validate.outputs.comment_id }}
+          REF: ${{ needs.validate.outputs.ref }}
+          NIGHTLY_RESULT: ${{ needs.nightly.result }}
+          NIGHTLY_RELEASE_RESULT: ${{ needs.nightly-release.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const result = process.env.COMMAND === 'nightly'
+              ? process.env.NIGHTLY_RESULT
+              : process.env.NIGHTLY_RELEASE_RESULT;
+            const status = result === 'success'
+              ? 'passed'
+              : result === 'cancelled'
+                ? 'was cancelled'
+                : 'failed';
+            const command = `/run ${process.env.COMMAND}`;
+            const body = [
+              `<!-- pr-workflow:${process.env.COMMAND}:${process.env.REF} -->`,
+              `\`${command}\` ${status} for merge commit \`${process.env.REF}\`.`,
+              `[View workflow run](${process.env.RUN_URL})`,
+            ].join('\n\n');
 
-  report-nightly-release:
-    needs: [validate, nightly-release]
-    if: always() && needs.validate.outputs.command == 'check-nightly-release'
-    uses: ./.github/workflows/report-pr-check.yml
-    with:
-      check_name: Nightly Release
-      status_context: PR Nightly Release
-      pr_number: ${{ needs.validate.outputs.pr_number }}
-      pr_sha: ${{ needs.validate.outputs.pr_sha }}
-      build_result: ${{ needs.nightly-release.result }}
-      test_result: ${{ needs.nightly-release.result }}
-      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-    permissions:
-      issues: write
-      pull-requests: write
-      statuses: write
-
-  report-zephyr:
-    needs: [validate, zephyr]
-    if: always() && needs.validate.outputs.command == 'check-zephyr'
-    uses: ./.github/workflows/report-pr-check.yml
-    with:
-      check_name: Zephyr
-      status_context: PR Zephyr
-      pr_number: ${{ needs.validate.outputs.pr_number }}
-      pr_sha: ${{ needs.validate.outputs.pr_sha }}
-      build_result: ${{ needs.zephyr.result }}
-      test_result: ${{ needs.zephyr.result }}
-      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-    permissions:
-      issues: write
-      pull-requests: write
-      statuses: write
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: Number(process.env.COMMENT_ID),
+              body,
+            });

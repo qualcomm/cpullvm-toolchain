@@ -9,15 +9,15 @@ name: Nightly Release Build and Test
 on:
   workflow_dispatch:
     inputs:
-      pr_sha:
-        description: 'Exact pull request head SHA'
+      ref:
+        description: 'Git ref to build'
         required: false
         type: string
         default: ''
   workflow_call:
     inputs:
-      pr_sha:
-        description: 'Exact pull request head SHA'
+      ref:
+        description: 'Git ref to build'
         required: false
         type: string
         default: ''
@@ -40,4 +40,4 @@ jobs:
       contents: read
     with:
       enable_assertions: false
-      pr_sha: ${{ inputs.pr_sha }}
+      ref: ${{ inputs.ref }}
