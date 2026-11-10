@@ -20,8 +20,6 @@ on:
 permissions:
   contents: read
 
-# DNM: run libc++ tests for new variant
-
 # Cancel in-progress runs for `pull_request` events only.
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}-${{ github.ref }}
