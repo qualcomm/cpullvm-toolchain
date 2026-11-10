@@ -259,6 +259,11 @@ set(LLDB_ENABLE_PYTHON ON CACHE BOOL "")
 set(LLVM_ENABLE_LIBXML2 FORCE_ON CACHE STRING "")
 set(LLDB_ENABLE_LIBXML2 ON CACHE STRING "")
 
+if(CMAKE_HOST_WIN32)
+  # Keep optional zlib disabled until ELD propagates its library path on Windows.
+  set(LLVM_ENABLE_ZLIB OFF CACHE STRING "")
+endif()
+
 if (NOT CMAKE_HOST_WIN32)
   # Allow using any version of Python at runtime.  We don't need to set this
   # on Windows because it uses a different mechanism to allow different
