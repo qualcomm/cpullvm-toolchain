@@ -253,6 +253,8 @@ set(LLVM_BUILD_RUNTIME OFF CACHE BOOL "")
 set(LIBCLANG_BUILD_STATIC ON CACHE BOOL "")
 set(LLVM_POLLY_LINK_INTO_TOOLS ON CACHE BOOL "")
 set(CLANG_DEFAULT_LINKER lld CACHE STRING "")
+
+# Enable python support for LLDB
 set(LLDB_ENABLE_PYTHON ON CACHE BOOL "")
 set(LLDB_ENABLE_SWIG ON CACHE BOOL "")
 
@@ -276,6 +278,8 @@ else ()
   # on Windows because it uses a different mechanism to allow different
   # Python versions.
   set(LLDB_ENABLE_DYNAMIC_SCRIPTINTERPRETERS ON CACHE BOOL "")
+  # FIXME: this can be removed once https://github.com/llvm/llvm-project/issues/222116
+  # is resolved.
   list(APPEND LLVM_DISTRIBUTION_COMPONENTS lldbPluginScriptInterpreterPython)
 
   # Force-enable LIBEDIT for both lldb and clang utilities. (Note "force-on"
