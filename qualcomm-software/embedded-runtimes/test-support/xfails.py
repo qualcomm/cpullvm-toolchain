@@ -290,12 +290,9 @@ def main():
                 "aarch64a_soft_nofp_pacret_bkey_bti",
                 "aarch64a_soft_nofp_pacret_bti",
                 "aarch64a_soft_nofp_pacret_bti_aligned",
-<<<<<<< HEAD
                 "aarch64a_soft_nofp_pacret_bti_aligned_nothreads",
-=======
                 "aarch64a_soft_nofp_aligned_tlsie",
                 "aarch64a_soft_nofp_tlsie",
->>>>>>> qualcomm-software
                 "riscv32imac_ilp32",
                 "riscv32imac_ilp32_nopic",
                 "riscv32imac_zba_zbb_ilp32",
@@ -449,12 +446,9 @@ def main():
                 "aarch64a_soft_nofp_pacret_bkey_bti",
                 "aarch64a_soft_nofp_pacret_bti",
                 "aarch64a_soft_nofp_pacret_bti_aligned",
-<<<<<<< HEAD
                 "aarch64a_soft_nofp_pacret_bti_aligned_nothreads",
-=======
                 "aarch64a_soft_nofp_aligned_tlsie",
                 "aarch64a_soft_nofp_tlsie",
->>>>>>> qualcomm-software
             ],
             description="cmath.pass.cpp fails on soft-float builds where std::sqrt(long double) "
                         "gives incorrect results. The 3-argument std::hypot precision assertion "
@@ -483,24 +477,19 @@ def main():
             variants=[
                 "aarch64a_tlsie",
                 "aarch64a_aligned_tlsie",
-<<<<<<< HEAD
                 "aarch64a_aligned_nothreads",
-                "aarch64a_pacret_bkey_bti_aligned_nothreads",
-                "aarch64a_soft_nofp_tlsie",
-                "aarch64a_soft_nofp_aligned_tlsie",
-                "aarch64a_soft_nofp_aligned_nothreads",
-                "aarch64a_soft_nofp_pacret_bti_aligned_nothreads",
-=======
                 "aarch64a_pacret",
                 "aarch64a_pacret_bti",
                 "aarch64a_pacret_bkey_bti_tlsie",
                 "aarch64a_pacret_bkey_bti_aligned_tlsie",
+                "aarch64a_pacret_bkey_bti_aligned_nothreads",
                 "aarch64a_soft_nofp_tlsie",
                 "aarch64a_soft_nofp_aligned_tlsie",
+                "aarch64a_soft_nofp_aligned_nothreads",
                 "aarch64a_soft_nofp_pacret_bti",
                 "aarch64a_soft_nofp_pacret_bti_aligned",
+                "aarch64a_soft_nofp_pacret_bti_aligned_nothreads",
                 "aarch64a_soft_nofp_pacret_bkey_bti",
->>>>>>> qualcomm-software
             ],
             description="QEMU does not deliver crash signals. The emupac test uses "
                 "%expect_crash which requires the OS to deliver a signal back to the "
