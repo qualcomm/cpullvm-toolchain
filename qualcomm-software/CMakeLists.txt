@@ -254,25 +254,24 @@ set(LIBCLANG_BUILD_STATIC ON CACHE BOOL "")
 set(LLVM_POLLY_LINK_INTO_TOOLS ON CACHE BOOL "")
 set(CLANG_DEFAULT_LINKER lld CACHE STRING "")
 set(LLDB_ENABLE_PYTHON ON CACHE BOOL "")
+set(LLDB_ENABLE_SWIG ON CACHE BOOL "")
 
 # Force-enable libxml2 for XML parsing on all hosts.
 set(LLVM_ENABLE_LIBXML2 FORCE_ON CACHE STRING "")
 set(LLDB_ENABLE_LIBXML2 ON CACHE STRING "")
 
-if(CMAKE_HOST_WIN32)
+if (CMAKE_HOST_WIN32)
   # libedit doesn't exist on Windows. See
   # https://discourse.llvm.org/t/rfc-switching-from-libedit-to-replxx-in-lldb/90720
   set(LLVM_ENABLE_LIBEDIT OFF CACHE STRING "")
   set(LLDB_ENABLE_LIBEDIT OFF CACHE STRING "")
 
-  # Curses doesn't exist on Windows.
+  # Curses doesn't exist on Windows
   set(LLDB_ENABLE_CURSES OFF CACHE STRING "")
 
-  # Keep zlib disabled for compressed debug info, matching the main branch.
+  # FIXME: Figure out how to build/install zlib for compressed debug info
   set(LLVM_ENABLE_ZLIB OFF CACHE STRING "")
-endif()
-
-if (NOT CMAKE_HOST_WIN32)
+else ()
   # Allow using any version of Python at runtime.  We don't need to set this
   # on Windows because it uses a different mechanism to allow different
   # Python versions.
@@ -283,7 +282,24 @@ if (NOT CMAKE_HOST_WIN32)
   # is spelled differently for LLVM vs. LLDB.)
   set(LLVM_ENABLE_LIBEDIT FORCE_ON CACHE STRING "")
   set(LLDB_ENABLE_LIBEDIT ON CACHE STRING "")
+
+  # Force-enable curses for consistency. Used by LLDB terminal UI; not sure if
+  # this is something anyone actually uses.
+  set(LLDB_ENABLE_CURSES ON CACHE STRING "")
+
+  # Force-enable zlib for compressed debug info
+  set(LLVM_ENABLE_ZLIB FORCE_ON CACHE STRING "")
 endif()
+
+# FIXME: Figure out how to build/install zstd/lzma for compressed debug info
+set(LLVM_ENABLE_ZSTD OFF CACHE STRING "")
+set(LLVM_ENABLE_LZMA OFF CACHE STRING "")
+
+# Misc dependencies we don't need; force off for consistency.
+set(LLDB_ENABLE_TREESITTER OFF CACHE STRING "")
+set(LLDB_ENABLE_LUA OFF CACHE STRING "")
+set(LLVM_ENABLE_Z3_SOLVER OFF CACHE STRING "")
+set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "")
 # Explicitly enable limited API. This overrides the default on Windows, and
 # it ensures we don't accidentally break anything on Linux.
 set(LLDB_EMBED_PYTHON_HOME OFF CACHE BOOL "")
