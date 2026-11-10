@@ -260,7 +260,15 @@ set(LLVM_ENABLE_LIBXML2 FORCE_ON CACHE STRING "")
 set(LLDB_ENABLE_LIBXML2 ON CACHE STRING "")
 
 if(CMAKE_HOST_WIN32)
-  # Keep optional zlib disabled until ELD propagates its library path on Windows.
+  # libedit doesn't exist on Windows. See
+  # https://discourse.llvm.org/t/rfc-switching-from-libedit-to-replxx-in-lldb/90720
+  set(LLVM_ENABLE_LIBEDIT OFF CACHE STRING "")
+  set(LLDB_ENABLE_LIBEDIT OFF CACHE STRING "")
+
+  # Curses doesn't exist on Windows.
+  set(LLDB_ENABLE_CURSES OFF CACHE STRING "")
+
+  # Keep zlib disabled for compressed debug info, matching the main branch.
   set(LLVM_ENABLE_ZLIB OFF CACHE STRING "")
 endif()
 
