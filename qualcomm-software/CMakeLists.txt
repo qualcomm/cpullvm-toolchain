@@ -273,6 +273,9 @@ if (CMAKE_HOST_WIN32)
 
   # FIXME: Figure out how to build/install zlib for compressed debug info
   set(LLVM_ENABLE_ZLIB OFF CACHE STRING "")
+
+  # Static libxml2 for Windows to avoid DLL dependency.
+  set(LLVM_USE_STATIC_LIBXML2 ON CACHE BOOL "")
 else ()
   # Allow using any version of Python at runtime.  We don't need to set this
   # on Windows because it uses a different mechanism to allow different
