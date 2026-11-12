@@ -4,8 +4,8 @@
 # Used by lldb
 choco install swig
 
-# Install pinned libxml2 for the host architecture. LLDB requires libxml2 2.8 or newer.
-$vcpkgTriplet = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64-windows" } else { "x64-windows" }
+# Install pinned static libxml2 for the host architecture. Keep the MSVC runtime dynamic.
+$vcpkgTriplet = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64-windows-static-md" } else { "x64-windows-static-md" }
 $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
 $manifestRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Push-Location $manifestRoot
