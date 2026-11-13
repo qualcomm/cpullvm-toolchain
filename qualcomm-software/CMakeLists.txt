@@ -843,6 +843,22 @@ install(
     COMPONENT llvm-toolchain-libs
 )
 
+if(CMAKE_HOST_WIN32 AND DEFINED ENV{CPULLVM_VCPKG_PREFIX})
+    # Bundle libxml2 and its vcpkg runtime dependencies with the toolchain.
+    install(
+        DIRECTORY "$ENV{CPULLVM_VCPKG_PREFIX}/bin/"
+        DESTINATION bin
+        COMPONENT llvm-toolchain-libs
+        FILES_MATCHING PATTERN "*.dll"
+    )
+
+    string(APPEND VCPKG_LICENSE_FILES
+        " - libxml2: third-party-licenses/libxml2-LICENSE.txt\n"
+        " - libiconv: third-party-licenses/libiconv-LICENSE.txt\n"
+        " - zlib: third-party-licenses/zlib-LICENSE.txt\n"
+    )
+endif()
+
 if(ENABLE_LINUX_LIBRARIES)
     # libc, libc++/libc++abi/libunwind only
     install(
@@ -928,6 +944,13 @@ list(APPEND third_party_license_files ${eld_SOURCE_DIR}/LICENSE eld-LICENSE.txt)
 list(APPEND third_party_license_files
     ${CMAKE_CURRENT_LIST_DIR}/ATfE-LICENSE.txt ATfE-LICENSE.txt
 )
+if(CMAKE_HOST_WIN32 AND DEFINED ENV{CPULLVM_VCPKG_PREFIX})
+    list(APPEND third_party_license_files
+        $ENV{CPULLVM_VCPKG_PREFIX}/share/libxml2/copyright libxml2-LICENSE.txt
+        $ENV{CPULLVM_VCPKG_PREFIX}/share/libiconv/copyright libiconv-LICENSE.txt
+        $ENV{CPULLVM_VCPKG_PREFIX}/share/zlib/copyright zlib-LICENSE.txt
+    )
+endif()
 
 if(LLVM_TOOLCHAIN_C_LIBRARY MATCHES "^picolibc")
     list(APPEND third_party_license_files

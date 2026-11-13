@@ -20,6 +20,7 @@ try {
 
 $libxml2Prefix = Join-Path $manifestRoot "vcpkg_installed\$vcpkgTriplet"
 Add-Content -Path $env:GITHUB_ENV -Value "CMAKE_PREFIX_PATH=$libxml2Prefix"
+Add-Content -Path $env:GITHUB_ENV -Value "CPULLVM_VCPKG_PREFIX=$libxml2Prefix"
 Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $libxml2Prefix "bin")
 
 # Install pyyaml
