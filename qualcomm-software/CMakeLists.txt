@@ -273,6 +273,9 @@ if (CMAKE_HOST_WIN32)
 
   # FIXME: Figure out how to build/install zlib for compressed debug info
   set(LLVM_ENABLE_ZLIB OFF CACHE STRING "")
+
+  # vcpkg's static triplet provides a static LibXml2::LibXml2 config target.
+  set(LLVM_USE_STATIC_LIBXML2 OFF CACHE BOOL "")
 else ()
   # Allow using any version of Python at runtime.  We don't need to set this
   # on Windows because it uses a different mechanism to allow different
@@ -422,9 +425,16 @@ set(clang_lit_xfails_path "${CMAKE_CURRENT_BINARY_DIR}/clang_lit_xfails.txt")
 set(CLANG_TEST_EXTRA_ARGS "@${clang_lit_xfails_path}")
 
 set(llvmproject_src_dir ${CMAKE_CURRENT_SOURCE_DIR}/..)
-add_subdirectory(
-    ${llvmproject_src_dir}/llvm llvm
-)
+if(CMAKE_HOST_WIN32)
+    function(cpullvm_add_llvm_subdirectory)
+        # Prefer vcpkg's LibXml2 config target, which carries static dependencies.
+        set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
+        add_subdirectory(${llvmproject_src_dir}/llvm llvm)
+    endfunction()
+    cpullvm_add_llvm_subdirectory()
+else()
+    add_subdirectory(${llvmproject_src_dir}/llvm llvm)
+endif()
 
 add_dependencies(check-all check-eld)
 
