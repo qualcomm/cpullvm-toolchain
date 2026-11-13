@@ -128,3 +128,14 @@ Example (non-exhaustive) components that can be used in the commands above:
 * `compiler-rt`
 * `picolibc` (or the name of the C library selected if different)
 * `cxx`/`cxxabi`/`unwind`
+
+### Running checks for a pull request
+
+To request a build and test workflow for a pull request, add a comment containing exactly one of these commands:
+
+* `/run nightly` runs the nightly build and tests with assertions enabled.
+* `/run nightly-release` runs the nightly build and tests with assertions disabled.
+
+The workflow tests GitHub's merge result for the pull request. If the pull request changes afterward, comment again to test the new merge result. The request comment is updated with a link to the workflow and its final result.
+
+Only members of the CPULLVM Toolchain write team can request a workflow, and pull requests from forks are not supported. Each comment must contain one command and no other text.
