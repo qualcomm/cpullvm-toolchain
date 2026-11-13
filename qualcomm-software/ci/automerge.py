@@ -3,6 +3,11 @@
 """
 A script to automatically perform the merge of incoming changes from a branch
 in upstream LLVM into a downstream branch.
+
+Supports pathspec patterns with negation to selectively ignore or keep files
+during the merge process. Files matching ignore patterns are restored to the
+destination branch version, while files matching keep patterns (prefixed with '!')
+are accepted from the upstream branch.
 """
 
 import argparse
@@ -61,22 +66,116 @@ def is_merge_in_progress(git_repo: Git) -> bool:
     return merge_head_path.exists()
 
 
-def restore_changes_to_ignored_files(git_repo: Git, ignore_list: list[str]) -> None:
-    if not ignore_list:
+def parse_pathspec_file(pathspec_file: Path) -> tuple[list[str], list[str]]:
+    """
+    Parse pathspec file and separate into include and exclude patterns.
+
+    Lines starting with '!' are exclusions (files to KEEP from upstream).
+    Other lines are inclusions (files to IGNORE from upstream).
+
+    Returns:
+        (ignore_patterns, keep_patterns)
+    """
+    ignore_patterns = []
+    keep_patterns = []
+
+    with open(pathspec_file) as f:
+        for line in f:
+            line = line.strip()
+            # Skip empty lines and comments
+            if not line or line.startswith('#'):
+                continue
+
+            if line.startswith('!'):
+                # Negation pattern - files to KEEP from upstream
+                keep_patterns.append(line[1:])  # Remove the '!'
+            else:
+                # Regular pattern - files to IGNORE from upstream
+                ignore_patterns.append(line)
+
+    return ignore_patterns, keep_patterns
+
+
+def get_files_matching_pathspec(git_repo: Git, patterns: list[str]) -> list[str]:
+    """
+    Get list of files matching the given pathspec patterns.
+    """
+    if not patterns:
+        return []
+
+    # Use git ls-files to find files matching patterns
+    try:
+        output = git_repo.run_cmd(["ls-files", "--"] + patterns)
+        return output.strip().splitlines()
+    except subprocess.CalledProcessError:
+        return []
+
+
+def get_conflicted_files(git_repo: Git, patterns: list[str]) -> list[str]:
+    """
+    Get list of conflicted files matching the given patterns.
+    """
+    if not patterns:
+        return []
+
+    try:
+        output = git_repo.run_cmd(
+            ["diff", "--name-only", "--diff-filter=U", "--"] + patterns
+        )
+        return output.strip().splitlines()
+    except subprocess.CalledProcessError:
+        return []
+
+
+def restore_changes_to_ignored_files(
+    git_repo: Git,
+    ignore_patterns: list[str],
+    keep_patterns: list[str]
+) -> None:
+    """
+    Restore ignored files to destination branch version, but keep files
+    matching keep_patterns from upstream.
+    """
+    if not ignore_patterns:
         return
+
+    # Get all files that match ignore patterns
+    all_ignored_files = get_conflicted_files(git_repo, ignore_patterns)
+
+    if not all_ignored_files:
+        logger.debug("No conflicted files matching ignore patterns")
+        return
+
+    # Get files that should be kept from upstream (negation patterns)
+    files_to_keep_from_upstream = []
+    if keep_patterns:
+        files_to_keep_from_upstream = get_files_matching_pathspec(git_repo, keep_patterns)
+
+    # Filter out files that should be kept from upstream
+    files_to_restore = [
+        f for f in all_ignored_files
+        if f not in files_to_keep_from_upstream
+    ]
+
+    if not files_to_restore:
+        logger.debug("No files to restore after applying keep patterns")
+        return
+
+    logger.debug(f"Restoring {len(files_to_restore)} files to destination version")
+    logger.debug(f"Keeping {len(files_to_keep_from_upstream)} files from upstream")
+
     # First, deal with any conflicting changes to files in the ignore list,
     # keeping the version from the destination branch
-    git_repo.run_cmd(["restore", "--ours", "--worktree"] + ignore_list)
+    git_repo.run_cmd(["restore", "--ours", "--worktree"] + files_to_restore)
+
     # Next, any files still unmerged are the ones deleted on the destination branch.
     # Make sure they stay deleted.
-    ls_files_output = git_repo.run_cmd(
-        ["diff", "--name-only", "--diff-filter=U", "--"] + ignore_list
-    )
-    deleted_by_us = ls_files_output.splitlines()
+    deleted_by_us = get_conflicted_files(git_repo, files_to_restore)
     if deleted_by_us:
         git_repo.run_cmd(["rm"] + deleted_by_us)
+
     # Finally, restore all other ignored files
-    git_repo.run_cmd(["restore", "--staged", "--worktree"] + ignore_list)
+    git_repo.run_cmd(["restore", "--staged", "--worktree"] + files_to_restore)
 
 
 def has_unresolved_conflicts(git_repo: Git) -> bool:
@@ -97,7 +196,8 @@ def merge_commit(
     git_repo: Git,
     to_branch: str,
     commit_hash: str,
-    ignored_paths: list[str],
+    ignore_patterns: list[str],
+    keep_patterns: list[str],
     dry_run: bool,
     verbose: bool,
 ) -> None:
@@ -115,7 +215,7 @@ def merge_commit(
     git_repo.run_cmd(["merge", commit_hash, "--no-commit", "--no-ff"], check=False)
     if not is_merge_in_progress(git_repo):
         raise RuntimeError("Unexpected error occurred when running git merge")
-    restore_changes_to_ignored_files(git_repo, ignored_paths)
+    restore_changes_to_ignored_files(git_repo, ignore_patterns, keep_patterns)
     if has_unresolved_conflicts(git_repo):
         logger.info("Merge failed")
         git_repo.run_cmd(["merge", "--abort"])
@@ -266,8 +366,14 @@ def main():
             logger.error("The repository worktree is not clean. Cannot continue.")
             sys.exit(1)
 
-        with open(MERGE_IGNORE_PATHSPEC_FILE) as ignored_paths_file:
-            ignored_paths = ignored_paths_file.read().splitlines()
+        # Parse pathspec file with negation support
+        ignore_patterns, keep_patterns = parse_pathspec_file(MERGE_IGNORE_PATHSPEC_FILE)
+
+        logger.info(f"Loaded {len(ignore_patterns)} ignore patterns")
+        logger.info(f"Loaded {len(keep_patterns)} keep patterns")
+        if args.verbose:
+            logger.debug(f"Ignore patterns: {ignore_patterns}")
+            logger.debug(f"Keep patterns: {keep_patterns}")
 
         merge_commits = get_merge_commit_list(
             git_repo, args.from_branch, args.to_branch
@@ -277,7 +383,8 @@ def main():
                 git_repo,
                 args.to_branch,
                 commit_hash,
-                ignored_paths,
+                ignore_patterns,
+                keep_patterns,
                 args.dry_run,
                 args.verbose,
             )
