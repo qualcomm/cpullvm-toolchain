@@ -10,4 +10,5 @@ additional or alternate licenses:
  - eld: third-party-licenses/eld-LICENSE.txt
  - Arm Toolchain for Embedded: third-party-licenses/ATfE-LICENSE.txt
 @LIBC_LICENSE_FILES@
+@VCPKG_LICENSE_FILES@
 Project licenses may refer to its source files. Sources are identified in VERSION.txt.
