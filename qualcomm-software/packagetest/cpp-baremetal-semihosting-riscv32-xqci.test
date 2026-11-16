@@ -1,0 +1,5 @@
+# RUN: %sample_make -C %samples_dir/src/cpp-baremetal-semihosting TARGET=riscv32-xqci clean
+# RUN: %sample_make -C %samples_dir/src/cpp-baremetal-semihosting TARGET=riscv32-xqci build
+# RUN: %if qemu-riscv32-xqci %{ %sample_make -C %samples_dir/src/cpp-baremetal-semihosting TARGET=riscv32-xqci run 2>&1 | FileCheck %s %}
+# RUN: %sample_make -C %samples_dir/src/cpp-baremetal-semihosting TARGET=riscv32-xqci clean
+# CHECK: 1 2 3 4 5

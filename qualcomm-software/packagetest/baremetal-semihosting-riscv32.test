@@ -1,0 +1,5 @@
+# RUN: %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=riscv32 clean
+# RUN: %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=riscv32 build
+# RUN: %if qemu-riscv32 %{ %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=riscv32 run 2>&1 | FileCheck %s %}
+# RUN: %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=riscv32 clean
+# CHECK: Hello World!
