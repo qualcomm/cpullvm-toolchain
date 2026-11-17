@@ -43,6 +43,7 @@ cmake ..\qualcomm-software `
   -GNinja `
   -DFETCHCONTENT_QUIET=OFF `
   -DPREBUILT_TARGET_LIBRARIES=ON `
+  -DENABLE_QEMU_TESTING=OFF `
   -DENABLE_LINUX_LIBRARIES=ON `
   @extraCmakeArgs
 
