@@ -28,15 +28,16 @@ list(APPEND LLVM_TOOLCHAIN_PACKAGE_TEST_DEPS
   not
 )
 
-# The sample tests build in the samples directory, so they cannot run in
-# parallel.
 add_lit_testsuite(check-package-llvm-toolchain
   "Running CPULLVM package tests"
   ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${LLVM_TOOLCHAIN_PACKAGE_TEST_DEPS}
-  ARGS -j 1
 )
 
+# llvm-lit cannot map this directory to its site config, as it is generated
+# before this file is processed, so run the per-directory suites from the
+# binary directory.
 add_lit_testsuites(package-llvm-toolchain ${CMAKE_CURRENT_SOURCE_DIR}
+  BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${LLVM_TOOLCHAIN_PACKAGE_TEST_DEPS}
 )

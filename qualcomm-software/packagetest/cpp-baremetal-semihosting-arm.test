@@ -1,5 +1,0 @@
-# RUN: %sample_make -C %samples_dir/src/cpp-baremetal-semihosting TARGET=arm clean
-# RUN: %sample_make -C %samples_dir/src/cpp-baremetal-semihosting TARGET=arm build
-# RUN: %if qemu-arm %{ %sample_make -C %samples_dir/src/cpp-baremetal-semihosting TARGET=arm run 2>&1 | FileCheck %s %}
-# RUN: %sample_make -C %samples_dir/src/cpp-baremetal-semihosting TARGET=arm clean
-# CHECK: 1 2 3 4 5

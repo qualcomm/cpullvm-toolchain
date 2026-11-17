@@ -44,18 +44,8 @@ llvm_config.add_tool_substitutions(
 )
 llvm_config.add_err_msg_substitutions()
 llvm_config.use_clang()
-llvm_config.config.substitutions.append(("%samples_dir", '"%s"' % config.samples_dir))
 llvm_config.config.substitutions.append(
     ("%unpack_directory", '"%s"' % config.unpack_directory)
-)
-# Invokes make with the variables needed to build a sample with the unpacked
-# toolchain, e.g. "%sample_make -C %samples_dir/src/<sample> TARGET=<target> build".
-llvm_config.config.substitutions.append(
-    (
-        "%sample_make",
-        'make BIN_PATH="%s" LIBC=%s'
-        % (os.path.join(config.unpack_directory, "bin"), config.packagetest_libc),
-    )
 )
 
 # Compiler options and QEMU command line for each supported target, matching

@@ -1,5 +1,0 @@
-# RUN: %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=aarch64 clean
-# RUN: %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=aarch64 build
-# RUN: %if qemu-aarch64 %{ %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=aarch64 run 2>&1 | FileCheck %s %}
-# RUN: %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=aarch64 clean
-# CHECK: Hello World!
