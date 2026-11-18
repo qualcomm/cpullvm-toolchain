@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [23.1.1]
 ### Added
-- Added two new Xqci variants riscv32ima_xqci_ilp32_exn_rtti_nopic and riscv32ima_zinx_xqci_ilp32_exn_rtti_nopic with exception and RTTI support enabled
+- Added two new Xqci variants with exception and RTTI support enabled (riscv32ima_xqci_ilp32_exn_rtti_nopic and riscv32ima_zinx_xqci_ilp32_exn_rtti_nopic)
 - Enabled libxml2 support for lldb on Windows hosts
 
 ### Changed
@@ -27,12 +27,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Prevent crash in Xqci custom implementations of strcpy in picolibc when provided an aligned source and unaligned destination
 - Ensure libedit is included as a dependency for lldb for Linux hosts
 - Fixed unexpected paths in lldb's Python support if unpackaging zipped Windows distributions on Linux
-- Included patches of LLVM changes to fix multiple issues in RISC-V Shadow Call Stack support:
+- Included LLVM changes to fix multiple issues in RISC-V Shadow Call Stack support:
   - 255162a - [RISC-V] Do not emit cm.popret[z] with zicfiss (#196267) and f24da9d - [RISC-V] Fix assert after 255162a
   - 66a38a5 - [RISCV] Ensure Shadow Stack checks correct RA
   - ccb7fb8 - [RISCV][compiler-rt] Asm funcs should be hidden
   - a44f885 - [RISCV] Correctly restore libcall CSRs with SCS
-- Included patches of LLVM changes to improve outlining when explicit section names are given:
+- Included LLVM changes to improve outlining when explicit section names are given:
   - 8d4e0bd - [Machine Outliner][RISCV] Input section aware machine outlining
   - PR230063 - Output section aware machine outliner fix for LTO + linker scripts
 
