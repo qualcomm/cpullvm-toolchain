@@ -26,7 +26,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 - Prevent crash in Xqci custom implementations of strcpy in picolibc when provided an aligned source and unaligned destination
 - Ensure libedit is included as a dependency for lldb for Linux hosts
-- Fixed broken symlinks in lldb's Python plugin support
 - Fixed unexpected paths in lldb's Python support if unpackaging zipped Windows distributions on Linux
 - Included patches of LLVM changes to fix multiple issues in RISC-V Shadow Call Stack support:
   - 255162a - [RISC-V] Do not emit cm.popret[z] with zicfiss (#196267) and f24da9d - [RISC-V] Fix assert after 255162a
