@@ -28,7 +28,6 @@ jobs:
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
         with:
-          github-token: ${{ github.token }}
           script: |
             const comment = process.env.COMMENT_BODY.trim();
 
@@ -166,7 +165,6 @@ jobs:
           NIGHTLY_RELEASE_RESULT: ${{ needs.nightly-release.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
-          github-token: ${{ github.token }}
           script: |
             const result = process.env.COMMAND === 'nightly'
               ? process.env.NIGHTLY_RESULT

@@ -129,9 +129,9 @@ Example (non-exhaustive) components that can be used in the commands above:
 * `picolibc` (or the name of the C library selected if different)
 * `cxx`/`cxxabi`/`unwind`
 
-## CI and GitHub tools
+## GitHub Workflow Tools
 
-### Running checks for a pull request
+### Requesting Additional Pull Request Checks
 
 To request a build and test workflow for a pull request, add a comment containing exactly one of these commands:
 
