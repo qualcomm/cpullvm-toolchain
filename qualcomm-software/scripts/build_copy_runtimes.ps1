@@ -33,7 +33,6 @@ $extraCmakeArgs = @()
 if ($env:EXTRA_CMAKE_ARGS) {
     $extraCmakeArgs = $env:EXTRA_CMAKE_ARGS -split '\s+'
 }
-
 cmake ..\qualcomm-software `
   -GNinja `
   -DFETCHCONTENT_QUIET=OFF `

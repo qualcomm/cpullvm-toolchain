@@ -33,6 +33,7 @@ on:
         type: boolean
         default: true
   pull_request:
+    # Exercise nightly builds when this workflow changes in a pull request.
     paths:
       - '.github/workflows/nightly.yml'
   schedule:
