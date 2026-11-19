@@ -892,6 +892,9 @@ if(LLVM_TOOLCHAIN_C_LIBRARY STREQUAL musl-embedded OR ENABLE_LINUX_LIBRARIES)
         string(APPEND LIBC_LICENSE_FILES " - musl: third-party-licenses/musl-COPYRIGHT.txt\n")
     endif()
 endif()
+if(CMAKE_HOST_WIN32)
+    string(APPEND LIBXML2_LICENSE_FILES " - libxml2: third-party-licenses/libxml2-Copyright.txt\n")
+endif()
 configure_file(cmake/THIRD-PARTY-LICENSES.txt.in THIRD-PARTY-LICENSES.txt @ONLY)
 
 if(NOT LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL)
@@ -953,6 +956,10 @@ if(ENABLE_LINUX_LIBRARIES)
         list(APPEND third_party_license_files
              ${musl-embedded_SOURCE_DIR}/COPYRIGHT musl-embedded-COPYRIGHT.txt)
     endif()
+endif()
+if(CMAKE_HOST_WIN32)
+    list(APPEND third_party_license_files
+        ${CMAKE_BINARY_DIR}/libxml2-build/install/Copyright libxml2-Copyright.txt)
 endif()
 
 while(third_party_license_files)

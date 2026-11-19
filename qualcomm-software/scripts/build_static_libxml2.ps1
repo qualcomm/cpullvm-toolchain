@@ -51,6 +51,11 @@ function Build-StaticLibXml2 {
     if (-not (Test-Path "$libxmlInstallDir/lib/libxml2s.lib")) {
         throw 'libxml2 static library was not installed'
     }
+    $libxmlCopyright = Join-Path $libxmlSource 'Copyright'
+    if (-not (Test-Path $libxmlCopyright)) {
+        throw 'libxml2 copyright file was not found'
+    }
+    Copy-Item -Path $libxmlCopyright -Destination $libxmlInstallDir -Force
     $libxmlExportsHeader = Join-Path $libxmlInstallDir 'include/libxml2/libxml/xmlexports.h'
     $libxmlExportsContents = Get-Content -Raw $libxmlExportsHeader
     if (-not $libxmlExportsContents.Contains('#if (defined(_WIN32) || defined(__CYGWIN__)) && !defined(LIBXML_STATIC)')) {
