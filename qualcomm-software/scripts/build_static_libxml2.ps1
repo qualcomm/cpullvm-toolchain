@@ -1,6 +1,10 @@
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+param(
+    [string]$BuildDir
+)
+
 function Build-StaticLibXml2 {
     param(
         [Parameter(Mandatory = $true)]
@@ -12,6 +16,14 @@ function Build-StaticLibXml2 {
     $libxmlSource = Join-Path $BuildDir "libxml2-v$libxmlVersion"
     $libxmlBuildDir = Join-Path $BuildDir 'libxml2-build'
     $libxmlInstallDir = Join-Path $libxmlBuildDir 'install'
+    $libxmlExportsHeader = Join-Path $libxmlInstallDir 'include/libxml2/libxml/xmlexports.h'
+
+    if ((Test-Path "$libxmlInstallDir/include/libxml2/libxml/xmlreader.h") -and
+        (Test-Path "$libxmlInstallDir/lib/libxml2s.lib") -and
+        (Test-Path $libxmlExportsHeader) -and
+        (Get-Content -Raw $libxmlExportsHeader).Contains('#if 0 /* LIBXML_STATIC */')) {
+        return
+    }
 
     # Build static libxml2 without optional external dependencies.
     Invoke-WebRequest `
@@ -51,7 +63,6 @@ function Build-StaticLibXml2 {
     if (-not (Test-Path "$libxmlInstallDir/lib/libxml2s.lib")) {
         throw 'libxml2 static library was not installed'
     }
-    $libxmlExportsHeader = Join-Path $libxmlInstallDir 'include/libxml2/libxml/xmlexports.h'
     $libxmlExportsContents = Get-Content -Raw $libxmlExportsHeader
     if (-not $libxmlExportsContents.Contains('#if (defined(_WIN32) || defined(__CYGWIN__)) && !defined(LIBXML_STATIC)')) {
         throw 'Unexpected libxml2 static-export guard'
@@ -64,18 +75,6 @@ function Build-StaticLibXml2 {
     Set-Content -Path $libxmlExportsHeader -Value $libxmlExportsContents -NoNewline -Encoding utf8
 }
 
-function Get-StaticLibXml2CMakeArgs {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$BuildDir
-    )
-
-    $libxmlInstallDir = Join-Path $BuildDir 'libxml2-build/install'
-    $libxmlStaticLibrary = Join-Path $libxmlInstallDir 'lib/libxml2s.lib'
-    @(
-        "-DLIBXML2_INCLUDE_DIR=$libxmlInstallDir/include/libxml2",
-        "-DLIBXML2_LIBRARIES=$libxmlStaticLibrary",
-        '-DCMAKE_EXE_LINKER_FLAGS=bcrypt.lib',
-        '-DCMAKE_SHARED_LINKER_FLAGS=bcrypt.lib'
-    )
+if ($BuildDir) {
+    Build-StaticLibXml2 -BuildDir $BuildDir
 }
