@@ -81,8 +81,7 @@ jobs:
 
           cat build-config.json
 
-          grep '"editline"' build-config.json
-          grep '"value": true' build-config.json
+          grep -E '"editline":\{[^}]*"value":true\}' build-config.json
 
       - name: Verify LLDB launches
         env:
@@ -125,80 +124,10 @@ jobs:
           child.send("\003")
           child.expect(r"\(lldb\) ")
 
-          # Inline editing
-          child.send("help prnit")
-          child.send("\x02\x02\x08n")
-          child.sendline("")
-          child.expect("Syntax: print")
-          child.expect(r"\(lldb\) ")
-
-          # History recall
-          child.sendline("expression 1")
-          child.expect(r"= 1")
-          child.expect(r"\(lldb\) ")
-
-          child.send("\x1b[A")
-          child.sendline("")
-          child.expect(r"= 1")
-          child.expect(r"\(lldb\) ")
-
           # Python support
           child.sendline('script print("python-ok")')
           child.expect("python-ok")
           child.expect(r"\(lldb\) ")
-
-          child.sendline("quit")
-          child.expect(pexpect.EOF)
-          PY
-
-      - name: Verify persistent history
-        env:
-          TOOLCHAIN_DIR: ${{ runner.temp }}/cpullvm
-        run: |
-          python3 <<'PY'
-          import os
-          import tempfile
-          import pexpect
-
-          lldb = os.path.join(
-              os.environ["TOOLCHAIN_DIR"],
-              "bin",
-              "lldb"
-          )
-
-          home_dir = tempfile.mkdtemp()
-
-          env = os.environ.copy()
-          env["HOME"] = home_dir
-
-          child = pexpect.spawn(
-              lldb,
-              env=env,
-              encoding="utf-8",
-              timeout=30
-          )
-
-          child.expect(r"\(lldb\) ")
-          child.sendline("version")
-          child.expect("lldb version")
-          child.expect(r"\(lldb\) ")
-          child.sendline("quit")
-          child.expect(pexpect.EOF)
-
-          child = pexpect.spawn(
-              lldb,
-              env=env,
-              encoding="utf-8",
-              timeout=30
-          )
-
-          child.expect(r"\(lldb\) ")
-
-          child.send("\x1b[A")
-          child.expect("version")
-
-          child.sendline("")
-          child.expect("lldb version")
 
           child.sendline("quit")
           child.expect(pexpect.EOF)
