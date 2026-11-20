@@ -63,7 +63,7 @@ jobs:
           child.expect(r'\(lldb\) ')
 
           child.send('help prnit')
-          child.send('\x1b[D\x1b[D\x7fn')
+          child.send('\x02\x02\x08n')
           child.sendline('')
           child.expect('Syntax: print')
           child.expect(r'\(lldb\) ')
