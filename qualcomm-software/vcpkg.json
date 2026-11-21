@@ -1,0 +1,12 @@
+{
+  "builtin-baseline": "a9b15b8ae5a1e7ad128aca9065a243a5224a8d62",
+  "dependencies": [
+    "libxml2"
+  ],
+  "overrides": [
+    {
+      "name": "libxml2",
+      "version": "2.15.4"
+    }
+  ]
+}
