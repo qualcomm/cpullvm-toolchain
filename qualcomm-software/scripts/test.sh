@@ -25,3 +25,4 @@ ninja check-all
 ninja check-llvm-toolchain
 ninja check-cxxabi
 ninja check-unwind
+ninja check-package-llvm-toolchain

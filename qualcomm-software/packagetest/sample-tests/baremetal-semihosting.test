@@ -1,0 +1,13 @@
+# RUN: %sample_make -C %samples_dir/src/baremetal-semihosting clean
+# RUN: %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=arm build
+# RUN: %if qemu-arm %{ %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=arm run 2>&1 | FileCheck %s %}
+# RUN: %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=aarch64 build
+# RUN: %if qemu-aarch64 %{ %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=aarch64 run 2>&1 | FileCheck %s %}
+# RUN: %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=riscv32 build
+# RUN: %if qemu-riscv32 %{ %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=riscv32 run 2>&1 | FileCheck %s %}
+# RUN: %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=riscv32-xqci build
+# RUN: %if qemu-riscv32-xqci %{ %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=riscv32-xqci run 2>&1 | FileCheck %s %}
+# RUN: %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=riscv64 build
+# RUN: %if qemu-riscv64 %{ %sample_make -C %samples_dir/src/baremetal-semihosting TARGET=riscv64 run 2>&1 | FileCheck %s %}
+# RUN: %sample_make -C %samples_dir/src/baremetal-semihosting clean
+# CHECK: Hello World!

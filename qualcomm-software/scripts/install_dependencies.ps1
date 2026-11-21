@@ -4,6 +4,9 @@
 # Used by lldb
 choco install swig
 
+# Used by package tests
+choco install make
+
 # Install pinned libxml2 for the host architecture. LLDB requires libxml2 2.8 or newer.
 $vcpkgTriplet = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64-windows" } else { "x64-windows" }
 $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT

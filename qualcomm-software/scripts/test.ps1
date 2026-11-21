@@ -24,3 +24,4 @@ cd $buildDir
 
 ninja check-all
 ninja check-llvm-toolchain
+ninja check-package-llvm-toolchain
