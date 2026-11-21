@@ -48,7 +48,7 @@ jobs:
     # Don't run on forks
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: build.sh on Linux-x86_64
-    runs-on: cpullvm-ubuntu24-x86_64
+    runs-on: self-hosted
     steps:
       - name: Checkout source
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -56,6 +56,22 @@ jobs:
           # We build in the repository and rely on clean to cleanup possible
           # old build products if the runner doesn't do it itself.
           clean: true
+
+      - name: Build job-local SWIG
+        run: |
+          set -euxo pipefail
+          swig_version=4.2.1
+          swig_source="$RUNNER_TEMP/swig-$swig_version"
+          swig_prefix="$RUNNER_TEMP/swig-$swig_version-install"
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/swig-$swig_version.tar.gz" "https://downloads.sourceforge.net/project/swig/swig/swig-$swig_version/swig-$swig_version.tar.gz"
+          tar -xzf "$RUNNER_TEMP/swig-$swig_version.tar.gz" -C "$RUNNER_TEMP"
+          pushd "$swig_source"
+          ./configure --prefix="$swig_prefix" --without-pcre
+          make -j"$(nproc)"
+          make install
+          popd
+          "$swig_prefix/bin/swig" -version
+          printf '%s\n' "$swig_prefix/bin" >> "$GITHUB_PATH"
 
       - name: Apply llvm-project patches
         run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
@@ -75,6 +91,10 @@ jobs:
       - name: Test
         run: ./qualcomm-software/scripts/test.sh
 
+      - name: Remove job-local SWIG
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/swig-4.2.1" "$RUNNER_TEMP/swig-4.2.1-install" "$RUNNER_TEMP/swig-4.2.1.tar.gz"
+
   build-and-test:
     if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: ${{ matrix.build_script }} on ${{ matrix.target_os }}
@@ -89,19 +109,19 @@ jobs:
             test_script: test.sh
             install_script: install_dependencies.sh
             target_os: Linux-AArch64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-22.04-arm
 
           - build_script: build_picolibc-v1812_overlay.sh
             test_script: test_picolibc-v1812_overlay.sh
             install_script: ''
             target_os: Linux-x86_64
-            runner: cpullvm-ubuntu24-x86_64
+            runner: self-hosted
 
           - build_script: build_musl-embedded_overlay.sh
             test_script: ''
             install_script: ''
             target_os: Linux-x86_64
-            runner: cpullvm-ubuntu24-x86_64
+            runner: self-hosted
 
           - build_script: build_copy_runtimes.ps1
             test_script: test.ps1
