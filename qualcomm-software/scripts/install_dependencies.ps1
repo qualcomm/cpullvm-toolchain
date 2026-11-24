@@ -1,6 +1,11 @@
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#Requires -Version 7.4
+
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+
 # Pin the x64 MSVC STL to the known Clang 20-compatible toolset.
 if ($env:PROCESSOR_ARCHITECTURE -eq 'AMD64') {
   $msvcToolset = '14.51.36231'
