@@ -29,6 +29,7 @@ $VariantTargets = @{
 # We link against Visual Studio libraries; make sure we can find them.
 
 $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+$hostArch = $env:PROCESSOR_ARCHITECTURE
 $vcVarsTargets = $null
 # We need to invoke vcvarsall.bat differently depending on the host.
 if ($hostArch -eq 'ARM64') {
@@ -57,19 +58,36 @@ $VCVARSALL = Join-PATH $VS_INSTALL "VC\Auxiliary\Build\vcvarsall.bat"
 if (-not (Test-Path $VCVARSALL)) {
   throw "*** ERROR: vcvarsall.bat not found."
 }
+Write-Host "Visual Studio installation: $VS_INSTALL"
+Write-Host "Requested MSVC toolset: $env:CPULLVM_MSVC_TOOLSET"
 
 foreach ($Variant in $Variants) {
-  Write-Host "Variant $Variant"
+  Write-Host "Windows runtime variant: $Variant"
   $VariantBaseBuildDir="$BaseBuildDir\$Variant"
   mkdir $VariantBaseBuildDir -ErrorAction SilentlyContinue
 
   # Switch environment to the current variant.
   $vcvarsTarget = $vcvarsTargets[$Variant]
-  cmd /c "call `"$VCVARSALL`" $vcvarsTarget && set" | ForEach-Object {
+  $vcvarsArgs = $vcvarsTarget
+  if ($env:CPULLVM_MSVC_TOOLSET) {
+    $toolsetDir = Join-Path $VS_INSTALL "VC\Tools\MSVC\$env:CPULLVM_MSVC_TOOLSET"
+    if (-not (Test-Path $toolsetDir)) {
+      throw "Requested MSVC toolset $env:CPULLVM_MSVC_TOOLSET is not installed at $toolsetDir."
+    }
+    $vcvarsArgs += " -vcvars_ver=$env:CPULLVM_MSVC_TOOLSET"
+  }
+  Write-Host "Initializing Visual Studio environment: $vcvarsArgs"
+  $vcvarsEnvironment = cmd /c "call `"$VCVARSALL`" $vcvarsArgs && set"
+  if ($LASTEXITCODE -ne 0) {
+    throw "vcvarsall.bat failed for $Variant with exit code $LASTEXITCODE."
+  }
+  $vcvarsEnvironment | ForEach-Object {
     if ($_ -match '^(.*?)=(.*)$') {
       [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process')
     }
   }
+  Write-Host "Selected MSVC toolset: $env:VCToolsVersion"
+  Write-Host "MSVC tools directory: $env:VCToolsInstallDir"
 
   $VariantTarget = $VariantTargets[$Variant]
   $CompilerRtBuildDir="$VariantBaseBuildDir/compiler-rt"
