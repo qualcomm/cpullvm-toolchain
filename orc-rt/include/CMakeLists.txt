@@ -6,6 +6,8 @@
 set(ORC_RT_HEADERS
     orc-rt-c/bedrock/ControllerHandlerTag.h
     orc-rt-c/bedrock/Session.h
+    orc-rt-c/bedrock/sys/posix/DlfcnLoaderAdapter.h
+    orc-rt-c/bedrock/sys/posix/dlfcn-types.h
     orc-rt-c/support/Compiler.h
     orc-rt-c/support/CoreTypes.h
     orc-rt-c/support/Error.h
@@ -31,6 +33,7 @@ set(ORC_RT_HEADERS
     orc-rt/bedrock/sps/MemoryAccessSPSCI.h
     orc-rt/bedrock/sps/NativeDylibManagerSPSCI.h
     orc-rt/bedrock/sps/SimpleNativeMemoryMapSPSCI.h
+    orc-rt/bedrock/sys/posix/DlfcnLoaderAdapter.h
     orc-rt/connect-socket/SocketConnector.h
     orc-rt/connect-socket/SocketHandle.h
     orc-rt/connect-socket/sps/SimpleRemoteCAOverSocket.h
@@ -60,6 +63,7 @@ set(ORC_RT_HEADERS
     orc-rt/support/StringPool.h
     orc-rt/support/SymbolLookupFlags.h
     orc-rt/support/SymbolLookupResult.h
+    orc-rt/support/SymbolLookupSet.h
     orc-rt/support/WrapperFunction.h
     orc-rt/support/bind.h
     orc-rt/support/bit.h
@@ -70,8 +74,8 @@ set(ORC_RT_HEADERS
     orc-rt/support/sps/SPSAllocAction.h
     orc-rt/support/sps/SPSJITDylibLookupFlags.h
     orc-rt/support/sps/SPSMemoryFlags.h
-    orc-rt/support/sps/SPSRemoteSymbolLookupSet.h
     orc-rt/support/sps/SPSSymbolLookupResult.h
+    orc-rt/support/sps/SPSSymbolLookupSet.h
     orc-rt/support/sps/SPSWrapperFunction.h
     orc-rt/support/sps/SPSWrapperFunctionBuffer.h
     orc-rt/support/sps/SimplePackedSerialization.h
@@ -80,6 +84,7 @@ set(ORC_RT_HEADERS
 # Headers for POSIX-only interfaces, installed only where they're implemented.
 if (ORC_RT_TARGET_POSIX)
   list(APPEND ORC_RT_HEADERS
+    orc-rt-c/bedrock/host/posix/dlfcn-host.h
     orc-rt/bedrock/sps/DWARFEHFrameRegistrarSPSCI.h
   )
 endif()
