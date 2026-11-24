@@ -13,7 +13,10 @@
 # the repository tree. It assumes a prebuilt CPULLVM package is already present
 # and uses the runtimes from that build, rather than rebuilding them.
 
+#Requires -Version 7.4
+
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
 
 . "$PSScriptRoot\init_win_env.ps1"
 Set-VS-Env
