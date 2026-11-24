@@ -19,6 +19,7 @@ name: Native Runtime Nightly Build and Test
 on:
   workflow_dispatch:
   pull_request:
+    # Run native runtime verification for this test PR.
     paths:
       - '.github/workflows/native-runtime-nightly.yml'
   schedule:
