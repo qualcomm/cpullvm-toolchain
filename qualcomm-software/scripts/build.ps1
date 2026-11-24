@@ -17,7 +17,7 @@ $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\init_win_env.ps1"
 Set-VS-Env
 
-$repoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
+$repoRoot = Invoke-Checked { git -C $PSScriptRoot rev-parse --show-toplevel }
 $buildDir = (Join-Path $repoRoot build)
 
 $env:CC = 'clang-cl'
@@ -32,10 +32,12 @@ if ($env:EXTRA_CMAKE_ARGS) {
     $extraCmakeArgs = $env:EXTRA_CMAKE_ARGS -split '\s+'
 }
 
-cmake ..\qualcomm-software `
-  -GNinja `
-  -DFETCHCONTENT_QUIET=OFF `
-  -DENABLE_QEMU_TESTING=OFF `
-  @extraCmakeArgs
+Invoke-Checked {
+  cmake ..\qualcomm-software `
+    -GNinja `
+    -DFETCHCONTENT_QUIET=OFF `
+    -DENABLE_QEMU_TESTING=OFF `
+    @extraCmakeArgs
+}
 
-ninja package-llvm-toolchain
+Invoke-Checked { ninja package-llvm-toolchain }

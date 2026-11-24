@@ -17,10 +17,10 @@ $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\init_win_env.ps1"
 Set-VS-Env
 
-$repoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
+$repoRoot = Invoke-Checked { git -C $PSScriptRoot rev-parse --show-toplevel }
 $buildDir = (Join-Path $repoRoot build)
 
 cd $buildDir
 
-ninja check-all
-ninja check-llvm-toolchain
+Invoke-Checked { ninja check-all }
+Invoke-Checked { ninja check-llvm-toolchain }

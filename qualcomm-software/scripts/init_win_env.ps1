@@ -1,5 +1,17 @@
 # A Powershell script to find and call vcvarsall to setup the environment for
 # building with Visual Studio tools and libraries.
+
+# Run a native command and throw if it exits non-zero. $ErrorActionPreference
+# does not apply to native commands, and Windows PowerShell 5.1 has no
+# equivalent of $PSNativeCommandUseErrorActionPreference.
+function Invoke-Checked {
+  param([Parameter(Mandatory)][scriptblock]$Command)
+  & $Command
+  if ($LASTEXITCODE -ne 0) {
+    throw "Command failed with exit code ${LASTEXITCODE}: $Command"
+  }
+}
+
 function Set-VS-Env {
   # Host architecture detection
   $hostArch = $env:PROCESSOR_ARCHITECTURE
@@ -41,7 +53,7 @@ function Set-VS-Env {
     exit 1
   }
 
-  cmd /c "call `"$VCVARSALL`" $vcvarsTarget && set" | ForEach-Object {
+  Invoke-Checked { cmd /c "call `"$VCVARSALL`" $vcvarsTarget && set" } | ForEach-Object {
     if ($_ -match '^(.*?)=(.*)$') {
       [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process')
     }

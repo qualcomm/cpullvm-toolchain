@@ -16,6 +16,8 @@ param(
     [string]$LLVMSrcDir
 )
 
+. "$PSScriptRoot\init_win_env.ps1"
+
 Write-Host "Options: -ToolsPath $ToolsPath -BaseBuildDir $BaseBuildDir -BaseInstallDir $BaseInstallDir -LLVMSrcDir $LLVMSrcDir"
 
 $env:Path = $ToolsPath + ";" + $env:Path
@@ -65,7 +67,7 @@ foreach ($Variant in $Variants) {
 
   # Switch environment to the current variant.
   $vcvarsTarget = $vcvarsTargets[$Variant]
-  cmd /c "call `"$VCVARSALL`" $vcvarsTarget && set" | ForEach-Object {
+  Invoke-Checked { cmd /c "call `"$VCVARSALL`" $vcvarsTarget && set" } | ForEach-Object {
     if ($_ -match '^(.*?)=(.*)$') {
       [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process')
     }
@@ -73,27 +75,29 @@ foreach ($Variant in $Variants) {
 
   $VariantTarget = $VariantTargets[$Variant]
   $CompilerRtBuildDir="$VariantBaseBuildDir/compiler-rt"
-  cmake -G Ninja `
-      -DCMAKE_INSTALL_PREFIX="$BaseInstallDir" `
-      -DCMAKE_BUILD_TYPE="Release" `
-      -DCMAKE_C_COMPILER="clang-cl" `
-      -DCMAKE_CXX_COMPILER="clang-cl" `
-      -DCMAKE_SYSTEM_NAME="Windows" `
-      -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON `
-      -DCMAKE_ASM_COMPILER_TARGET="$VariantTarget" `
-      -DCMAKE_C_COMPILER_TARGET="$VariantTarget" `
-      -DCMAKE_CXX_COMPILER_TARGET="$VariantTarget" `
-      -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON `
-      -DCOMPILER_RT_BUILD_BUILTINS=ON `
-      -DCOMPILER_RT_BUILD_LIBFUZZER=OFF `
-      -DCOMPILER_RT_SANITIZERS_TO_BUILD="" `
-      -DCOMPILER_RT_BUILD_ORC=OFF `
-      -DCOMPILER_RT_BUILD_XRAY=OFF `
-      -DLLVM_ENABLE_RUNTIMES=compiler-rt `
-      -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" `
-      -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld" `
-      -DCMAKE_MODULE_LINKER_FLAGS="-fuse-ld=lld" `
-      -B "$CompilerRtBuildDir" `
-      -S "$LLVMSrcDir/runtimes"
-  ninja -C "$CompilerRtBuildDir" install
+  Invoke-Checked {
+    cmake -G Ninja `
+        -DCMAKE_INSTALL_PREFIX="$BaseInstallDir" `
+        -DCMAKE_BUILD_TYPE="Release" `
+        -DCMAKE_C_COMPILER="clang-cl" `
+        -DCMAKE_CXX_COMPILER="clang-cl" `
+        -DCMAKE_SYSTEM_NAME="Windows" `
+        -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON `
+        -DCMAKE_ASM_COMPILER_TARGET="$VariantTarget" `
+        -DCMAKE_C_COMPILER_TARGET="$VariantTarget" `
+        -DCMAKE_CXX_COMPILER_TARGET="$VariantTarget" `
+        -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON `
+        -DCOMPILER_RT_BUILD_BUILTINS=ON `
+        -DCOMPILER_RT_BUILD_LIBFUZZER=OFF `
+        -DCOMPILER_RT_SANITIZERS_TO_BUILD="" `
+        -DCOMPILER_RT_BUILD_ORC=OFF `
+        -DCOMPILER_RT_BUILD_XRAY=OFF `
+        -DLLVM_ENABLE_RUNTIMES=compiler-rt `
+        -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" `
+        -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld" `
+        -DCMAKE_MODULE_LINKER_FLAGS="-fuse-ld=lld" `
+        -B "$CompilerRtBuildDir" `
+        -S "$LLVMSrcDir/runtimes"
+  }
+  Invoke-Checked { ninja -C "$CompilerRtBuildDir" install }
 }

@@ -18,7 +18,7 @@ $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\init_win_env.ps1"
 Set-VS-Env
 
-$repoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
+$repoRoot = Invoke-Checked { git -C $PSScriptRoot rev-parse --show-toplevel }
 $buildDir = (Join-Path $repoRoot build)
 
 $env:CC = 'clang-cl'
@@ -27,23 +27,27 @@ $env:CXX = 'clang-cl'
 mkdir $buildDir -Force
 cd $buildDir
 
-python3 ..\qualcomm-software\cmake\copy_target_libraries.py `
-  --include-linux-libraries `
-  --distribution-file=cpullvm-*.tar.xz `
-  --build-dir=$buildDir `
-  --include-library-info `
-  --library-info-dest-dir=$buildDir\copied-library-info
+Invoke-Checked {
+  python3 ..\qualcomm-software\cmake\copy_target_libraries.py `
+    --include-linux-libraries `
+    --distribution-file=cpullvm-*.tar.xz `
+    --build-dir=$buildDir `
+    --include-library-info `
+    --library-info-dest-dir=$buildDir\copied-library-info
+}
 
 $extraCmakeArgs = @()
 if ($env:EXTRA_CMAKE_ARGS) {
     $extraCmakeArgs = $env:EXTRA_CMAKE_ARGS -split '\s+'
 }
 
-cmake ..\qualcomm-software `
-  -GNinja `
-  -DFETCHCONTENT_QUIET=OFF `
-  -DPREBUILT_TARGET_LIBRARIES=ON `
-  -DENABLE_LINUX_LIBRARIES=ON `
-  @extraCmakeArgs
+Invoke-Checked {
+  cmake ..\qualcomm-software `
+    -GNinja `
+    -DFETCHCONTENT_QUIET=OFF `
+    -DPREBUILT_TARGET_LIBRARIES=ON `
+    -DENABLE_LINUX_LIBRARIES=ON `
+    @extraCmakeArgs
+}
 
-ninja package-llvm-toolchain
+Invoke-Checked { ninja package-llvm-toolchain }
