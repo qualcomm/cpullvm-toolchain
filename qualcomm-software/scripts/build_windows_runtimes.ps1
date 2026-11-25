@@ -61,12 +61,28 @@ if (-not (Test-Path $VCVARSALL)) {
 Write-Host "Visual Studio installation: $VS_INSTALL"
 Write-Host "Requested MSVC toolset: $env:CPULLVM_MSVC_TOOLSET"
 
+$vsEnvironmentVariables = @(
+  'INCLUDE',
+  'LIB',
+  'LIBPATH',
+  'VCINSTALLDIR',
+  'VCToolsInstallDir',
+  'VCToolsRedistDir',
+  'VCToolsVersion',
+  'VSCMD_ARG_HOST_ARCH',
+  'VSCMD_ARG_TGT_ARCH',
+  'VSCMD_VER'
+)
+
 foreach ($Variant in $Variants) {
   Write-Host "Windows runtime variant: $Variant"
   $VariantBaseBuildDir="$BaseBuildDir\$Variant"
   mkdir $VariantBaseBuildDir -ErrorAction SilentlyContinue
 
   # Switch environment to the current variant.
+  foreach ($variable in $vsEnvironmentVariables) {
+    Remove-Item "Env:$variable" -ErrorAction SilentlyContinue
+  }
   $vcvarsTarget = $vcvarsTargets[$Variant]
   $vcvarsArgs = $vcvarsTarget
   if ($env:CPULLVM_MSVC_TOOLSET) {
@@ -88,8 +104,17 @@ foreach ($Variant in $Variants) {
   }
   Write-Host "Selected MSVC toolset: $env:VCToolsVersion"
   Write-Host "MSVC tools directory: $env:VCToolsInstallDir"
+  Write-Host "Selected Visual Studio target architecture: $env:VSCMD_ARG_TGT_ARCH"
+  Write-Host "MSVC library path: $env:LIB"
 
   $VariantTarget = $VariantTargets[$Variant]
+  $expectedTargetArch = if ($Variant -eq 'aarch64') { 'arm64' } else { 'x64' }
+  if ($env:VSCMD_ARG_TGT_ARCH -ne $expectedTargetArch) {
+    throw "Visual Studio environment selected $env:VSCMD_ARG_TGT_ARCH instead of $expectedTargetArch for $Variant."
+  }
+  if (-not $env:LIB -or $env:LIB -notmatch "(?i)\\lib\\$expectedTargetArch(?:;|$)") {
+    throw "Visual Studio library path does not contain $expectedTargetArch libraries for $Variant."
+  }
   $CompilerRtBuildDir="$VariantBaseBuildDir/compiler-rt"
   cmake -G Ninja `
       -DCMAKE_INSTALL_PREFIX="$BaseInstallDir" `
@@ -113,5 +138,11 @@ foreach ($Variant in $Variants) {
       -DCMAKE_MODULE_LINKER_FLAGS="-fuse-ld=lld" `
       -B "$CompilerRtBuildDir" `
       -S "$LLVMSrcDir/runtimes"
+  if ($LASTEXITCODE -ne 0) {
+    throw "CMake configuration failed for $Variant with exit code $LASTEXITCODE."
+  }
   ninja -C "$CompilerRtBuildDir" install
+  if ($LASTEXITCODE -ne 0) {
+    throw "Runtime build failed for $Variant with exit code $LASTEXITCODE."
+  }
 }
