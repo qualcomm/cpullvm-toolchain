@@ -1,0 +1,1983 @@
+From a77d3ebf76cad823a460c42b3373a8001f2cb161 Mon Sep 17 00:00:00 2001
+From: Sudharsan Veeravalli <svs@qti.qualcomm.com>
+Date: Thu, 23 Jul 2026 10:27:42 +0530
+Subject: [PATCH] LTO with linker scripts, end-to-end.
+
+"LTO with linker scripts" is a set of features that makes LTO interact in a more predictable way with linker scripts: the semantics of linker script rules are much closer to non-LTO semantics.
+
+This includes all changes, end-to-end, required to enable LTO with linker scripts. All the changes are guarded under flags: a clang flag -flto-linker-scripts, and an lld flag --lto-linker-scripts.
+
+Posting as one large patch so the whole design can be easily reviewed; I'll split into patches as appropriate once the approach is approved.
+
+RFC: https://discourse.llvm.org/t/rfc-lto-lld-lto-with-linker-scripts-implemented/91089/1
+---
+ clang/include/clang/Basic/CodeGenOptions.def  |   3 +
+ clang/include/clang/Options/Options.td        |   7 +
+ clang/lib/CodeGen/BackendUtil.cpp             |   6 +
+ clang/lib/Driver/ToolChains/Clang.cpp         |   3 +
+ clang/test/CodeGen/lto-linker-scripts.c       |   4 +
+ lld/ELF/Config.h                              |   1 +
+ lld/ELF/Driver.cpp                            |   2 +
+ lld/ELF/InputFiles.cpp                        |  24 ++-
+ lld/ELF/LTO.cpp                               |   9 ++
+ lld/ELF/LinkerScript.cpp                      |  51 +++++-
+ lld/ELF/LinkerScript.h                        |   5 +
+ lld/ELF/Options.td                            |   5 +
+ .../CheckWrapSymbolResolution.test            |  67 ++++++++
+ .../lto-with-linker-scripts/LTOAsmAlias.test  |  41 +++++
+ .../LTOAsmEmptySymbol.test                    |  51 ++++++
+ .../LTOKeepSymbol.test                        |  63 ++++++++
+ .../LTOPreemptSymbol.test                     |  53 +++++++
+ .../lto-with-linker-scripts/LTOSaveTemps.test |  63 ++++++++
+ .../lto/lto-with-linker-scripts/LTOUsed.test  |  19 +++
+ .../LocalsLinkerScriptSections.test           |  45 ++++++
+ .../LocalsSameNameTwoFiles.test               |  46 ++++++
+ .../NamespaceOverride.test                    |  72 +++++++++
+ .../lto-with-linker-scripts/NoCrossRefs.test  | 107 +++++++++++++
+ .../OutputSection.test                        |  22 +++
+ .../SectionsWithNoSyms.test                   |  47 ++++++
+ .../ThinLTOCaching.test                       | 110 +++++++++++++
+ .../ThinLTOSameFileNameArchive.test           |  63 ++++++++
+ .../ThinLTOWithLS.test                        |  65 ++++++++
+ .../lto/lto-with-linker-scripts/ltokeep.test  |  44 ++++++
+ .../ltosectionattribute.test                  |  46 ++++++
+ .../llvm/CodeGen/AssignSectionsToGlobals.h    |  26 ++++
+ llvm/include/llvm/LTO/LTO.h                   |   9 +-
+ llvm/include/llvm/Object/IRSymtab.h           |   2 +
+ llvm/include/llvm/Object/SymbolicFile.h       |   2 +
+ llvm/lib/Analysis/InlineCost.cpp              |  23 +++
+ llvm/lib/CodeGen/AssignSectionsToGlobals.cpp  | 145 ++++++++++++++++++
+ llvm/lib/CodeGen/CMakeLists.txt               |   1 +
+ llvm/lib/LTO/LTO.cpp                          |  62 +++++++-
+ llvm/lib/Object/IRSymtab.cpp                  |   2 +
+ llvm/lib/Object/ModuleSymbolTable.cpp         |   2 +-
+ 40 files changed, 1403 insertions(+), 15 deletions(-)
+ create mode 100644 clang/test/CodeGen/lto-linker-scripts.c
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/CheckWrapSymbolResolution.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmAlias.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmEmptySymbol.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOKeepSymbol.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOPreemptSymbol.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOSaveTemps.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LTOUsed.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LocalsLinkerScriptSections.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/LocalsSameNameTwoFiles.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/NamespaceOverride.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/NoCrossRefs.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/OutputSection.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/SectionsWithNoSyms.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/ThinLTOCaching.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/ThinLTOSameFileNameArchive.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/ThinLTOWithLS.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/ltokeep.test
+ create mode 100644 lld/test/ELF/lto/lto-with-linker-scripts/ltosectionattribute.test
+ create mode 100644 llvm/include/llvm/CodeGen/AssignSectionsToGlobals.h
+ create mode 100644 llvm/lib/CodeGen/AssignSectionsToGlobals.cpp
+
+diff --git a/clang/include/clang/Basic/CodeGenOptions.def b/clang/include/clang/Basic/CodeGenOptions.def
+index 7e54e75752f3..0b206fcdb556 100644
+--- a/clang/include/clang/Basic/CodeGenOptions.def
++++ b/clang/include/clang/Basic/CodeGenOptions.def
+@@ -539,6 +539,9 @@ CODEGENOPT(DisableOutlining, 1, 0, Benign)
+ /// Controlls the emission of function name in PPA1 on z/OS.
+ CODEGENOPT(ZOSPPA1Name, 1, 1, Benign)
+ 
++/// Emit section annotations in bitcode files for LTO.
++CODEGENOPT(LTOLinkerScripts, 1, 0, Benign)
++
+ /// FIXME: Make DebugOptions its own top-level .def file.
+ #include "DebugOptions.def"
+ 
+diff --git a/clang/include/clang/Options/Options.td b/clang/include/clang/Options/Options.td
+index f5264d5ea12f..4fbe286f1823 100644
+--- a/clang/include/clang/Options/Options.td
++++ b/clang/include/clang/Options/Options.td
+@@ -9999,3 +9999,10 @@ def wasm_opt : Flag<["--"], "wasm-opt">,
+   Group<m_Group>,
+   HelpText<"Enable the wasm-opt optimizer (default)">,
+   MarshallingInfoNegativeFlag<LangOpts<"NoWasmOpt">>;
++
++defm lto_linker_scripts : BoolFOption<"lto-linker-scripts",
++  CodeGenOpts<"LTOLinkerScripts">, DefaultFalse,
++  PosFlag<SetTrue, [], [ClangOption, CC1Option],
++          "Emit bitcode annotations to preserve linker script semantics "
++          "during LTO.">,
++  NegFlag<SetFalse, [], [ClangOption]>>;
+diff --git a/clang/lib/CodeGen/BackendUtil.cpp b/clang/lib/CodeGen/BackendUtil.cpp
+index 068b1b4c262c..5808a082c109 100644
+--- a/clang/lib/CodeGen/BackendUtil.cpp
++++ b/clang/lib/CodeGen/BackendUtil.cpp
+@@ -25,6 +25,7 @@
+ #include "llvm/Bitcode/BitcodeReader.h"
+ #include "llvm/Bitcode/BitcodeWriter.h"
+ #include "llvm/Bitcode/BitcodeWriterPass.h"
++#include "llvm/CodeGen/AssignSectionsToGlobals.h"
+ #include "llvm/CodeGen/MachineModuleInfo.h"
+ #include "llvm/CodeGen/TargetSubtargetInfo.h"
+ #include "llvm/Config/llvm-config.h"
+@@ -1157,6 +1158,11 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
+   if (!actionRequiresCodeGen(Action) && CodeGenOpts.VerifyModule)
+     MPM.addPass(VerifierPass());
+ 
++  if ((Action == Backend_EmitBC || Action == Backend_EmitLL) &&
++      CodeGenOpts.LTOLinkerScripts && TM) {
++    MPM.addPass(AssignSectionsToGlobalsPass(TM.get()));
++  }
++
+   if (Action == Backend_EmitBC || Action == Backend_EmitLL ||
+       CodeGenOpts.FatLTO) {
+     if (CodeGenOpts.PrepareForThinLTO && !CodeGenOpts.DisableLLVMPasses) {
+diff --git a/clang/lib/Driver/ToolChains/Clang.cpp b/clang/lib/Driver/ToolChains/Clang.cpp
+index 1178f625d117..e25d4be62d44 100644
+--- a/clang/lib/Driver/ToolChains/Clang.cpp
++++ b/clang/lib/Driver/ToolChains/Clang.cpp
+@@ -6620,6 +6620,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
+   Args.AddLastArg(CmdArgs, options::OPT_fconvergent_functions,
+                   options::OPT_fno_convergent_functions);
+ 
++  Args.addOptInFlag(CmdArgs, options::OPT_flto_linker_scripts,
++                    options::OPT_fno_lto_linker_scripts);
++
+   // NVPTX doesn't support PGO or coverage
+   if (!Triple.isNVPTX())
+     addPGOAndCoverageFlags(TC, C, JA, Output, Args, SanitizeArgs, CmdArgs);
+diff --git a/clang/test/CodeGen/lto-linker-scripts.c b/clang/test/CodeGen/lto-linker-scripts.c
+new file mode 100644
+index 000000000000..52ded692d071
+--- /dev/null
++++ b/clang/test/CodeGen/lto-linker-scripts.c
+@@ -0,0 +1,4 @@
++// RUN: %clang_cc1 -flto-linker-scripts -triple aarch64-linux-gnu -emit-llvm < %s | FileCheck %s
++// REQUIRES: aarch64-registered-target
++// CHECK: @x = global i32 0, section ".bss"
++int x;
+diff --git a/lld/ELF/Config.h b/lld/ELF/Config.h
+index 1426aab12758..a817cd17c291 100644
+--- a/lld/ELF/Config.h
++++ b/lld/ELF/Config.h
+@@ -375,6 +375,7 @@ struct Config {
+   bool ltoPGOWarnMismatch;
+   bool ltoDebugPassManager;
+   bool ltoEmitAsm;
++  bool ltoLinkerScripts;
+   bool ltoUniqueBasicBlockSectionNames;
+   bool ltoValidateAllVtablesHaveTypeInfos;
+   bool ltoWholeProgramVisibility;
+diff --git a/lld/ELF/Driver.cpp b/lld/ELF/Driver.cpp
+index 51d9e32419f9..7d32a6931d02 100644
+--- a/lld/ELF/Driver.cpp
++++ b/lld/ELF/Driver.cpp
+@@ -1476,6 +1476,8 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
+                                             OPT_no_lto_pgo_warn_mismatch, true);
+   ctx.arg.ltoDebugPassManager = args.hasArg(OPT_lto_debug_pass_manager);
+   ctx.arg.ltoEmitAsm = args.hasArg(OPT_lto_emit_asm);
++  ctx.arg.ltoLinkerScripts =
++      args.hasFlag(OPT_lto_linker_scripts, OPT_no_lto_linker_scripts, false);
+   ctx.arg.ltoNewPmPasses = args.getLastArgValue(OPT_lto_newpm_passes);
+   ctx.arg.ltoWholeProgramVisibility =
+       args.hasFlag(OPT_lto_whole_program_visibility,
+diff --git a/lld/ELF/InputFiles.cpp b/lld/ELF/InputFiles.cpp
+index 05c0f3f1c445..51ce42f0682b 100644
+--- a/lld/ELF/InputFiles.cpp
++++ b/lld/ELF/InputFiles.cpp
+@@ -1830,7 +1830,7 @@ BitcodeFile::BitcodeFile(Ctx &ctx, MemoryBufferRef mb, StringRef archiveName,
+ 
+   MemoryBufferRef mbref(mb.getBuffer(), name);
+ 
+-  obj = CHECK2(lto::InputFile::create(mbref), this);
++  obj = CHECK2(lto::InputFile::create(mbref, ctx.arg.ltoLinkerScripts), this);
+   obj->setArchivePathAndName(archiveName, mb.getBufferIdentifier());
+ 
+   Triple t(obj->getTargetTriple());
+@@ -1854,10 +1854,26 @@ static uint8_t mapVisibility(GlobalValue::VisibilityTypes gvVisibility) {
+ static void createBitcodeSymbol(Ctx &ctx, Symbol *&sym,
+                                 const lto::InputFile::Symbol &objSym,
+                                 BitcodeFile &f) {
+-  uint8_t binding = objSym.isWeak() ? STB_WEAK : STB_GLOBAL;
++  uint8_t binding;
++  if (!objSym.isGlobal())
++    binding = STB_LOCAL;
++  else if (objSym.isWeak())
++    binding = STB_WEAK;
++  else
++    binding = STB_GLOBAL;
+   uint8_t type = objSym.isTLS() ? STT_TLS : STT_NOTYPE;
+   uint8_t visibility = mapVisibility(objSym.getVisibility());
+ 
++  if (!objSym.isGlobal()) {
++    // Local symbols aren't inserted in the symbol table.
++    assert(!sym);
++    objSym.Name = ctx.uniqueSaver.save(objSym.getName());
++    sym = reinterpret_cast<Symbol *>(makeThreadLocalN<SymbolUnion>(1));
++    new (sym) Defined(ctx, &f, StringRef(), binding, visibility, type, 0, 0,
++                      nullptr);
++    return;
++  }
++
+   if (!sym) {
+     // Symbols can be duplicated in bitcode files because of '#include' and
+     // linkonce_odr. Use uniqueSaver to save symbol names for de-duplication.
+@@ -1920,6 +1936,8 @@ void BitcodeFile::parseLazy() {
+   numSymbols = obj->symbols().size();
+   symbols = std::make_unique<Symbol *[]>(numSymbols);
+   for (auto [i, irSym] : llvm::enumerate(obj->symbols())) {
++    if (!irSym.isGlobal())
++      continue;
+     // Symbols can be duplicated in bitcode files because of '#include' and
+     // linkonce_odr. Use uniqueSaver to save symbol names for de-duplication.
+     // Update objSym.Name to reference (via StringRef) the string saver's copy;
+@@ -1938,7 +1956,7 @@ void BitcodeFile::postParse() {
+   for (auto [i, irSym] : llvm::enumerate(obj->symbols())) {
+     const Symbol &sym = *symbols[i];
+     if (sym.file == this || !sym.isDefined() || irSym.isUndefined() ||
+-        irSym.isCommon() || irSym.isWeak())
++        !irSym.isGlobal() || irSym.isCommon() || irSym.isWeak())
+       continue;
+     int c = irSym.getComdatIndex();
+     if (c != -1 && !keptComdats[c])
+diff --git a/lld/ELF/LTO.cpp b/lld/ELF/LTO.cpp
+index a11681133373..59d52bb70f1b 100644
+--- a/lld/ELF/LTO.cpp
++++ b/lld/ELF/LTO.cpp
+@@ -9,6 +9,7 @@
+ #include "LTO.h"
+ #include "Config.h"
+ #include "InputFiles.h"
++#include "LinkerScript.h"
+ #include "SymbolTable.h"
+ #include "Symbols.h"
+ #include "lld/Common/ErrorHandler.h"
+@@ -245,6 +246,8 @@ void BitcodeCompiler::add(BitcodeFile &f) {
+ 
+   ArrayRef<Symbol *> syms = f.getSymbols();
+   ArrayRef<lto::InputFile::Symbol> objSyms = obj.symbols();
++  if (ctx.arg.ltoLinkerScripts && ctx.script)
++    ctx.script->ltoInputFileMapping[obj.getName()] = &f;
+   std::vector<lto::SymbolResolution> resols(syms.size());
+ 
+   // Provide a resolution to the LTO API for each symbol.
+@@ -296,6 +299,12 @@ void BitcodeCompiler::add(BitcodeFile &f) {
+     // (with --wrap) symbols because otherwise LTO would inline them while
+     // their values are still not final.
+     r.LinkerRedefined = sym->scriptDefined;
++
++    StringRef inputSection = objSym.getSectionName();
++    if (!inputSection.empty() && ctx.script && ctx.arg.ltoLinkerScripts) {
++      r.VisibleToRegularObj |= ctx.script->shouldKeep(inputSection, &f);
++      r.OutputSectionName = ctx.script->mapLTOSectionName(inputSection, &f);
++    }
+   }
+   checkError(ctx.e, ltoObj->add(std::move(f.obj), resols));
+ }
+diff --git a/lld/ELF/LinkerScript.cpp b/lld/ELF/LinkerScript.cpp
+index 64fb717e17d9..aa8ce55d3c83 100644
+--- a/lld/ELF/LinkerScript.cpp
++++ b/lld/ELF/LinkerScript.cpp
+@@ -461,6 +461,20 @@ bool LinkerScript::shouldKeep(InputSectionBase *s) {
+   return false;
+ }
+ 
++bool LinkerScript::shouldKeep(StringRef name, InputFile *file) {
++  for (InputSectionDescription *id : keptSections) {
++    if (id->matchesFile(*file)) {
++      for (SectionPattern &p : id->sectionPatterns) {
++        if (p.sectionPat.match(name)) {
++          // FIXME: Also check flags?  Need to synthesize.
++          return true;
++        }
++      }
++    }
++  }
++  return false;
++}
++
+ // A helper function for the SORT() command.
+ static bool matchConstraints(ArrayRef<InputSectionBase *> sections,
+                              ConstraintKind kind) {
+@@ -528,6 +542,28 @@ static void sortInputSections(Ctx &ctx, MutableArrayRef<InputSectionBase *> vec,
+   sortSections(vec, outer);
+ }
+ 
++StringRef LinkerScript::mapLTOSectionName(StringRef inputSection,
++                                          InputFile *file) {
++  for (auto *cmd : sectionCommands) {
++    if (auto *os = dyn_cast<OutputDesc>(cmd)) {
++      for (auto *innercmd : os->osec.commands) {
++        if (auto *isd = dyn_cast<InputSectionDescription>(innercmd)) {
++          for (const SectionPattern &pat : isd->sectionPatterns) {
++            if (!pat.sectionPat.match(inputSection))
++              continue;
++
++            if (!isd->matchesFile(*file) || pat.excludesFile(*file))
++              continue;
++
++            return os->osec.name;
++          }
++        }
++      }
++    }
++  }
++  return "";
++}
++
+ // Compute and remember which sections the InputSectionDescription matches.
+ SmallVector<InputSectionBase *, 0>
+ LinkerScript::computeInputSections(const InputSectionDescription *cmd,
+@@ -580,11 +616,22 @@ LinkerScript::computeInputSections(const InputSectionDescription *cmd,
+             cast<InputSection>(sec)->getRelocatedSection())
+           continue;
+ 
++        StringRef sectionName = sec->name;
++        const InputFile *sectionFile = sec->file;
++        if (ctx.arg.ltoLinkerScripts) {
++          auto splitSectionName = sec->name.split("^^");
++          if (StringRef filename = splitSectionName.second; !filename.empty()) {
++            if (const InputFile *file = ltoInputFileMapping.lookup(filename)) {
++              sectionName = splitSectionName.first;
++              sectionFile = file;
++            }
++          }
++        }
+         // Check the name early to improve performance in the common case.
+-        if (!pat.sectionPat.match(sec->name))
++        if (!pat.sectionPat.match(sectionName))
+           continue;
+ 
+-        if (!cmd->matchesFile(*sec->file) || pat.excludesFile(*sec->file) ||
++        if (!cmd->matchesFile(*sectionFile) || pat.excludesFile(*sectionFile) ||
+             !flagsMatch(sec))
+           continue;
+ 
+diff --git a/lld/ELF/LinkerScript.h b/lld/ELF/LinkerScript.h
+index 80c4f564afab..6db8a88569c7 100644
+--- a/lld/ELF/LinkerScript.h
++++ b/lld/ELF/LinkerScript.h
+@@ -377,6 +377,7 @@ public:
+   bool needsInterpSection();
+ 
+   bool shouldKeep(InputSectionBase *s);
++  bool shouldKeep(StringRef name, InputFile *file);
+   std::pair<const OutputSection *, const Defined *> assignAddresses();
+   bool spillSections();
+   void erasePotentialSpillSections();
+@@ -411,6 +412,8 @@ public:
+   // undefined reference.
+   bool shouldAddProvideSym(StringRef symName);
+ 
++  StringRef mapLTOSectionName(StringRef inputSection, InputFile *file);
++
+   // SECTIONS command list.
+   SmallVector<SectionCommand *, 0> sectionCommands;
+ 
+@@ -469,6 +472,8 @@ public:
+   // section descriptions. Multiple references allow for sections to spill from
+   // one output section to another.
+   llvm::DenseMap<llvm::CachedHashStringRef, SectionClassDesc *> sectionClasses;
++
++  llvm::StringMap<InputFile *> ltoInputFileMapping;
+ };
+ 
+ } // end namespace lld::elf
+diff --git a/lld/ELF/Options.td b/lld/ELF/Options.td
+index 64c42eb49607..0efb11f87548 100644
+--- a/lld/ELF/Options.td
++++ b/lld/ELF/Options.td
+@@ -737,6 +737,11 @@ defm thinlto_remote_compiler_arg: EEq<"thinlto-remote-compiler-arg",
+ defm fat_lto_objects: BB<"fat-lto-objects",
+     "Use the .llvm.lto section, which contains LLVM bitcode, in fat LTO object files to perform LTO.",
+     "Ignore the .llvm.lto section in relocatable object files (default).">;
++defm lto_linker_scripts
++    : BB<"lto-linker-scripts",
++         "Make LTO respect section mappings specified in linker scripts",
++         "Ignore section mappings specified in linker scripts during LTO "
++         "(default)">;
+ 
+ def: J<"plugin-opt=O">, Alias<lto_O>, HelpText<"Alias for --lto-O">;
+ def: F<"plugin-opt=debug-pass-manager">,
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/CheckWrapSymbolResolution.test b/lld/test/ELF/lto/lto-with-linker-scripts/CheckWrapSymbolResolution.test
+new file mode 100644
+index 000000000000..4ed61882af5d
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/CheckWrapSymbolResolution.test
+@@ -0,0 +1,67 @@
++# REQUIRES: aarch64
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-mc -filetype=obj -triple=aarch64-unknown-linux-gnu %t/1.s -o %t/1.o
++# RUN: llvm-as %t/2.ll -o %t/2.o
++# RUN: llvm-as %t/3.ll -o %t/3.o
++# RUN: llvm-as %t/w.ll -o %t/w.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts %t/1.o %t/w.o %t/2.o %t/3.o \
++# RUN:   -T %t/script.t --wrap foo -t -o %t/out
++# RUN: llvm-objdump -Cx %t/out | FileCheck %s
++
++# CHECK: f000000 {{.*}}     F .wrap  {{.*}} __wrap_foo
++
++#--- 1.s
++.text
++.section .text.main,"ax",@progbits
++.globl main
++.type main,@function
++main:
++  bl foo
++  ret
++.size main, .-main
++
++#--- 2.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++declare i32 @foo()
++
++define i32 @bar() section ".text.bar" {
++  %v = call i32 @foo()
++  ret i32 %v
++}
++
++#--- 3.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++declare i32 @foo()
++
++define i32 @b1() section ".text.b1" {
++  %v = call i32 @foo()
++  ret i32 %v
++}
++
++#--- w.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++define i32 @__wrap_foo() section ".text.__wrap_foo" {
++  ret i32 1
++}
++
++#--- script.t
++SECTIONS {
++ .near : {
++    *(.text.main)
++    *(.text.foo)
++    *(.text.bar)
++    *(.text.b1)
++    *(.text.b2)
++  }
++
++  . = 0xF000000;
++  .wrap : {
++    *(.text.__wrap_foo)
++  }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmAlias.test b/lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmAlias.test
+new file mode 100644
+index 000000000000..14a556b05af4
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmAlias.test
+@@ -0,0 +1,41 @@
++# REQUIRES: aarch64
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/1.ll -o %t/1.o
++# RUN: llvm-mc -filetype=obj -triple=aarch64-unknown-linux-gnu %t/2.s -o %t/2.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts --gc-sections -e main -T %t/script.t \
++# RUN:   %t/1.o %t/2.o -o %t/out
++# RUN: llvm-readelf -S -W %t/out | FileCheck --check-prefix=SECTIONS %s
++# RUN: llvm-readelf -s -W %t/out | FileCheck %s
++
++# SECTIONS: foo
++# SECTIONS-NOT: ] .text
++
++# CHECK-DAG: FUNC GLOBAL DEFAULT {{.*}} foo
++# CHECK-DAG: FUNC GLOBAL DEFAULT {{.*}} alias_foo
++# CHECK-DAG: FUNC GLOBAL DEFAULT {{.*}} main
++
++#--- 1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++module asm ".global alias_foo"
++module asm ".set alias_foo, foo"
++
++define i32 @foo() section ".text.foo" {
++  ret i32 0
++}
++
++#--- 2.s
++.text
++.section .text.main,"ax",@progbits
++.globl main
++.type main,@function
++main:
++  bl alias_foo
++  ret
++.size main, .-main
++
++#--- script.t
++SECTIONS {
++foo : { *(.text.*) }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmEmptySymbol.test b/lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmEmptySymbol.test
+new file mode 100644
+index 000000000000..39f8613b8159
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/LTOAsmEmptySymbol.test
+@@ -0,0 +1,51 @@
++# REQUIRES: aarch64
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/1.ll -o %t/1.o
++# RUN: llvm-as %t/2.ll -o %t/2.o
++# RUN: llvm-mc -filetype=obj -triple=aarch64-unknown-linux-gnu %t/3.s -o %t/3.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts --gc-sections -e main -T %t/script.t \
++# RUN:   %t/1.o %t/2.o %t/3.o -o %t/out
++# RUN: llvm-readelf -s -W %t/out | FileCheck %s
++
++# CHECK: FUNC GLOBAL DEFAULT {{.*}} foo
++
++#--- 1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++module asm ".xword ."
++
++define i32 @foo(i32 %x) nounwind section ".text.foo" {
++  %r = add i32 %x, 2
++  ret i32 %r
++}
++
++#--- 2.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++module asm ".xword ."
++module asm ".weak foo"
++module asm ".equ foo,bar"
++
++@llvm.compiler.used = appending global [1 x ptr] [ptr @bar], section "llvm.metadata"
++
++define internal i32 @bar(i32 %x) nounwind section ".text.bar" {
++  %r = add i32 %x, 1
++  ret i32 %r
++}
++
++#--- 3.s
++.text
++.section .text.main,"ax",@progbits
++.globl main
++.type main,@function
++main:
++  .xword foo
++  ret
++.size main, .-main
++
++#--- script.t
++SECTIONS {
++  .text : { *(.text.*) }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/LTOKeepSymbol.test b/lld/test/ELF/lto/lto-with-linker-scripts/LTOKeepSymbol.test
+new file mode 100644
+index 000000000000..159a1b747811
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/LTOKeepSymbol.test
+@@ -0,0 +1,63 @@
++# REQUIRES: aarch64
++
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/1.ll -o %t/1.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts %t/1.o -plugin-opt=-function-sections \
++# RUN:   -Map=%t/map.txt -T %t/script.t -o %t/out
++# RUN: FileCheck %s --check-prefix=KEEP < %t/map.txt
++
++# KEEP: .text.baz1
++# KEEP: .text.baz2
++# KEEP: .text.baz3
++# KEEP: .text.baz
++# KEEP: .rodata.sys_call_table
++
++#--- 1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++@sys_call_table = constant [2 x ptr] [ptr @baz, ptr @baz], section ".rodata.sys_call_table"
++
++define hidden i32 @foo() section ".text.foo" {
++  ret i32 0
++}
++
++define weak i32 @bar() section ".text.bar" {
++  ret i32 0
++}
++
++define void @baz1() section ".text.baz1" {
++  call void @baz2()
++  ret void
++}
++
++define void @baz2() section ".text.baz2" {
++  call void @baz3()
++  ret void
++}
++
++define void @baz3() section ".text.baz3" {
++  %a = call i32 @foo()
++  %b = call i32 @baz()
++  %c = add i32 %a, %b
++  %d = icmp eq i32 %c, -1
++  br i1 %d, label %hit, label %done
++
++hit:
++  call void asm sideeffect "", ""()
++  br label %done
++
++done:
++  ret void
++}
++
++define i32 @baz() section ".text.baz" {
++  ret i32 0
++}
++
++#--- script.t
++SECTIONS {
++  .baz : { KEEP(*(.text.baz*)) }
++  .keeprodata : { KEEP(*(.rodata*)) }
++  .mytext : { *(.text*) }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/LTOPreemptSymbol.test b/lld/test/ELF/lto/lto-with-linker-scripts/LTOPreemptSymbol.test
+new file mode 100644
+index 000000000000..fa3d2ae2aa70
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/LTOPreemptSymbol.test
+@@ -0,0 +1,53 @@
++# REQUIRES: aarch64
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/1.ll -o %t/1.o
++# RUN: llvm-mc -filetype=obj -triple=aarch64-unknown-linux-gnu %t/2.s -o %t/2.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts %t/1.o %t/2.o -Map=%t/map.txt -T %t/script.t -o %t/out
++# RUN: FileCheck %s < %t/map.txt
++
++# CHECK: .tcm
++# CHECK-NEXT: 1.o
++# CHECK-NEXT: $x
++# CHECK-NEXT: bar
++# CHECK: .text
++# CHECK-NEXT: 2.o:(.text)
++# CHECK-NEXT: 2.o:(.text.foo)
++# CHECK-NEXT: $x
++# CHECK-NEXT: foo
++
++#--- 1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++define weak i32 @foo() section ".tcm_static" {
++  ret i32 0
++}
++
++define weak i32 @bar() section ".tcm_static" {
++  ret i32 0
++}
++
++#--- 2.s
++.text
++.section .text.foo,"ax",@progbits
++.globl foo
++.type foo,@function
++foo:
++  mov x0, xzr
++  ret
++.size foo, .-foo
++
++.section .text.main,"ax",@progbits
++.globl main
++.type main,@function
++main:
++  bl foo
++  bl bar
++  ret
++.size main, .-main
++
++#--- script.t
++SECTIONS {
++  .tcm : { KEEP (*(.tcm_static)) }
++  .text : { *(.text*) }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/LTOSaveTemps.test b/lld/test/ELF/lto/lto-with-linker-scripts/LTOSaveTemps.test
+new file mode 100644
+index 000000000000..48c99ae282cf
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/LTOSaveTemps.test
+@@ -0,0 +1,63 @@
++# REQUIRES: aarch64
++# RUN: rm -rf %t && split-file %s %t
++# RUN: opt -module-summary %t/1.ll -o %t/1.1.o
++# RUN: opt -module-summary %t/2.ll -o %t/1.2.o
++# RUN: llvm-mc -filetype=obj -triple=aarch64-unknown-linux-gnu %t/3.s -o %t/1.3.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts --gc-sections -save-temps -e main \
++# RUN:   -T %t/script.t %t/1.1.o %t/1.2.o %t/1.3.o -o %t/1.out
++# RUN: llvm-readelf -S -W %t/1.out | FileCheck --check-prefix=SECTIONS %s
++# RUN: llvm-as %t/1.ll -o %t/2.1.o
++# RUN: llvm-as %t/2.ll -o %t/2.2.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts --gc-sections -save-temps -e main \
++# RUN:   -T %t/script.t %t/2.1.o %t/2.2.o %t/1.3.o -o %t/2.out
++# RUN: llvm-readelf -S -W %t/2.out | FileCheck --check-prefix=REGSECTIONS %s
++
++# With thin LTO, IPSCCP propagates the constant return value of otherfun2, so .special gets GC'd.
++# SECTIONS: .alltext
++# SECTIONS-NOT: ] .text
++
++# With regular LTO, IPSCCP propagates the constant return value of otherfun2, so .special gets GC'd.
++# REGSECTIONS: .alltext
++# REGSECTIONS-NOT: ] .text
++
++#--- 1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++declare i32 @otherfun()
++declare i32 @otherfun2()
++
++define i32 @myfun() section ".text.myfun" {
++  %a = call i32 @otherfun()
++  %b = call i32 @otherfun2()
++  %c = add i32 %a, %b
++  ret i32 %c
++}
++
++#--- 2.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++define i32 @otherfun() section ".text.otherfun" {
++  ret i32 23
++}
++
++define i32 @otherfun2() section ".text.otherfun2" {
++  ret i32 42
++}
++
++#--- 3.s
++.text
++.section .text.main,"ax",@progbits
++.globl main
++.type main,@function
++main:
++  bl myfun
++  ret
++.size main, .-main
++
++#--- script.t
++SECTIONS {
++  .special : { *.2.o(.text.otherfun2) }
++  .alltext : { *(.text.*) }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/LTOUsed.test b/lld/test/ELF/lto/lto-with-linker-scripts/LTOUsed.test
+new file mode 100644
+index 000000000000..cb81aadcc9b3
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/LTOUsed.test
+@@ -0,0 +1,19 @@
++# REQUIRES: aarch64
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/used.ll -o %t/used.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts %t/used.o -e foo -o %t/out
++# RUN: llvm-readelf -s -W %t/out | FileCheck %s
++
++# CHECK: val
++
++#--- used.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++@val = global i32 2, section ".data.val", align 4
++@llvm.used = appending global [1 x ptr] [ptr @val], section "llvm.metadata"
++
++define i32 @foo() section ".text.foo" {
++  %v = load volatile i32, ptr @val
++  ret i32 %v
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/LocalsLinkerScriptSections.test b/lld/test/ELF/lto/lto-with-linker-scripts/LocalsLinkerScriptSections.test
+new file mode 100644
+index 000000000000..4c534256f81f
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/LocalsLinkerScriptSections.test
+@@ -0,0 +1,45 @@
++# REQUIRES: aarch64
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/1.ll -o %t/1.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts -e main -T %t/script.t \
++# RUN:   -plugin-opt=O0 -plugin-opt=-data-sections -plugin-opt=-function-sections %t/1.o -o %t/out
++# RUN: llvm-readelf -S %t/out | FileCheck %s --check-prefix=SEC
++
++# SEC:  .myfoo            PROGBITS
++# SEC:  .mybar            PROGBITS
++# SEC:  .mybaz            PROGBITS
++
++#--- 1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++define internal i32 @foo(i32 %x) section ".text.foo" {
++  %m = mul i32 %x, 10
++  ret i32 %m
++}
++
++define i32 @bar(i32 %y) section ".text.bar" {
++  %m = mul i32 %y, 10
++  %v = call i32 @foo(i32 %m)
++  ret i32 %v
++}
++
++define i32 @baz(i32 %z) section ".text.baz" {
++  %m = mul i32 %z, 20
++  %v = call i32 @foo(i32 %m)
++  ret i32 %v
++}
++
++define i32 @main(i32 %argc) section ".text.main" {
++  %a = call i32 @bar(i32 %argc)
++  %b = call i32 @baz(i32 %argc)
++  %c = add i32 %a, %b
++  ret i32 %c
++}
++
++#--- script.t
++SECTIONS {
++  .myfoo : { *(.text.foo)}
++  .mybar : { *1.o(.text.bar)}
++  .mybaz : { *1.o(.text.baz)}
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/LocalsSameNameTwoFiles.test b/lld/test/ELF/lto/lto-with-linker-scripts/LocalsSameNameTwoFiles.test
+new file mode 100644
+index 000000000000..8ec4fa6557a6
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/LocalsSameNameTwoFiles.test
+@@ -0,0 +1,46 @@
++# REQUIRES: aarch64
++
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/1.ll -o %t/1.o
++# RUN: llvm-as %t/2.ll -o %t/2.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts -T %t/script.t -plugin-opt=O0 \
++# RUN:   -plugin-opt=-data-sections -plugin-opt=-function-sections %t/1.o %t/2.o -o %t/out
++# RUN: llvm-readelf -S -W %t/out | FileCheck %s --check-prefix=SEC
++
++# SEC:  .mydata1          PROGBITS
++# SEC:  .mydata2          PROGBITS
++
++#--- 1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++@bar = internal global i32 20, section ".data.bar"
++
++declare i32 @baz()
++
++define i32 @foo() section ".text.foo" {
++  %a = load i32, ptr @bar
++  %b = call i32 @baz()
++  %c = add i32 %a, %b
++  ret i32 %c
++}
++
++#--- 2.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++@bar = internal global i64 30, section ".data.bar"
++
++define i32 @baz() section ".text.baz" {
++  %a = load i64, ptr @bar
++  %b = trunc i64 %a to i32
++  ret i32 %b
++}
++
++#--- script.t
++SECTIONS {
++  .text.foo : { *1.o(.text.foo) }
++  .text.baz : { *1.o(.text.baz) }
++  .mydata1 : { *1.o(.data.bar) }
++  .mydata2 : { *2.o(.data.bar) }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/NamespaceOverride.test b/lld/test/ELF/lto/lto-with-linker-scripts/NamespaceOverride.test
+new file mode 100644
+index 000000000000..13cf727dd70f
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/NamespaceOverride.test
+@@ -0,0 +1,72 @@
++# REQUIRES: aarch64
++
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/A.ll -o %t/A.o
++# RUN: llvm-mc -filetype=obj -triple=aarch64-unknown-linux-gnu %t/B.s -o %t/B.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts -Map=%t/map.txt -T %t/script.t %t/A.o %t/B.o -o %t/out
++# RUN: FileCheck %s --check-prefix=MAP < %t/map.txt
++
++# MAP: .foo
++# MAP: __foo_A
++# MAP: .text.Afun1
++# MAP: .text.Afun2
++# MAP: __foo_B
++# MAP: .text.Bfun1
++# MAP: .text.Bfun2
++# MAP: .text.main
++# MAP: __foo_end
++
++#--- A.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++declare ptr @Bfun2(i32)
++
++define internal ptr @Afun1(i32 %x) noinline section ".text.Afun1" {
++  %p = call ptr @Bfun2(i32 0)
++  ret ptr %p
++}
++
++define ptr @Afun2(i32 %y) section ".text.Afun2" {
++  %p = call ptr @Afun1(i32 0)
++  ret ptr %p
++}
++
++#--- B.s
++.text
++.section .text.Bfun1,"ax",@progbits
++.type Bfun1,@function
++Bfun1:
++  mov x0, xzr
++  ret
++.size Bfun1, .-Bfun1
++
++.section .text.Bfun2,"ax",@progbits
++.globl Bfun2
++.type Bfun2,@function
++Bfun2:
++  b Bfun1
++.size Bfun2, .-Bfun2
++
++.section .text.main,"ax",@progbits
++.globl main
++.type main,@function
++main:
++  mov x0, xzr
++  bl Afun2
++  mov x0, xzr
++  bl Bfun2
++  mov x0, xzr
++  ret
++.size main, .-main
++
++#--- script.t
++SECTIONS {
++  .foo : {
++     __foo_A = .;
++     *A.o(.text.*)
++     __foo_B = .;
++     *B.o(.text.*)
++     __foo_end = .;
++     }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/NoCrossRefs.test b/lld/test/ELF/lto/lto-with-linker-scripts/NoCrossRefs.test
+new file mode 100644
+index 000000000000..118700ffe44e
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/NoCrossRefs.test
+@@ -0,0 +1,107 @@
++# REQUIRES: aarch64
++
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/1.ll -o %t/1.o
++# RUN: mkdir -p %t/archive
++# RUN: llvm-as %t/2.ll -o %t/archive/2.o
++# RUN: llvm-ar cr %t/lib1.a %t/archive/2.o
++# RUN: not ld.lld -m aarch64elf %t/1.o -T %t/script.t %t/lib1.a -e main \
++# RUN:   -plugin-opt=-function-sections -o %t/1.out --error-limit 0 2>&1 | \
++# RUN:   FileCheck %s --check-prefix=REGULAR
++# RUN: ld.lld -m aarch64elf %t/1.o -T %t/script.gc %t/lib1.a --gc-sections -o %t/2.out --entry=main
++# RUN: not ld.lld -m aarch64elf %t/1.o -T %t/script.dbg %t/lib1.a -e main -o %t/3.out 2>&1 | \
++# RUN:   FileCheck %s --check-prefix=DBG
++
++# Test normal cross-reference prohibition between commons and sections.
++# REGULAR: .text.main{{.*}}: prohibited cross reference from '.text' to '.text.baz' in '.baz'
++
++# Test a cross reference between debug and text. The script keeps .debug_info as orphan,
++# which also checks orphan accounting for NOCROSSREFS.
++# DBG: .debug_info{{.*}}: prohibited cross reference from '.debug_info' to '.text.main' in '.text'
++
++#--- 1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++@common = common global i32 0, align 4
++@another_common = external global [100 x i32], align 16
++@z = external global i32, align 4
++@x = global ptr @z, section ".data.x", align 8
++
++define i32 @baz() noinline optnone section ".text.baz" !dbg !8 {
++entry:
++  %v = load i32, ptr @z, align 4, !dbg !10
++  ret i32 %v, !dbg !11
++}
++
++define i32 @main() noinline optnone section ".text.main" !dbg !12 {
++entry:
++  store i32 1, ptr @common, align 4, !dbg !13
++  %p = getelementptr inbounds [100 x i32], ptr @another_common, i64 0, i64 0, !dbg !14
++  store i32 1, ptr %p, align 4, !dbg !14
++  %a = load i32, ptr @common, align 4, !dbg !15
++  %b = load i32, ptr %p, align 4, !dbg !16
++  %c = add i32 %a, %b, !dbg !17
++  %d = call i32 @baz(), !dbg !18
++  %e = add i32 %c, %d, !dbg !19
++  ret i32 %e, !dbg !20
++}
++
++!llvm.dbg.cu = !{!0}
++!llvm.module.flags = !{!4, !5}
++
++!0 = distinct !DICompileUnit(language: DW_LANG_C11, file: !1, producer: "clang", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
++!1 = !DIFile(filename: "1.c", directory: "/")
++!2 = !DIBasicType(name: "int", size: 32, encoding: DW_ATE_signed)
++!3 = !DISubroutineType(types: !{!2})
++!4 = !{i32 2, !"Dwarf Version", i32 4}
++!5 = !{i32 2, !"Debug Info Version", i32 3}
++!8 = distinct !DISubprogram(name: "baz", scope: !1, file: !1, line: 6, type: !3, scopeLine: 6, spFlags: DISPFlagDefinition, unit: !0)
++!10 = !DILocation(line: 6, column: 24, scope: !8)
++!11 = !DILocation(line: 6, column: 17, scope: !8)
++!12 = distinct !DISubprogram(name: "main", scope: !1, file: !1, line: 8, type: !3, scopeLine: 8, spFlags: DISPFlagDefinition, unit: !0)
++!13 = !DILocation(line: 9, column: 3, scope: !12)
++!14 = !DILocation(line: 10, column: 3, scope: !12)
++!15 = !DILocation(line: 11, column: 10, scope: !12)
++!16 = !DILocation(line: 11, column: 19, scope: !12)
++!17 = !DILocation(line: 11, column: 17, scope: !12)
++!18 = !DILocation(line: 11, column: 36, scope: !12)
++!19 = !DILocation(line: 11, column: 28, scope: !12)
++!20 = !DILocation(line: 11, column: 3, scope: !12)
++
++#--- 2.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++@z = global i32 1, section ".data.z", align 4
++@another_common = global [100 x i32] zeroinitializer, section ".sdata.another_common", align 16
++
++#--- script.t
++NOCROSSREFS(  .baz .text .bss .data .xsection .zsection)
++SECTIONS {
++  .zsection : { *(.data.z) }
++  .xsection : { *(.data.x) }
++  .baz : { *(.text.baz) }
++  .text : { *(.text.*) }
++  .bss : { *(.sdata*) }
++}
++
++#--- script.gc
++NOCROSSREFS(.text .xsection)
++SECTIONS {
++  .zsection : { *(.data.z) }
++  .xsection : { *(.data.x) }
++  .baz : { *(.text.baz) }
++  .text : { *(.text.*) }
++  .bss : { *(.sdata*) }
++}
++
++#--- script.dbg
++NOCROSSREFS(.text .debug_info)
++SECTIONS {
++  .zsection : { *(.data.z) }
++  .xsection : { *(.data.x) }
++  .baz : { *(.text.baz) }
++  .text : { *(.text.*) }
++  .bss : { *(.sdata*) }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/OutputSection.test b/lld/test/ELF/lto/lto-with-linker-scripts/OutputSection.test
+new file mode 100644
+index 000000000000..201ee1e4130d
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/OutputSection.test
+@@ -0,0 +1,22 @@
++# REQUIRES: aarch64
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/foo.ll -o %t/foo.foo.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts -T %t/script.t %t/foo.foo.o -e foo \
++# RUN:   -plugin-opt=-function-sections -o %t/out
++# RUN: llvm-readelf -S -s -W %t/out | FileCheck %s --check-prefix=ELF
++
++# ELF: [ [[S:[0-9]+]]] .myfoo PROGBITS
++# ELF: FUNC GLOBAL DEFAULT [[S]] foo
++
++#--- foo.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++define i32 @foo() section ".text.foo" {
++  ret i32 0
++}
++
++#--- script.t
++SECTIONS {
++  .myfoo : { *.foo.o(.text.foo) }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/SectionsWithNoSyms.test b/lld/test/ELF/lto/lto-with-linker-scripts/SectionsWithNoSyms.test
+new file mode 100644
+index 000000000000..4a765fe2e856
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/SectionsWithNoSyms.test
+@@ -0,0 +1,47 @@
++# REQUIRES: aarch64
++
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/1.ll -o %t/1.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts -e main -T %t/script.t -plugin-opt=O0 \
++# RUN:   -plugin-opt=-data-sections -plugin-opt=-function-sections %t/1.o -o %t/out
++# RUN: llvm-readelf -S %t/out | FileCheck %s --check-prefix=SEC
++
++# SEC:  .myrodata         PROGBITS{{.*}}000004
++
++#--- 1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++@.str = private unnamed_addr constant [4 x i8] c"100\00", section ".rodata.str"
++@s = global ptr @.str, section ".data.s", align 8
++
++define i32 @bar() section ".text.bar" {
++  %p = load ptr, ptr @s, align 8
++  %c0 = load i8, ptr %p, align 1
++  %p1 = getelementptr inbounds i8, ptr %p, i64 1
++  %c1 = load i8, ptr %p1, align 1
++  %i0 = sext i8 %c0 to i32
++  %i1 = sext i8 %c1 to i32
++  %sum = add i32 %i0, %i1
++  ret i32 %sum
++}
++
++define i32 @main(i32 %a) section ".text.main" {
++  %f = ptrtoint ptr @bar to i64
++  %f32 = trunc i64 %f to i32
++  %p = load ptr, ptr @s, align 8
++  %p3 = getelementptr inbounds i8, ptr %p, i64 3
++  %c3 = load i8, ptr %p3, align 1
++  %i3 = sext i8 %c3 to i32
++  %sum = add i32 %f32, %i3
++  ret i32 %sum
++}
++
++#--- script.t
++SECTIONS {
++  .text.main : { *1.o(.text.main) }
++  .text.bar : { *1.o(.text.bar) }
++  .myrodata : { *1.o(.rodata*)  }
++  .mydata : { *1.o(.data.s) }
++  .unrecognized : { *1.o(*) }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/ThinLTOCaching.test b/lld/test/ELF/lto/lto-with-linker-scripts/ThinLTOCaching.test
+new file mode 100644
+index 000000000000..4b6e6c5a3fbb
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/ThinLTOCaching.test
+@@ -0,0 +1,110 @@
++# REQUIRES: aarch64
++# RUN: rm -rf %t && split-file %s %t
++# RUN: opt -module-hash -module-summary %t/1.ll -o %t/1.1.o
++# RUN: opt -module-hash -module-summary %t/2.ll -o %t/1.2.o
++# RUN: llvm-mc -filetype=obj -triple=aarch64-unknown-linux-gnu %t/3.s -o %t/1.3.o
++# RUN: cp -f %t/script.t %t/1.script.t
++# RUN: rm -Rf %t/1.cache && mkdir %t/1.cache
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts --gc-sections --thinlto-cache-dir=%t/1.cache \
++# RUN:   -plugin-opt=-function-sections -e main -T %t/1.script.t %t/1.1.o %t/1.2.o %t/1.3.o -o %t/1.out
++# RUN: llvm-readelf -S -W %t/1.out | FileCheck --check-prefix=SECTIONS %s
++# RUN: ls %t/1.cache | FileCheck --check-prefix=LLVMCACHE-TWO --check-prefix=LLVMCACHE %s
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts --gc-sections --thinlto-cache-dir=%t/1.cache \
++# RUN:   -plugin-opt=-function-sections -e main -T %t/1.script.t %t/1.1.o %t/1.2.o %t/1.3.o -o %t/1.out
++# RUN: ls %t/1.cache | FileCheck --check-prefix=LLVMCACHE-TWO --check-prefix=LLVMCACHE %s
++# RUN: llvm-readelf -S -W %t/1.out | FileCheck --check-prefix=SECTIONS %s
++# RUN: cp -f %t/script2.t %t/1.script.t
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts --gc-sections --thinlto-cache-dir=%t/1.cache \
++# RUN:   -plugin-opt=-function-sections -e main -T %t/1.script.t %t/1.1.o %t/1.2.o %t/1.3.o -o %t/1.out
++# RUN: llvm-readelf -S -W %t/1.out | FileCheck --check-prefix=SECTIONS %s
++# RUN: ls %t/1.cache | FileCheck --check-prefix=LLVMCACHE-TWO --check-prefix=LLVMCACHE %s
++# RUN: cp -f %t/script2a.t %t/1.script.t
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts --gc-sections --thinlto-cache-dir=%t/1.cache \
++# RUN:   -plugin-opt=-function-sections -e main -T %t/1.script.t %t/1.1.o %t/1.2.o %t/1.3.o -o %t/1.out
++# RUN: llvm-readelf -S -W %t/1.out | FileCheck --check-prefix=SECTIONS2 %s
++# RUN: ls %t/1.cache | FileCheck --check-prefix=LLVMCACHE-TWO --check-prefix=LLVMCACHE %s
++# RUN: llvm-ar cr %t/1.lib.a %t/1.3.o
++# RUN: llvm-ar cr %t/1.lib.a %t/1.2.o
++# RUN: llvm-ar cr %t/1.lib.a %t/1.1.o
++# RUN: cp -f %t/script3.t %t/1.script.t
++# RUN: rm -Rf %t/1.cache && mkdir %t/1.cache
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts --gc-sections --thinlto-cache-dir=%t/1.cache \
++# RUN:   -plugin-opt=-function-sections -e main -T %t/1.script.t %t/1.lib.a -o %t/1.out
++# RUN: ls %t/1.cache | FileCheck --check-prefix=LLVMCACHE-TWO --check-prefix=LLVMCACHE %s
++# RUN: rm %t/1.lib.a
++# RUN: llvm-ar cr %t/1.lib.a %t/1.1.o
++# RUN: llvm-ar cr %t/1.lib.a %t/1.2.o
++# RUN: llvm-ar cr %t/1.lib.a %t/1.3.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts --gc-sections --thinlto-cache-dir=%t/1.cache \
++# RUN:   -e main -T %t/1.script.t %t/1.lib.a -o %t/1.out
++# RUN: ls %t/1.cache | FileCheck --check-prefix=LLVMCACHE-TWO --check-prefix=LLVMCACHE %s
++
++# SECTIONS: .alltext
++# SECTIONS-NOT: ] .text
++
++# SECTIONS2-NOT: .special
++
++# LLVMCACHE-TWO-COUNT-2: llvmcache-[[X:[[:xdigit:]]+]]
++# LLVMCACHE-NOT:         llvmcache-[[X:[[:xdigit:]]+]]
++
++#--- 1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++declare i32 @otherfun()
++declare i32 @otherfun2()
++
++define i32 @myfun() section ".text.myfun" {
++  %a = call i32 @otherfun()
++  %b = call i32 @otherfun2()
++  %c = add i32 %a, %b
++  ret i32 %c
++}
++
++#--- 2.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++define i32 @otherfun() section ".text.otherfun" {
++  ret i32 23
++}
++
++define i32 @otherfun2() section ".text.otherfun2" {
++  ret i32 42
++}
++
++#--- 3.s
++.text
++.section .text.main,"ax",@progbits
++.globl main
++.type main,@function
++main:
++  bl myfun
++  ret
++.size main, .-main
++
++#--- script.t
++SECTIONS {
++  .special : { *.2.o(.text.otherfun2) }
++  .alltext : { *(.text.*) }
++}
++
++#--- script2.t
++/* Identical to script.t except for this comment */
++SECTIONS {
++  .special : { *.2.o(.text.otherfun2) }
++  .alltext : { *(.text.*) }
++}
++
++#--- script2a.t
++SECTIONS {
++  .special : { *.2.o(.text.nomatch) }
++  .alltext : { *(.text.*) }
++}
++
++#--- script3.t
++/* Identical to script.t except for this comment */
++SECTIONS {
++  .special : { *.lib.a:(.text.otherfun2) }
++  .alltext : { *(.text.*) }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/ThinLTOSameFileNameArchive.test b/lld/test/ELF/lto/lto-with-linker-scripts/ThinLTOSameFileNameArchive.test
+new file mode 100644
+index 000000000000..055cf468513c
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/ThinLTOSameFileNameArchive.test
+@@ -0,0 +1,63 @@
++# REQUIRES: aarch64
++# RUN: rm -rf %t && split-file %s %t
++# RUN: mkdir -p %t/1/tmp
++# RUN: mkdir -p %t/2/tmp
++# RUN: opt -module-hash -module-summary %t/a/1.ll -o %t/1/tmp/1.o
++# RUN: opt -module-hash -module-summary %t/b/1.ll -o %t/2/tmp/1.o
++# RUN: llvm-ar cr %t/2.a %t/1/tmp/1.o %t/2/tmp/1.o
++# RUN: llvm-mc -filetype=obj -triple=aarch64-unknown-linux-gnu %t/3.s -o %t/1.3.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts --gc-sections -plugin-opt=-function-sections \
++# RUN:   -plugin-opt=-data-sections -e main -T %t/script.t %t/1.3.o %t/2.a -o %t/1.out
++# RUN: llvm-readelf -S -W %t/1.out | FileCheck --check-prefix=SECTIONS %s
++# RUN: llvm-readelf -s -W %t/1.out | FileCheck %s
++
++# SECTIONS: .alltext
++# SECTIONS-NOT: .text
++
++# CHECK-NOT: FUNC
++# CHECK-DAG: FUNC GLOBAL DEFAULT {{[0-9]+}} main
++# CHECK-DAG: FUNC GLOBAL DEFAULT {{[0-9]+}} myfun
++# CHECK-NOT: FUNC
++
++#--- a/1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++declare i32 @otherfun()
++declare i32 @otherfun2()
++
++define i32 @myfun() section ".text.myfun" {
++  %a = call i32 @otherfun()
++  %b = call i32 @otherfun2()
++  %c = add i32 %a, %b
++  ret i32 %c
++}
++
++#--- b/1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++define i32 @otherfun() section ".text.otherfun" {
++  ret i32 23
++}
++
++define i32 @otherfun2() section ".text.otherfun2" {
++  ret i32 42
++}
++
++#--- 3.s
++.text
++.section .text.main,"ax",@progbits
++.globl main
++.type main,@function
++main:
++  bl myfun
++  ret
++.size main, .-main
++
++#--- script.t
++SECTIONS {
++  .special : { *(.text.otherfun2) }
++  .alltext : { *(.text.*) }
++  .ARM.exidx : { *(.ARM.exidx*) }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/ThinLTOWithLS.test b/lld/test/ELF/lto/lto-with-linker-scripts/ThinLTOWithLS.test
+new file mode 100644
+index 000000000000..06f762b14b08
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/ThinLTOWithLS.test
+@@ -0,0 +1,65 @@
++# REQUIRES: aarch64
++# RUN: rm -rf %t && split-file %s %t
++# RUN: opt -module-hash -module-summary %t/1.ll -o %t/1.1.o
++# RUN: opt -module-hash -module-summary %t/2.ll -o %t/1.2.o
++# RUN: llvm-mc -filetype=obj -triple=aarch64-unknown-linux-gnu %t/3.s -o %t/1.3.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts --gc-sections -print-gc-sections \
++# RUN:   -plugin-opt=-function-sections -plugin-opt=-data-sections --save-temps -e main \
++# RUN:   -T %t/script.t %t/1.1.o %t/1.2.o %t/1.3.o -o %t/1.out 2>&1 | \
++# RUN:   FileCheck --check-prefix=GARBAGE %s
++# RUN: llvm-readelf -S -W %t/1.out | FileCheck --check-prefix=SECTIONS %s
++# RUN: llvm-readelf -s -W %t/1.out | FileCheck %s
++
++# GARBAGE-DAG: removing unused section {{.*}}(.text.otherfun2)
++# GARBAGE-DAG: removing unused section {{.*}}(.text.otherfun)
++
++# SECTIONS: .alltext
++# SECTIONS-NOT: .text
++
++# CHECK-NOT: FUNC
++# CHECK: FUNC GLOBAL DEFAULT {{[0-9]+}} myfun
++# CHECK: FUNC GLOBAL DEFAULT {{[0-9]+}} main
++# CHECK-NOT: FUNC
++
++#--- 1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++declare i32 @otherfun()
++declare i32 @otherfun2()
++
++define i32 @myfun() section ".text.myfun" {
++  %a = call i32 @otherfun()
++  %b = call i32 @otherfun2()
++  %c = add i32 %a, %b
++  ret i32 %c
++}
++
++#--- 2.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++define i32 @otherfun() section ".text.otherfun" {
++  ret i32 23
++}
++
++define i32 @otherfun2() section ".text.otherfun2" {
++  ret i32 42
++}
++
++#--- 3.s
++.text
++.section .text.main,"ax",@progbits
++.globl main
++.type main,@function
++main:
++  bl myfun
++  ret
++.size main, .-main
++
++#--- script.t
++SECTIONS {
++  .special : { *.2.o(.text.otherfun2) }
++  .alltext : { *(.text.*) }
++  .ARM.exidx : { *(.ARM.exidx*) }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/ltokeep.test b/lld/test/ELF/lto/lto-with-linker-scripts/ltokeep.test
+new file mode 100644
+index 000000000000..d2127a57364f
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/ltokeep.test
+@@ -0,0 +1,44 @@
++# REQUIRES: aarch64
++
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/foo.ll -o %t/foo.o
++# RUN: llvm-mc -filetype=obj -triple=aarch64-unknown-linux-gnu %t/main.s -o %t/main.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts %t/foo.o %t/main.o -T %t/script.t -o %t/out
++# RUN: llvm-readelf -S %t/out | FileCheck %s --check-prefix=SECTIONS
++
++# SECTIONS: .text.foo
++
++#--- foo.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++declare i32 @bar()
++
++define i32 @foo() section ".text.foo" {
++  %v = call i32 @bar()
++  ret i32 %v
++}
++
++#--- main.s
++.text
++.section .text.main,"ax",@progbits
++.globl main
++.type main,@function
++main:
++  mov x0, xzr
++  ret
++.size main, .-main
++
++.section .text.bar,"ax",@progbits
++.globl bar
++.type bar,@function
++bar:
++  mov x0, xzr
++  ret
++.size bar, .-bar
++
++#--- script.t
++SECTIONS {
++  .text.foo : { KEEP(*(.text.foo)) }
++  .text.others : { *(.text.*) }
++}
+diff --git a/lld/test/ELF/lto/lto-with-linker-scripts/ltosectionattribute.test b/lld/test/ELF/lto/lto-with-linker-scripts/ltosectionattribute.test
+new file mode 100644
+index 000000000000..93d0a7c8506c
+--- /dev/null
++++ b/lld/test/ELF/lto/lto-with-linker-scripts/ltosectionattribute.test
+@@ -0,0 +1,46 @@
++# REQUIRES: aarch64
++# RUN: rm -rf %t && split-file %s %t
++# RUN: llvm-as %t/1.ll -o %t/1.o
++# RUN: llvm-as %t/2.ll -o %t/2.o
++# RUN: llvm-mc -filetype=obj -triple=aarch64-unknown-linux-gnu %t/3.s -o %t/3.o
++# RUN: ld.lld -m aarch64elf --lto-linker-scripts %t/1.o %t/2.o %t/3.o -T %t/script.t -o %t/out
++# RUN: llvm-readelf -S -W %t/out | FileCheck %s
++
++# CHECK: .myfoo
++# CHECK: .mybar
++
++#--- 1.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++define i32 @foo() section ".foo" {
++  ret i32 0
++}
++
++#--- 2.ll
++target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++target triple = "aarch64-unknown-linux-gnu"
++
++define i32 @bar() section ".foo" {
++  ret i32 0
++}
++
++#--- 3.s
++.text
++.section .text,"ax",@progbits
++.globl main
++.type main,@function
++main:
++  bl foo
++  mov x0, xzr
++  bl bar
++  mov x0, xzr
++  ret
++.size main, .-main
++
++#--- script.t
++SECTIONS {
++.myfoo : { *1.o*(.foo) }
++.mybar : { *2.o*(.foo) }
++.main : { *(.text) }
++}
+diff --git a/llvm/include/llvm/CodeGen/AssignSectionsToGlobals.h b/llvm/include/llvm/CodeGen/AssignSectionsToGlobals.h
+new file mode 100644
+index 000000000000..4648390ad984
+--- /dev/null
++++ b/llvm/include/llvm/CodeGen/AssignSectionsToGlobals.h
+@@ -0,0 +1,26 @@
++//==- include/llvm/CodeGen/AssignSectionsToGlobals.h -------------*- C++ -*-==//
++//
++// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
++// See https://llvm.org/LICENSE.txt for license information.
++// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
++//
++
++#ifndef LLVM_CODEGEN_ASSIGNSECTIONSTOGLOBALS_H
++#define LLVM_CODEGEN_ASSIGNSECTIONSTOGLOBALS_H
++
++#include "llvm/IR/PassManager.h"
++#include "llvm/Target/TargetMachine.h"
++
++namespace llvm {
++
++class AssignSectionsToGlobalsPass
++    : public PassInfoMixin<AssignSectionsToGlobalsPass> {
++  TargetMachine *TM;
++
++public:
++  AssignSectionsToGlobalsPass(TargetMachine *tm) : TM(tm) {}
++  LLVM_ABI PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
++};
++} // end namespace llvm
++
++#endif // LLVM_CODEGEN_ASSIGNSECTIONSTOGLOBALS_H
+diff --git a/llvm/include/llvm/LTO/LTO.h b/llvm/include/llvm/LTO/LTO.h
+index cea66f99b99b..6882df591d09 100644
+--- a/llvm/include/llvm/LTO/LTO.h
++++ b/llvm/include/llvm/LTO/LTO.h
+@@ -141,6 +141,7 @@ private:
+   // standalone file. Effectively, extracted from its container.
+   bool ExtractForDistribution = false;
+   bool IsThinLTO = false;
++  bool IncludeLocalSymbols = false;
+   StringRef ArchivePath;
+   StringRef MemberName;
+ 
+@@ -149,7 +150,7 @@ public:
+ 
+   /// Create an InputFile.
+   LLVM_ABI static Expected<std::unique_ptr<InputFile>>
+-  create(MemoryBufferRef Object);
++  create(MemoryBufferRef Object, bool IncludeLocalSymbols = false);
+ 
+   /// The purpose of this struct is to only expose the symbol information that
+   /// an LTO client should need in order to do symbol resolution.
+@@ -709,6 +710,12 @@ struct SymbolResolution {
+   /// Linker redefined version of the symbol which appeared in -wrap or -defsym
+   /// linker option.
+   unsigned LinkerRedefined : 1;
++
++  /// When linking with a linker script, the output section where this symbol
++  /// will be placed. Certain optimizations must be suppressed between globals
++  /// with a different output section, to ensure the variable or function is
++  /// actually emitted into the correct section.
++  StringRef OutputSectionName;
+ };
+ 
+ } // namespace lto
+diff --git a/llvm/include/llvm/Object/IRSymtab.h b/llvm/include/llvm/Object/IRSymtab.h
+index f59ad293d61a..48a18ce76600 100644
+--- a/llvm/include/llvm/Object/IRSymtab.h
++++ b/llvm/include/llvm/Object/IRSymtab.h
+@@ -115,6 +115,7 @@ struct Symbol {
+     FB_format_specific,
+     FB_unnamed_addr,
+     FB_executable,
++    FB_private,
+   };
+ };
+ 
+@@ -215,6 +216,7 @@ struct Symbol {
+   bool isFormatSpecific() const { return (Flags >> S::FB_format_specific) & 1; }
+   bool isUnnamedAddr() const { return (Flags >> S::FB_unnamed_addr) & 1; }
+   bool isExecutable() const { return (Flags >> S::FB_executable) & 1; }
++  bool isPrivate() const { return (Flags >> S::FB_private) & 1; }
+ 
+   uint64_t getCommonSize() const {
+     assert(isCommon());
+diff --git a/llvm/include/llvm/Object/SymbolicFile.h b/llvm/include/llvm/Object/SymbolicFile.h
+index da59eec7700b..8f46af3fbdcd 100644
+--- a/llvm/include/llvm/Object/SymbolicFile.h
++++ b/llvm/include/llvm/Object/SymbolicFile.h
+@@ -122,6 +122,8 @@ public:
+     SF_Const = 1U << 10,         // Symbol value is constant
+     SF_Executable = 1U << 11,    // Symbol points to an executable section
+                                  // (IR only)
++    SF_Private = 1U << 12,       // Symbol points to a private "symbol"
++                                 // (IR only)
+   };
+ 
+   BasicSymbolRef() = default;
+diff --git a/llvm/lib/Analysis/InlineCost.cpp b/llvm/lib/Analysis/InlineCost.cpp
+index 73f7f5e6cba0..dd435c49e448 100644
+--- a/llvm/lib/Analysis/InlineCost.cpp
++++ b/llvm/lib/Analysis/InlineCost.cpp
+@@ -184,6 +184,10 @@ static cl::opt<bool> InlineAllViableCalls(
+     "inline-all-viable-calls", cl::Hidden, cl::init(false),
+     cl::desc("Inline all viable calls, even if they exceed the inlining "
+              "threshold"));
++static cl::opt<bool> InlineOnlyWithinSection(
++    "inline-only-within-section", cl::init(true), cl::Hidden,
++    cl::desc("Only inline functions into call sites within the same section."));
++
+ namespace llvm {
+ std::optional<int> getStringFnAttrAsInt(const Attribute &Attr) {
+   if (Attr.isValid()) {
+@@ -3078,6 +3082,19 @@ void InlineCostCallAnalyzer::print(raw_ostream &OS) {
+ LLVM_DUMP_METHOD void InlineCostCallAnalyzer::dump() { print(dbgs()); }
+ #endif
+ 
++/// Test that two functions have matching output sections.
++static bool functionsHaveMatchingOutputSections(Function *F1, Function *F2) {
++  Attribute F1Sec = F1->getFnAttribute("linker_output_section");
++  Attribute F2Sec = F2->getFnAttribute("linker_output_section");
++  if (F1Sec.isValid() != F2Sec.isValid())
++    return false; // Differing output sections.
++
++  if (F1Sec.isValid())
++    return F1Sec.getValueAsString() == F2Sec.getValueAsString();
++
++  return true; // No output sections specified.
++}
++
+ /// Test that there are no attribute conflicts between Caller and Callee
+ ///        that prevent inlining.
+ static bool functionsHaveCompatibleAttributes(
+@@ -3216,6 +3233,12 @@ std::optional<InlineResult> llvm::getAttributeBasedInliningDecision(
+     return InlineResult::failure(IsViable.getFailureReason());
+   }
+ 
++  // With a linker script, only inline functions into call sites within the same
++  // output section (unless callee has always-inline attribute).
++  if (InlineOnlyWithinSection &&
++      !functionsHaveMatchingOutputSections(Call.getCaller(), Callee))
++    return InlineResult::failure("caller and callee in different sections");
++
+   // Never inline functions with conflicting attributes (unless callee has
+   // always-inline attribute).
+   if (!functionsHaveCompatibleAttributes(Caller, Callee, GetTLI))
+diff --git a/llvm/lib/CodeGen/AssignSectionsToGlobals.cpp b/llvm/lib/CodeGen/AssignSectionsToGlobals.cpp
+new file mode 100644
+index 000000000000..608c2c701e09
+--- /dev/null
++++ b/llvm/lib/CodeGen/AssignSectionsToGlobals.cpp
+@@ -0,0 +1,145 @@
++//===- AssignSectionsToGlobals.cpp ----------------------------------------===//
++//
++// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
++// See https://llvm.org/LICENSE.txt for license information.
++// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
++//
++//===----------------------------------------------------------------------===//
++//
++// For each global which doesn't have a section, set it's section to the
++// default as computed by the backend.  For LTO with a linker script, this is
++// used by the linker before LTO runs to compute the output sections for each
++// global.
++//
++//===----------------------------------------------------------------------===//
++
++#include "llvm/CodeGen/AssignSectionsToGlobals.h"
++#include "llvm/Bitcode/BitcodeWriterPass.h"
++#include "llvm/CodeGen/AsmPrinter.h"
++#include "llvm/CodeGen/MachineModuleInfo.h"
++#include "llvm/CodeGen/Passes.h"
++#include "llvm/CodeGen/TargetInstrInfo.h"
++#include "llvm/CodeGen/TargetLowering.h"
++#include "llvm/CodeGen/TargetPassConfig.h"
++#include "llvm/CodeGen/TargetSubtargetInfo.h"
++#include "llvm/IR/LegacyPassManager.h"
++#include "llvm/IR/Metadata.h"
++#include "llvm/IR/Module.h"
++#include "llvm/InitializePasses.h"
++#include "llvm/MC/MCAsmInfo.h"
++#include "llvm/MC/MCContext.h"
++#include "llvm/MC/MCDirectives.h"
++#include "llvm/MC/MCInstrInfo.h"
++#include "llvm/MC/MCObjectFileInfo.h"
++#include "llvm/MC/MCParser/MCAsmParser.h"
++#include "llvm/MC/MCParser/MCTargetAsmParser.h"
++#include "llvm/MC/MCRegisterInfo.h"
++#include "llvm/MC/MCSectionELF.h"
++#include "llvm/MC/MCStreamer.h"
++#include "llvm/MC/MCSubtargetInfo.h"
++#include "llvm/MC/MCSymbol.h"
++#include "llvm/MC/MCTargetOptions.h"
++#include "llvm/MC/TargetRegistry.h"
++#include "llvm/Pass.h"
++#include "llvm/Support/MemoryBuffer.h"
++#include "llvm/Support/SourceMgr.h"
++#include "llvm/Target/TargetLoweringObjectFile.h"
++#include "llvm/Target/TargetMachine.h"
++#include "llvm/Transforms/Utils/ModuleUtils.h"
++
++#define DEBUG_TYPE "assign-sections-globals"
++
++using namespace llvm;
++
++namespace {
++
++class AssignSections {
++public:
++  bool run(Module &M, TargetMachine *TM);
++
++private:
++  TargetMachine *TM;
++  Module *M;
++
++  void collectGlobalObjectSections(
++      SmallVectorImpl<std::pair<StringRef, StringRef>> &GOSectionPairs);
++  void collectAsmAliasSections(
++      const Triple &TT, const Target &T, MCContext &MCCtx,
++      SmallVectorImpl<std::pair<StringRef, StringRef>> &GOSectionPairs);
++  StringRef getDefaultSectionNameForGlobal(const GlobalObject &GO);
++};
++
++} // namespace
++
++StringRef
++AssignSections::getDefaultSectionNameForGlobal(const GlobalObject &GO) {
++  TargetLoweringObjectFile &TLOF = *TM->getObjFileLowering();
++
++  SectionKind GVKind = TLOF.getKindForGlobal(&GO, *TM);
++
++  // Section selection might depend on module flags like SmallDataLimit.
++  TLOF.getModuleMetadata(*M);
++
++  auto Section = static_cast<const MCSectionELF *>(
++      TLOF.SectionForGlobal(&GO, GVKind, *TM));
++
++  if (Section)
++    return Section->getName();
++  else
++    return "";
++}
++
++bool AssignSections::run(Module &Mod, TargetMachine *TMIn) {
++  M = &Mod;
++  TM = TMIn;
++
++  if (!TM)
++    return false;
++
++  if (Mod.alias_empty() && Mod.global_empty() && Mod.empty())
++    return false;
++
++  // We currently only support ELF for LTO with linker scripts.
++  const Triple TT(Mod.getTargetTriple());
++  if (!TT.isOSBinFormatELF())
++    return false;
++
++  // Initialize the target so we can query sections.
++  const Target &T = TM->getTarget();
++  assert(T.hasMCAsmParser());
++  std::unique_ptr<MCRegisterInfo> MRI(T.createMCRegInfo(TT));
++  if (!MRI)
++    return false;
++  llvm::MCTargetOptions MCOptions;
++  std::unique_ptr<MCAsmInfo> MAI(T.createMCAsmInfo(*MRI, TT, MCOptions));
++  if (!MAI)
++    return false;
++  std::unique_ptr<llvm::MCSubtargetInfo> STI(
++      T.createMCSubtargetInfo(TT, "", ""));
++  MCObjectFileInfo MOFI;
++  MCContext MCCtx(Triple(TT), *MAI, *MRI, *STI);
++  MCCtx.setObjectFileInfo(&MOFI);
++  MOFI.initMCObjectFileInfo(MCCtx, /*PIC*/ false);
++  TM->getObjFileLowering()->Initialize(MCCtx, *TM);
++
++  // Iterate over objects, and assign sections
++  for (GlobalObject &GO : M->global_objects()) {
++    if (GO.isDeclarationForLinker() || GO.hasSection() ||
++        GO.hasCommonLinkage() || GO.getName().starts_with("llvm."))
++      continue;
++
++    GO.setSection(getDefaultSectionNameForGlobal(GO));
++  }
++
++  return true;
++}
++
++PreservedAnalyses AssignSectionsToGlobalsPass::run(Module &M,
++                                                   ModuleAnalysisManager &MAM) {
++  AssignSections O;
++
++  if (O.run(M, TM))
++    return PreservedAnalyses::none();
++
++  return PreservedAnalyses::all();
++}
+diff --git a/llvm/lib/CodeGen/CMakeLists.txt b/llvm/lib/CodeGen/CMakeLists.txt
+index c572128b023c..69a692a9508b 100644
+--- a/llvm/lib/CodeGen/CMakeLists.txt
++++ b/llvm/lib/CodeGen/CMakeLists.txt
+@@ -27,6 +27,7 @@ add_llvm_component_library(LLVMCodeGen
+   AllocationOrder.cpp
+   Analysis.cpp
+   AssignmentTrackingAnalysis.cpp
++  AssignSectionsToGlobals.cpp
+   AtomicExpandPass.cpp
+   BasicTargetTransformInfo.cpp
+   BranchFolding.cpp
+diff --git a/llvm/lib/LTO/LTO.cpp b/llvm/lib/LTO/LTO.cpp
+index c8c5b0880819..abe7a9b06e08 100644
+--- a/llvm/lib/LTO/LTO.cpp
++++ b/llvm/lib/LTO/LTO.cpp
+@@ -627,13 +627,15 @@ void llvm::thinLTOInternalizeAndPromoteInIndex(
+ // Requires a destructor for std::vector<InputModule>.
+ InputFile::~InputFile() = default;
+ 
+-Expected<std::unique_ptr<InputFile>> InputFile::create(MemoryBufferRef Object) {
++Expected<std::unique_ptr<InputFile>>
++InputFile::create(MemoryBufferRef Object, bool IncludeLocalSymbols) {
+   std::unique_ptr<InputFile> File(new InputFile);
+ 
+   Expected<IRSymtabFile> FOrErr = readIRSymtab(Object);
+   if (!FOrErr)
+     return FOrErr.takeError();
+ 
++  File->IncludeLocalSymbols = IncludeLocalSymbols;
+   File->TargetTriple = FOrErr->TheReader.getTargetTriple();
+   File->SourceFileName = FOrErr->TheReader.getSourceFileName();
+   File->COFFLinkerOpts = FOrErr->TheReader.getCOFFLinkerOpts();
+@@ -645,11 +647,17 @@ Expected<std::unique_ptr<InputFile>> InputFile::create(MemoryBufferRef Object) {
+   for (unsigned I = 0; I != FOrErr->Mods.size(); ++I) {
+     size_t Begin = File->Symbols.size();
+     for (const irsymtab::Reader::SymbolRef &Sym :
+-         FOrErr->TheReader.module_symbols(I))
++         FOrErr->TheReader.module_symbols(I)) {
+       // Skip symbols that are irrelevant to LTO. Note that this condition needs
+       // to match the one in Skip() in LTO::addRegularLTO().
+-      if (Sym.isGlobal() && !Sym.isFormatSpecific())
+-        File->Symbols.push_back(Sym);
++      if (IncludeLocalSymbols) {
++        if (!Sym.isFormatSpecific() || Sym.isPrivate())
++          File->Symbols.push_back(Sym);
++      } else {
++        if (Sym.isGlobal() && !Sym.isFormatSpecific())
++          File->Symbols.push_back(Sym);
++      }
++    }
+     File->ModuleSymIndices.push_back({Begin, File->Symbols.size()});
+   }
+ 
+@@ -731,6 +739,9 @@ void LTO::addModuleToGlobalRes(ArrayRef<InputFile::Symbol> Syms,
+     assert(ResI != ResE);
+     SymbolResolution Res = *ResI++;
+ 
++    if (!Sym.isGlobal())
++      continue;
++
+     StringRef SymbolName = Sym.getName();
+     // Keep copies of symbols if the client of LTO says so.
+     if (GlobalResolutionSymbolSaver && !GlobalResolutions->contains(SymbolName))
+@@ -1032,9 +1043,15 @@ LTO::addRegularLTO(InputFile &Input, ArrayRef<SymbolResolution> InputRes,
+   auto Skip = [&]() {
+     while (MsymI != MsymE) {
+       auto Flags = SymTab.getSymbolFlags(*MsymI);
+-      if ((Flags & object::BasicSymbolRef::SF_Global) &&
+-          !(Flags & object::BasicSymbolRef::SF_FormatSpecific))
+-        return;
++      if (Input.IncludeLocalSymbols) {
++        if (!(Flags & object::BasicSymbolRef::SF_FormatSpecific) ||
++            (Flags & object::BasicSymbolRef::SF_Private))
++          return;
++      } else {
++        if ((Flags & object::BasicSymbolRef::SF_Global) &&
++            !(Flags & object::BasicSymbolRef::SF_FormatSpecific))
++          return;
++      }
+       ++MsymI;
+     }
+   };
+@@ -1088,6 +1105,31 @@ LTO::addRegularLTO(InputFile &Input, ArrayRef<SymbolResolution> InputRes,
+           GV->setDLLStorageClass(GlobalValue::DLLStorageClassTypes::
+                                  DefaultStorageClass);
+       }
++
++      // Set the output section based on the linker script.
++      if (!R.OutputSectionName.empty()) {
++        if (auto *GVar = dyn_cast<GlobalVariable>(GV)) {
++          // First, remove the old attribute if present
++          if (GVar->hasAttribute("linker_output_section")) {
++            AttrBuilder Attrs(GVar->getParent()->getContext(),
++                              GVar->getAttributes());
++            Attrs.removeAttribute("linker_output_section");
++            GVar->setAttributes(AttributeSet::get(GVar->getContext(), Attrs));
++          }
++          GVar->addAttribute("linker_output_section", R.OutputSectionName);
++          if (GVar->hasSection())
++            GVar->setSection(
++                (GVar->getSection() + "^^" + M.getModuleIdentifier()).str());
++        } else if (auto *F = dyn_cast<Function>(GV)) {
++          // First, remove the old attribute if present
++          if (F->hasFnAttribute("linker_output_section"))
++            F->removeFnAttr("linker_output_section");
++          F->addFnAttr("linker_output_section", R.OutputSectionName);
++          if (F->hasSection())
++            F->setSection(
++                (F->getSection() + "^^" + M.getModuleIdentifier()).str());
++        }
++      }
+     } else if (auto *AS =
+                    dyn_cast_if_present<ModuleSymbolTable::AsmSymbol *>(Msym)) {
+       // Collect non-prevailing symbols.
+@@ -1128,7 +1170,11 @@ LTO::addRegularLTO(InputFile &Input, ArrayRef<SymbolResolution> InputRes,
+             if (!NonPrevailingAsmSymbols.count(Alias))
+               NonPrevailingAsmSymbols.erase(Name);
+           });
+-      NewIA += " " + llvm::join(NonPrevailingAsmSymbols, ", ");
++      // Empty names can be produced by asm symbol scanning for empty inline asm
++      // statements. They are not valid operands for .lto_discard.
++      NonPrevailingAsmSymbols.erase(StringRef());
++      if (!NonPrevailingAsmSymbols.empty())
++        NewIA += " " + llvm::join(NonPrevailingAsmSymbols, ", ");
+     }
+     NewIA += "\n";
+     M.prependModuleInlineAsm(NewIA);
+diff --git a/llvm/lib/Object/IRSymtab.cpp b/llvm/lib/Object/IRSymtab.cpp
+index 0f404be9bd4a..24698c3be6a6 100644
+--- a/llvm/lib/Object/IRSymtab.cpp
++++ b/llvm/lib/Object/IRSymtab.cpp
+@@ -246,6 +246,8 @@ Error Builder::addSymbol(const ModuleSymbolTable &Msymtab,
+     Sym.Flags |= 1 << storage::Symbol::FB_format_specific;
+   if (Flags & object::BasicSymbolRef::SF_Executable)
+     Sym.Flags |= 1 << storage::Symbol::FB_executable;
++  if (Flags & object::BasicSymbolRef::SF_Private)
++    Sym.Flags |= 1 << storage::Symbol::FB_private;
+ 
+   Sym.ComdatIndex = -1;
+   auto *GV = dyn_cast_if_present<GlobalValue *>(Msym);
+diff --git a/llvm/lib/Object/ModuleSymbolTable.cpp b/llvm/lib/Object/ModuleSymbolTable.cpp
+index 44f717ec1232..a44445e7e5ad 100644
+--- a/llvm/lib/Object/ModuleSymbolTable.cpp
++++ b/llvm/lib/Object/ModuleSymbolTable.cpp
+@@ -234,7 +234,7 @@ uint32_t ModuleSymbolTable::getSymbolFlags(Symbol S) const {
+   if (isa<GlobalAlias>(GV))
+     Res |= BasicSymbolRef::SF_Indirect;
+   if (GV->hasPrivateLinkage())
+-    Res |= BasicSymbolRef::SF_FormatSpecific;
++    Res |= BasicSymbolRef::SF_FormatSpecific | BasicSymbolRef::SF_Private;
+   if (!GV->hasLocalLinkage())
+     Res |= BasicSymbolRef::SF_Global;
+   if (GV->hasCommonLinkage())
+-- 
+2.34.1
+
