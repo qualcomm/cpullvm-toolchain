@@ -25,7 +25,7 @@ def main():
         "--method",
         choices=["am", "apply"],
         default="apply",
-        help="Git command to use. git am will add each patch as a commit, whereas git apply will leave patched changes staged.",
+        help="Git command to use. git am will add each patch as a commit, whereas git apply will leave patched changes staged and skip patches that are already applied.",
     )
     parser.add_argument(
         "--reset",
@@ -114,7 +114,9 @@ def main():
                 if args.three_way:
                     apply_check_args.append("--3way")
                 apply_check_args.append(str(current_patch))
-                p_check = subprocess.run(apply_check_args)
+                p_check = subprocess.run(
+                    apply_check_args, capture_output=True, text=True
+                )
 
                 if p_check.returncode == 0:
                     # Patch will apply.
@@ -129,7 +131,23 @@ def main():
                     p = subprocess.run(apply_args, check=True)
                     applied_patches.append(current_patch)
                 else:
-                    # Patch won't apply.
+                    # Patch does not apply cleanly. Check if it is already applied
+                    # by attempting a reverse check.
+                    reverse_check_args = git_cmd + [
+                        "apply",
+                        "--ignore-whitespace",
+                        "--reverse",
+                        "--check",
+                        str(current_patch),
+                    ]
+                    p_rev = subprocess.run(
+                        reverse_check_args, capture_output=True, text=True
+                    )
+                    if p_rev.returncode == 0:
+                        print(f"Skipping {current_patch.name} (already applied).")
+                        continue
+
+                    # Patch is not already applied and cannot be applied cleanly.
                     print(f"Unable to apply {current_patch.name}")
                     if args.restore_on_fail:
                         # Remove any patches that have already been applied.
