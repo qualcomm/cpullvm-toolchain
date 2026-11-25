@@ -37,7 +37,7 @@ jobs:
           - build_script: build.sh
             test_script: test.sh
             target_os: Linux-x86_64
-            runner: cpullvm-ubuntu24-x86_64
+            runner: self-hosted
 
     steps:
       - name: Checkout source
