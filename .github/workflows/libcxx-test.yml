@@ -20,8 +20,6 @@ on:
 permissions:
   contents: read
 
-# DNM: run libc++ tests for new variant
-
 jobs:
   build-and-test:
     # Don't run on forks
