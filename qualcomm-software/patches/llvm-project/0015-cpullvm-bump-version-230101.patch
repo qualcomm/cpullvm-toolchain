@@ -1,0 +1,79 @@
+From 38b3e7f99e8d4c916991362960bb2b89a6eeaf4f Mon Sep 17 00:00:00 2001
+From: akaver <akaver@qti.qualcomm.com>
+Date: Mon, 23 Nov 2026 22:03:34 -0800
+Subject: [PATCH] [cpullvm] Bump LLVM version to 23.1.1
+
+Signed-off-by: akaver <akaver@qti.qualcomm.com>
+---
+ cmake/Modules/LLVMVersion.cmake          | 2 +-
+ libcxx/include/__config                  | 2 +-
+ llvm/utils/gn/secondary/llvm/version.gni | 2 +-
+ llvm/utils/lit/lit/__init__.py           | 2 +-
+ llvm/utils/mlgo-utils/mlgo/__init__.py   | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/cmake/Modules/LLVMVersion.cmake b/cmake/Modules/LLVMVersion.cmake
+index 42daf82be283..c323cfb28e73 100644
+--- a/cmake/Modules/LLVMVersion.cmake
++++ b/cmake/Modules/LLVMVersion.cmake
+@@ -7,7 +7,7 @@ if(NOT DEFINED LLVM_VERSION_MINOR)
+   set(LLVM_VERSION_MINOR 1)
+ endif()
+ if(NOT DEFINED LLVM_VERSION_PATCH)
+-  set(LLVM_VERSION_PATCH 0)
++  set(LLVM_VERSION_PATCH 1)
+ endif()
+ if(NOT DEFINED LLVM_VERSION_SUFFIX)
+   set(LLVM_VERSION_SUFFIX)
+diff --git a/libcxx/include/__config b/libcxx/include/__config
+index d6caacef6691..30accb9cca55 100644
+--- a/libcxx/include/__config
++++ b/libcxx/include/__config
+@@ -36,7 +36,7 @@
+ // _LIBCPP_VERSION represents the version of libc++, which matches the version of LLVM.
+ // Given a LLVM release LLVM XX.YY.ZZ (e.g. LLVM 17.0.1 == 17.00.01), _LIBCPP_VERSION is
+ // defined to XXYYZZ.
+-#  define _LIBCPP_VERSION 230100
++#  define _LIBCPP_VERSION 230101
+ 
+ #  if defined(_LIBCPP_ABI_MICROSOFT) && !defined(_LIBCPP_NO_VCRUNTIME)
+ #    define _LIBCPP_ABI_VCRUNTIME
+diff --git a/llvm/utils/gn/secondary/llvm/version.gni b/llvm/utils/gn/secondary/llvm/version.gni
+index 8420f988572e..952c942c084c 100644
+--- a/llvm/utils/gn/secondary/llvm/version.gni
++++ b/llvm/utils/gn/secondary/llvm/version.gni
+@@ -1,4 +1,4 @@
+ llvm_version_major = 23
+ llvm_version_minor = 1
+-llvm_version_patch = 0
++llvm_version_patch = 1
+ llvm_version = "$llvm_version_major.$llvm_version_minor.$llvm_version_patch"
+diff --git a/llvm/utils/lit/lit/__init__.py b/llvm/utils/lit/lit/__init__.py
+index d6c6d64cbe23..9124541d66ef 100644
+--- a/llvm/utils/lit/lit/__init__.py
++++ b/llvm/utils/lit/lit/__init__.py
+@@ -2,7 +2,7 @@
+ 
+ __author__ = "Daniel Dunbar"
+ __email__ = "daniel@minormatter.com"
+-__versioninfo__ = (23, 1, 0)
++__versioninfo__ = (23, 1, 1)
+ __version__ = ".".join(str(v) for v in __versioninfo__) + "dev"
+ 
+ __all__ = []
+diff --git a/llvm/utils/mlgo-utils/mlgo/__init__.py b/llvm/utils/mlgo-utils/mlgo/__init__.py
+index f0e5c8b214ff..e330be49d02a 100644
+--- a/llvm/utils/mlgo-utils/mlgo/__init__.py
++++ b/llvm/utils/mlgo-utils/mlgo/__init__.py
+@@ -4,7 +4,7 @@
+ 
+ from datetime import timezone, datetime
+ 
+-__versioninfo__ = (23, 1, 0)
++__versioninfo__ = (23, 1, 1)
+ __version__ = (
+     ".".join(str(v) for v in __versioninfo__)
+     + "dev"
+-- 
+2.34.1
+
