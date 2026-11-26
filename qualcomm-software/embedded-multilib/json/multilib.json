@@ -90,6 +90,12 @@
             "flags": "--target=armv7-unknown-none-eabi -mfpu=none -munaligned-access"
         },
         {
+            "variant": "armv7a_soft_nofp_aligned",
+            "json": "armv7a_soft_nofp_aligned.json",
+            "flags": "--target=armv7-unknown-none-eabi -mfpu=none -mno-unaligned-access",
+            "libraries_supported": "picolibc"
+        },
+        {
             "variant": "armv7a_hard_vfpv3",
             "json": "armv7a_hard_vfpv3.json",
             "flags": "--target=armv7-unknown-none-eabihf -mfpu=vfpv3 -munaligned-access",

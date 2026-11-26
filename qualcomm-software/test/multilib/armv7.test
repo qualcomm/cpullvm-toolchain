@@ -8,10 +8,17 @@
 # CHECK-ARMV7-EMPTY:
 
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=softfp -mfpu=none -mhwdiv=none | FileCheck %s --check-prefix=CHECK-ARMV7-NOFP
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=softfp -mfpu=none -mhwdiv=none -munaligned-access | FileCheck %s --check-prefix=CHECK-ARMV7-NOFP
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=softfp -marm -mfpu=none -mhwdiv=none | FileCheck %s --check-prefix=CHECK-ARMV7-NOFP
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=softfp -mthumb -mfpu=none -mhwdiv=none | FileCheck %s --check-prefix=CHECK-ARMV7-NOFP
 # CHECK-ARMV7-NOFP: arm-none-eabi/armv7a_soft_nofp{{$}}
 # CHECK-ARMV7-NOFP-EMPTY:
+
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=softfp -mfpu=none -mhwdiv=none -mno-unaligned-access | FileCheck %s --check-prefix=CHECK-ARMV7-NOFP-ALIGNED
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=softfp -marm -mfpu=none -mhwdiv=none -mno-unaligned-access | FileCheck %s --check-prefix=CHECK-ARMV7-NOFP-ALIGNED
+# RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=softfp -mthumb -mfpu=none -mhwdiv=none -mno-unaligned-access | FileCheck %s --check-prefix=CHECK-ARMV7-NOFP-ALIGNED
+# CHECK-ARMV7-NOFP-ALIGNED: arm-none-eabi/armv7a_soft_nofp_aligned{{$}}
+# CHECK-ARMV7-NOFP-ALIGNED-EMPTY:
 
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=hard -mfpu=vfpv3 | FileCheck %s --check-prefix=CHECK-ARMV7-HARD-VFPV3
 # RUN: %clang_with_libc_cfg -print-multi-directory --target=arm-none-eabi -march=armv7a -mfloat-abi=hard -marm -mfpu=vfpv3 | FileCheck %s --check-prefix=CHECK-ARMV7-HARD-VFPV3
