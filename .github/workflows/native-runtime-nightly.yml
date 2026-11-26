@@ -59,7 +59,7 @@ jobs:
 
           - build_script: build_musl-embedded_overlay.sh
             test_script: ''
-            install_script: ''
+            install_script: install_dependencies.sh
             target_os: Linux-AArch64
             runner: ubuntu-24.04-arm
 
