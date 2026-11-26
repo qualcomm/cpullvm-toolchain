@@ -12,7 +12,10 @@
 # The script creates a build of the toolchain in the 'build' directory, inside
 # the repository tree.
 
+#Requires -Version 7.4
+
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
 
 . "$PSScriptRoot\init_win_env.ps1"
 Set-VS-Env

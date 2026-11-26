@@ -809,7 +809,7 @@ if(ENABLE_WINDOWS_LIBRARIES)
         DEPENDS ${lib_tool_dependencies}
         CONFIGURE_COMMAND ""
         BUILD_COMMAND
-            powershell -ExecutionPolicy Bypass -File "<SOURCE_DIR>/build_windows_runtimes.ps1"
+            pwsh -ExecutionPolicy Bypass -File "<SOURCE_DIR>/build_windows_runtimes.ps1"
                 -ToolsPath ${CMAKE_CURRENT_BINARY_DIR}/llvm/bin
                 -BaseBuildDir <BINARY_DIR>
                 -BaseInstallDir <INSTALL_DIR>
@@ -819,7 +819,6 @@ if(ENABLE_WINDOWS_LIBRARIES)
         USES_TERMINAL_BUILD TRUE
         USES_TERMINAL_INSTALL TRUE
         STEP_TARGETS build install
-        LOG_BUILD TRUE
         BUILD_ALWAYS TRUE
     )
 

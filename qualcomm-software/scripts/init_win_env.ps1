@@ -41,9 +41,19 @@ function Set-VS-Env {
     exit 1
   }
 
-  cmd /c "call `"$VCVARSALL`" $vcvarsTarget && set" | ForEach-Object {
+  $vcvarsArgs = $vcvarsTarget
+  if ($env:CPULLVM_MSVC_TOOLSET) {
+    $toolsetDir = Join-Path $VS_INSTALL "VC\Tools\MSVC\$env:CPULLVM_MSVC_TOOLSET"
+    if (-not (Test-Path $toolsetDir)) {
+      throw "Requested MSVC toolset $env:CPULLVM_MSVC_TOOLSET is not installed at $toolsetDir."
+    }
+    $vcvarsArgs += " -vcvars_ver=$env:CPULLVM_MSVC_TOOLSET"
+  }
+
+  cmd /c "call `"$VCVARSALL`" $vcvarsArgs && set" | ForEach-Object {
     if ($_ -match '^(.*?)=(.*)$') {
       [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process')
     }
   }
+  Write-Host "Selected MSVC toolset: $env:VCToolsVersion"
 }

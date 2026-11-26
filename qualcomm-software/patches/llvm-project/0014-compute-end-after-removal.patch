@@ -1,0 +1,110 @@
+From 27825e751662497914dac447753f6d8daca974ff Mon Sep 17 00:00:00 2001
+From: Daniel Paoliello <danpao@microsoft.com>
+Date: Fri, 20 Nov 2026 08:38:02 -0800
+Subject: [PATCH] [ADT] Compute end() after removal in llvm::erase and
+ llvm::erase_if (#243189)
+
+Per the C++ Standard, `std::remove` may leave unspecified values in the
+removed tail. Visual Studio 2026's vectorized implementation on ARM64
+clears a removed singleton pointer, causing `TinyPtrVector` to become
+empty and changing its `end()`.
+
+Since the call to the container's `erase()` used both `std::remove` and
+`end()` for different arguments, there was no guarantee which order they
+will be evaluated. The fix is to split the call to `std::remove` into
+its own statement, guaranteeing that it will be evaluated before the
+call to `end()`.
+
+Fixes <https://github.com/rust-lang/rust/issues/165953>
+---
+ llvm/include/llvm/ADT/STLExtras.h    | 15 +++++++----
+ llvm/unittests/ADT/STLExtrasTest.cpp | 38 ++++++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+), 5 deletions(-)
+
+diff --git a/llvm/include/llvm/ADT/STLExtras.h b/llvm/include/llvm/ADT/STLExtras.h
+index 2d9dc40f7d66..888d8aea7f90 100644
+--- a/llvm/include/llvm/ADT/STLExtras.h
++++ b/llvm/include/llvm/ADT/STLExtras.h
+@@ -2200,21 +2200,26 @@ template <typename T> constexpr auto not_equal_to(T &&Arg) {
+ /// Provide a container algorithm similar to C++ Library Fundamentals v2's
+ /// `erase_if` which is equivalent to:
+ ///
+-///   C.erase(remove_if(C, pred), C.end());
++///   auto I = remove_if(C, pred);
++///   C.erase(I, C.end());
+ ///
+ /// This version works for any container with an erase method call accepting
+-/// two iterators.
++/// two iterators. Compute end() after removal, since removing elements can
++/// change it for containers such as TinyPtrVector.
+ template <typename Container, typename UnaryPredicate>
+ void erase_if(Container &C, UnaryPredicate P) {
+-  C.erase(remove_if(C, P), C.end());
++  auto I = remove_if(C, P);
++  C.erase(I, C.end());
+ }
+ 
+ /// Wrapper function to remove a value from a container:
+ ///
+-/// C.erase(remove(C.begin(), C.end(), V), C.end());
++/// auto I = std::remove(C.begin(), C.end(), V);
++/// C.erase(I, C.end());
+ template <typename Container, typename ValueType>
+ void erase(Container &C, ValueType V) {
+-  C.erase(std::remove(C.begin(), C.end(), V), C.end());
++  auto I = std::remove(C.begin(), C.end(), V);
++  C.erase(I, C.end());
+ }
+ 
+ /// Wrapper function to append range `R` to container `C`.
+diff --git a/llvm/unittests/ADT/STLExtrasTest.cpp b/llvm/unittests/ADT/STLExtrasTest.cpp
+index 0893e4c92424..58926db4f1f8 100644
+--- a/llvm/unittests/ADT/STLExtrasTest.cpp
++++ b/llvm/unittests/ADT/STLExtrasTest.cpp
+@@ -796,6 +796,44 @@ TEST(STLExtrasTest, EraseIf) {
+   EXPECT_EQ(7, V[3]);
+ }
+ 
++struct ContainerWithChangingEnd {
++  int Value = 0;
++  int *End = &Value + 1;
++
++  int *begin() { return &Value; }
++  int *end() { return End; }
++  void erase(int *First, int *Last) {
++    EXPECT_EQ(First, begin());
++    EXPECT_EQ(Last, End);
++  }
++};
++
++// Model removal changing end() without relying on the standard library's
++// treatment of removed elements.
++struct RemoveAndUpdateEnd {
++  ContainerWithChangingEnd &C;
++
++  bool operator()(int) const {
++    // Change the end() of the container.
++    C.End = C.begin();
++    return true;
++  }
++  friend bool operator==(int V, const RemoveAndUpdateEnd &P) {
++    // Forward to the operator above.
++    return P(V);
++  }
++};
++
++TEST(STLExtrasTest, EraseWithChangingEnd) {
++  ContainerWithChangingEnd C;
++  llvm::erase(C, RemoveAndUpdateEnd{C});
++}
++
++TEST(STLExtrasTest, EraseIfWithChangingEnd) {
++  ContainerWithChangingEnd C;
++  llvm::erase_if(C, RemoveAndUpdateEnd{C});
++}
++
+ TEST(STLExtrasTest, AppendRange) {
+   std::vector<int> V = {1, 2};
+   auto AppendVals1 = {3};
+-- 
+2.34.1
