@@ -215,6 +215,7 @@ set(LLVM_DISTRIBUTION_COMPONENTS
     llvm-nm
     llvm-objcopy
     llvm-objdump
+    opt
     llvm-opt-report
     llvm-pdbutil
     llvm-profdata
