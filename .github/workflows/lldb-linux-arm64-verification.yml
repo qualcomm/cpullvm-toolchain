@@ -1,0 +1,153 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: '[DNM] 23.x LLDB Linux AArch64 Verification'
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/lldb-linux-arm64-verification.yml'
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  verify-lldb:
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    name: Verify LLDB libxml2/libedit on Linux AArch64
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout artifact download action
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          sparse-checkout: .github/actions/fetch-linux-toolchain
+
+      - name: Install LLDB runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libedit2 \
+            libxml2 \
+            python3-pexpect
+
+      - name: Fetch Linux AArch64 toolchain
+        uses: ./.github/actions/fetch-linux-toolchain
+        with:
+          github-token: ${{ github.token }}
+          run-id: '44456183345'
+          package-name: cpullvm-packages-build_copy_runtimes.sh-Linux-AArch64
+          install-dir: ${{ runner.temp }}/cpullvm
+
+      - name: Verify LLDB dynamic dependencies
+        env:
+          TOOLCHAIN_DIR: ${{ runner.temp }}/cpullvm
+        run: |
+          set -euxo pipefail
+
+          echo "=== LLDB dependencies ==="
+          "$TOOLCHAIN_DIR/bin/llvm-readelf" \
+            --dynamic "$TOOLCHAIN_DIR/bin/lldb"
+
+          echo "=== Verify libedit dependency ==="
+          "$TOOLCHAIN_DIR/bin/llvm-readelf" \
+            --dynamic "$TOOLCHAIN_DIR/bin/lldb" \
+            | grep 'Shared library: \[libedit.so.2\]'
+
+          echo "=== Verify libxml2 dependency ==="
+          "$TOOLCHAIN_DIR/bin/llvm-readelf" \
+            --dynamic "$TOOLCHAIN_DIR/bin/lldb" \
+            | grep 'Shared library: \[libxml2.so.2\]'
+
+          echo "=== Verify liblldb dependency ==="
+          "$TOOLCHAIN_DIR/bin/llvm-readelf" \
+            --dynamic "$TOOLCHAIN_DIR/lib/liblldb.so"* \
+            | grep 'Shared library: \[libedit.so.2\]'
+
+          ldd "$TOOLCHAIN_DIR/bin/lldb" | grep libedit
+          ldd "$TOOLCHAIN_DIR/bin/lldb" | grep libxml2
+
+      - name: Verify LLDB build configuration
+        env:
+          TOOLCHAIN_DIR: ${{ runner.temp }}/cpullvm
+        run: |
+          set -euxo pipefail
+
+          "$TOOLCHAIN_DIR/bin/lldb" -b \
+            -o 'script s=lldb.SBStream(); lldb.SBDebugger.GetBuildConfiguration().GetAsJSON(s); print(s.GetData())' \
+            -o quit > build-config.json
+
+          cat build-config.json
+
+          grep -E '"editline":\{[^}]*"value":true\}' build-config.json
+
+      - name: Verify LLDB launches
+        env:
+          TOOLCHAIN_DIR: ${{ runner.temp }}/cpullvm
+        run: |
+          "$TOOLCHAIN_DIR/bin/lldb" --version
+
+      - name: Verify LLDB editline and Python functionality
+        env:
+          TOOLCHAIN_DIR: ${{ runner.temp }}/cpullvm
+        run: |
+          python3 <<'PY'
+          import os
+          import pexpect
+
+          lldb = os.path.join(
+              os.environ["TOOLCHAIN_DIR"],
+              "bin",
+              "lldb"
+          )
+
+          child = pexpect.spawn(
+              lldb,
+              encoding="utf-8",
+              timeout=30
+          )
+
+          child.expect(r"\(lldb\) ")
+
+          # Command completion
+          child.send("vers\t")
+          child.expect("version")
+          child.sendline("")
+          child.expect("lldb version")
+          child.expect(r"\(lldb\) ")
+
+          # List completion
+          child.send("fi\t")
+          child.expect(["file", "finish"])
+          child.send("\003")
+          child.expect(r"\(lldb\) ")
+
+          # Python support
+          child.sendline('script print("python-ok")')
+          child.expect("python-ok")
+          child.expect(r"\(lldb\) ")
+
+          child.sendline("quit")
+          child.expect(pexpect.EOF)
+          PY
+
+      - name: Verify LLDB expression evaluation
+        env:
+          TOOLCHAIN_DIR: ${{ runner.temp }}/cpullvm
+        run: |
+          "$TOOLCHAIN_DIR/bin/lldb" -b \
+            -o 'expression 1 + 1' \
+            -o quit \
+            | tee lldb-expression.log
+
+          grep '= 2' lldb-expression.log
+
+      - name: Verify LLDB can load without errors
+        env:
+          TOOLCHAIN_DIR: ${{ runner.temp }}/cpullvm
+        run: |
+          "$TOOLCHAIN_DIR/bin/lldb" -b \
+            -o version \
+            -o quit
