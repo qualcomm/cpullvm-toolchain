@@ -1,6 +1,8 @@
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#Requires -Version 7.4
+
 param(
     [Parameter(Mandatory,
     HelpMessage="Path to directory to find Clang/LLVM tools")]
@@ -15,6 +17,9 @@ param(
     HelpMessage="Directory of the LLVM sources")]
     [string]$LLVMSrcDir
 )
+
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
 
 Write-Host "Options: -ToolsPath $ToolsPath -BaseBuildDir $BaseBuildDir -BaseInstallDir $BaseInstallDir -LLVMSrcDir $LLVMSrcDir"
 
