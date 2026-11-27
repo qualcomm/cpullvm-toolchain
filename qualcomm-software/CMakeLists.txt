@@ -243,6 +243,7 @@ set(LLVM_DISTRIBUTION_COMPONENTS
 set(LLVM_TOOLCHAIN_DISTRIBUTION_COMPONENTS
     llvm-toolchain-docs
     llvm-toolchain-libs
+    llvm-toolchain-samples
     llvm-toolchain-third-party-licenses
     CACHE STRING "Components defined by this CMakeLists that should be
 installed by the install-llvm-toolchain target"
@@ -895,6 +896,14 @@ install(
     COMPONENT llvm-toolchain-docs
 )
 
+# Install samples
+install(
+    DIRECTORY samples
+    DESTINATION .
+    COMPONENT llvm-toolchain-samples
+    FILES_MATCHING REGEX "Makefile|.*\\.(c|conf|cpp|h|ld|md|in)"
+)
+
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_libc_license_info.cmake)
 set(libc_names_to_process ${LLVM_TOOLCHAIN_C_LIBRARY})
 if(ENABLE_LINUX_LIBRARIES)
@@ -1037,12 +1046,33 @@ add_custom_target(
     package-llvm-toolchain
     DEPENDS ${package_filepath}
 )
+set(unpack_directory ${CMAKE_CURRENT_BINARY_DIR}/unpack/${PACKAGE_FILE_NAME})
+add_custom_target(
+    clear-unpack-directory
+    COMMAND "${CMAKE_COMMAND}" -E rm -rf unpack
+    COMMAND "${CMAKE_COMMAND}" -E make_directory unpack
+)
+add_custom_target(
+    unpack-llvm-toolchain
+    COMMAND "${CMAKE_COMMAND}" -E tar x ${package_filepath}
+    DEPENDS ${package_filepath}
+    USES_TERMINAL
+    WORKING_DIRECTORY unpack
+)
+add_dependencies(
+    unpack-llvm-toolchain
+    clear-unpack-directory
+)
 
 add_custom_target(check-llvm-toolchain)
 add_dependencies(check-llvm-toolchain check-${LLVM_TOOLCHAIN_C_LIBRARY})
 add_dependencies(check-llvm-toolchain check-compiler-rt)
 add_subdirectory(test)
 add_dependencies(check-llvm-toolchain check-llvm-toolchain-lit)
+# Overlay packages do not contain the tools, so cannot be tested on their own.
+if(NOT LLVM_TOOLCHAIN_LIBRARY_OVERLAY_INSTALL)
+    add_subdirectory(packagetest)
+endif()
 
 add_custom_target(check-all-llvm-toolchain)
 

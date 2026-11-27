@@ -136,6 +136,7 @@ to test these components separately. A non-exhaustive list of `check-` targets C
 * `check-clang`, `check-llvm`, and the other usual LLVM `check-` targets are all still valid
 * `check-eld` works as usual
 * `check-llvm-toolchain-lit` runs only the built-in [multilib tests](../test/multilib/)
+* `check-package-llvm-toolchain` runs the [package tests](../packagetest/) which test the final packaged toolchain
 * `check-<component>` targets will run any enabled tests for that component across all variants
 * `check-<component>-<variant>` targets will run the given component tests for the specified variant
 
