@@ -16,7 +16,6 @@ $ErrorActionPreference = 'Stop'
 
 . "$PSScriptRoot\init_win_env.ps1"
 Set-VS-Env
-. "$PSScriptRoot\build_static_libxml2.ps1"
 
 $repoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
 $buildDir = (Join-Path $repoRoot build)
@@ -25,8 +24,6 @@ $env:CC = 'clang-cl'
 $env:CXX = 'clang-cl'
 
 mkdir $buildDir
-Build-StaticLibXml2 -BuildDir $buildDir
-
 cd $buildDir
 
 # Omit Linux runtimes, QEMU testing on Windows builds.
@@ -34,7 +31,6 @@ $extraCmakeArgs = @()
 if ($env:EXTRA_CMAKE_ARGS) {
     $extraCmakeArgs = $env:EXTRA_CMAKE_ARGS -split '\s+'
 }
-$extraCmakeArgs += Get-StaticLibXml2CMakeArgs -BuildDir $buildDir
 
 cmake ..\qualcomm-software `
   -GNinja `

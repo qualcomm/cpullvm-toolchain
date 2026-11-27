@@ -9,5 +9,5 @@ additional or alternate licenses:
  - libunwind: third-party-licenses/LIBUNWIND-LICENSE.txt
  - eld: third-party-licenses/eld-LICENSE.txt
  - Arm Toolchain for Embedded: third-party-licenses/ATfE-LICENSE.txt
-@THIRD_PARTY_LICENSE_SUMMARY@
+@LIBC_LICENSE_FILES@
 Project licenses may refer to its source files. Sources are identified in VERSION.txt.
