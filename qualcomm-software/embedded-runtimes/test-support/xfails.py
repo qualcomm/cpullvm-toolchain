@@ -122,6 +122,10 @@ def main():
             variants=[
                 "aarch64a_tlsie",
                 "aarch64a_aligned_tlsie",
+                "aarch64a_aligned_nothreads",
+                "aarch64a_pacret_bkey_bti_aligned_nothreads",
+                "aarch64a_soft_nofp_aligned_nothreads",
+                "aarch64a_soft_nofp_pacret_bti_aligned_nothreads",
                 "riscv64gc_lp64d_nopic",
                 "riscv64gc_lp64_nopic",
                 "riscv64gc_zba_zbb_lp64d_nopic",
@@ -231,8 +235,12 @@ def main():
             variants=[
                 "aarch64a_tlsie",
                 "aarch64a_aligned_tlsie",
+                "aarch64a_aligned_nothreads",
                 "aarch64a_soft_nofp_tlsie",
                 "aarch64a_soft_nofp_aligned_tlsie",
+                "aarch64a_soft_nofp_aligned_nothreads",
+                "aarch64a_soft_nofp_pacret_bti_aligned_nothreads",
+                "aarch64a_pacret_bkey_bti_aligned_nothreads",
             ],
             description="picolibc's `*-raw-*` tests rely on serial port usage "
                         "to exit correctly which our existing wrappers are not "
@@ -270,6 +278,10 @@ def main():
             variants=[
                 "aarch64a_tlsie",
                 "aarch64a_aligned_tlsie",
+                "aarch64a_aligned_nothreads",
+                "aarch64a_pacret_bkey_bti_aligned_nothreads",
+                "aarch64a_soft_nofp_aligned_nothreads",
+                "aarch64a_soft_nofp_pacret_bti_aligned_nothreads",
                 "riscv32imac_ilp32",
                 "riscv32imac_ilp32_nopic",
                 "riscv32imac_zba_zbb_ilp32",
@@ -415,6 +427,8 @@ def main():
                 "riscv32ima_xqci_ilp32_nopic",
                 "riscv32ima_xqci_ilp32_exn_rtti_nopic",
                 "riscv64imac_lp64_nopic",
+                "aarch64a_soft_nofp_aligned_nothreads",
+                "aarch64a_soft_nofp_pacret_bti_aligned_nothreads",
             ],
             description="cmath.pass.cpp fails on soft-float builds where std::sqrt(long double) "
                         "gives incorrect results. The 3-argument std::hypot precision assertion "
@@ -461,8 +475,12 @@ def main():
             variants=[
                 "aarch64a_tlsie",
                 "aarch64a_aligned_tlsie",
+                "aarch64a_aligned_nothreads",
+                "aarch64a_pacret_bkey_bti_aligned_nothreads",
                 "aarch64a_soft_nofp_tlsie",
                 "aarch64a_soft_nofp_aligned_tlsie",
+                "aarch64a_soft_nofp_aligned_nothreads",
+                "aarch64a_soft_nofp_pacret_bti_aligned_nothreads",
             ],
             description="QEMU does not deliver crash signals. The emupac test uses "
                 "%expect_crash which requires the OS to deliver a signal back to the "
