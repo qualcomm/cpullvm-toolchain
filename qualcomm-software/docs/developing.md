@@ -143,3 +143,16 @@ Example (non-exhaustive) components that can be used in the commands above:
 * `compiler-rt`
 * `picolibc` (or the name of the C library selected if different)
 * `cxx`/`cxxabi`/`unwind`
+
+## GitHub Workflow Tools
+
+### Requesting Additional Pull Request Checks
+
+To request a build and test workflow for a pull request, add a comment containing exactly one of these commands:
+
+* `/run nightly` runs the nightly build and tests with assertions enabled.
+* `/run nightly-release` runs the nightly build and tests with assertions disabled.
+
+The workflow tests GitHub's merge result for the pull request. It supports pull requests from forks. If the pull request changes afterward, comment again to test the new merge result. The request comment is updated with a link to the workflow and its final result.
+
+Only users with write, maintain, or admin permission for the repository can request a workflow. Each comment must contain one command and no other text.

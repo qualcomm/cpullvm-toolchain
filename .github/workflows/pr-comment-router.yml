@@ -1,0 +1,188 @@
+name: PR Comment Router
+run-name: "PR workflow request #${{ github.event.issue.number }}"
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: >-
+      github.repository == 'qualcomm/cpullvm-toolchain' &&
+      github.event.issue.pull_request != null &&
+      startsWith(github.event.comment.body, '/run ')
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
+    outputs:
+      command: ${{ steps.request.outputs.command }}
+      ref: ${{ steps.request.outputs.ref }}
+      head_sha: ${{ steps.request.outputs.head_sha }}
+    steps:
+      - name: Validate workflow request
+        id: request
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        with:
+          script: |
+            const comment = process.env.COMMENT_BODY.trim();
+
+            const commands = new Map([
+              ['/run nightly', 'nightly'],
+              ['/run nightly-release', 'nightly-release'],
+            ]);
+            const command = commands.get(comment);
+            const reply = async (body) => github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+            if (!command) {
+              await reply('Unsupported workflow request. Use `/run nightly` or `/run nightly-release`.');
+              core.setFailed('Unsupported workflow request.');
+              return;
+            }
+
+            let authorized = false;
+            try {
+              const permission = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username: context.payload.comment.user.login,
+              });
+              authorized = ['write', 'maintain', 'admin'].includes(permission.data.permission);
+            } catch (error) {
+              core.info(`Unable to verify repository permission: ${error.message}`);
+            }
+            if (!authorized) {
+              await reply(`@${context.payload.comment.user.login} is not authorized to run pull request workflows.`);
+              core.setFailed('Comment author is not authorized to run pull request workflows.');
+              return;
+            }
+
+            let pullRequest;
+            let ref;
+            for (let attempt = 0; attempt < 5; ++attempt) {
+              pullRequest = (await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+              })).data;
+
+              if (pullRequest.mergeable === null) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                continue;
+              }
+              if (!pullRequest.mergeable) {
+                break;
+              }
+
+              try {
+                ref = (await github.rest.git.getRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `pulls/${context.issue.number}/merge`,
+                })).data.object.sha;
+                const mergeCommit = (await github.rest.repos.getCommit({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref,
+                })).data;
+                const parents = mergeCommit.parents.map(parent => parent.sha);
+                if (parents.includes(pullRequest.base.sha) && parents.includes(pullRequest.head.sha)) {
+                  break;
+                }
+              } catch (error) {
+                core.info(`GitHub has not finished creating the merge ref: ${error.message}`);
+              }
+              ref = undefined;
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+
+            if (!ref) {
+              await reply('GitHub has not created a current merge commit for this pull request. Resolve merge conflicts and try again.');
+              core.setFailed('GitHub did not provide a current merge commit.');
+              return;
+            }
+
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              body: [
+                `\`/run ${command}\` is running for merge commit \`${ref}\` (PR head \`${pullRequest.head.sha}\`).`,
+                `[View workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+              ].join('\n\n'),
+            });
+
+            core.setOutput('command', command);
+            core.setOutput('ref', ref);
+            core.setOutput('head_sha', pullRequest.head.sha);
+
+  nightly:
+    needs: validate
+    if: needs.validate.outputs.command == 'nightly'
+    uses: ./.github/workflows/nightly.yml
+    with:
+      ref: ${{ needs.validate.outputs.ref }}
+      enable_assertions: true
+    concurrency:
+      group: pr-workflow-${{ github.event.issue.number }}-nightly
+      cancel-in-progress: true
+
+  nightly-release:
+    needs: validate
+    if: needs.validate.outputs.command == 'nightly-release'
+    uses: ./.github/workflows/nightly-release.yml
+    with:
+      ref: ${{ needs.validate.outputs.ref }}
+    concurrency:
+      group: pr-workflow-${{ github.event.issue.number }}-nightly-release
+      cancel-in-progress: true
+
+  report:
+    needs: [validate, nightly, nightly-release]
+    if: >-
+      !cancelled() && needs.validate.result == 'success' &&
+      (needs.validate.outputs.command == 'nightly' || needs.validate.outputs.command == 'nightly-release')
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Update workflow request
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          COMMAND: ${{ needs.validate.outputs.command }}
+          REF: ${{ needs.validate.outputs.ref }}
+          HEAD_SHA: ${{ needs.validate.outputs.head_sha }}
+          NIGHTLY_RESULT: ${{ needs.nightly.result }}
+          NIGHTLY_RELEASE_RESULT: ${{ needs.nightly-release.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const result = process.env.COMMAND === 'nightly'
+              ? process.env.NIGHTLY_RESULT
+              : process.env.NIGHTLY_RELEASE_RESULT;
+            const status = result === 'success'
+              ? 'passed'
+              : result === 'cancelled'
+                ? 'was cancelled'
+                : 'failed';
+            const command = `/run ${process.env.COMMAND}`;
+            const body = [
+              `\`${command}\` ${status} for merge commit \`${process.env.REF}\` (PR head \`${process.env.HEAD_SHA}\`).`,
+              `[View workflow run](${process.env.RUN_URL})`,
+            ].join('\n\n');
+
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              body,
+            });
